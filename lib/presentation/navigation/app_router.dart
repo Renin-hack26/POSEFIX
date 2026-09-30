@@ -11,6 +11,11 @@ import '../home/home_screen.dart';
 import '../plan/plan_screen.dart';
 import '../settings/settings_screen.dart';
 import '../splash/splash_screen.dart';
+import '../veda/veda_chat_screen.dart';
+import '../workout/instruction_video_screen.dart';
+import '../workout/session_summary_screen.dart';
+import '../workout/vision_screen.dart';
+import '../workout/workout_details_screen.dart';
 import '../workout/workout_screen.dart';
 import 'app_shell.dart';
 
@@ -42,6 +47,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           args: state.extra is OtpArgs ? state.extra as OtpArgs : null,
         ),
       ),
+
+      // --- Reserved full-screen pages (PLANNING §10.2) ---
+      GoRoute(
+        path: '/workout-details',
+        builder: (context, state) => const WorkoutDetailsScreen(),
+      ),
+      GoRoute(
+        path: '/instruction-video',
+        builder: (context, state) => const InstructionVideoScreen(),
+      ),
+      GoRoute(path: '/vision', builder: (context, state) => const VisionScreen()),
+      GoRoute(
+        path: '/summary',
+        builder: (context, state) => const SessionSummaryScreen(),
+      ),
+      GoRoute(path: '/veda', builder: (context, state) => const VedaChatScreen()),
 
       // --- 4-tab shell ---
       StatefulShellRoute.indexedStack(

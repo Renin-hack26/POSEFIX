@@ -312,9 +312,9 @@ Profile (view/edit incl. weight/height) · Units (kg/lb) · Theme (light/dark/sy
 | Instruction videos (per exercise) | ⏳ awaiting |
 | Rive/Lottie posture avatar files | ⏳ awaiting |
 | Final HTML/CSS designs (via §9 workflow) | 🟡 Direction A sample in `sample/` — awaiting user's pick + change list |
-| Supabase project (URL + anon key) | ⏳ awaiting — user creates + provides (auth/storage/sync) |
-| GROQ API key (VEDA chat) | ⏳ awaiting — user provides (P6) |
-| Gmail App Password (OTP email) | ⏳ awaiting — user provides (P1) |
+| Supabase project (URL + anon key) | ✅ provided 2026-09-30 — URL + publishable key (app) + secret key (**server-only, never in app**) in `secrets/local.env` |
+| GROQ API key (VEDA chat) | ✅ provided 2026-09-30 (`secrets/local.env`) |
+| Gmail App Password (OTP email) | ✅ provided 2026-09-30 (`secrets/local.env`: address + App Password) |
 | Official doc templates (if provided later) | ⏳ optional |
 
 ### 10.2 Reserved Pages — slots inside the 4 tabs (user fills later)

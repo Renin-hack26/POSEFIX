@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<!-- FixPose launcher icon — legacy (API 24-25) full tile.
+     Mirrors the sample splash/sign-in logo: 160deg chartreuse tile +
+     Material Symbols Rounded accessibility_new (FILL 1, wght 450) in accent ink.
+     Render: chrome --headless --window-size=1024,1024
+             --default-background-color=00000000 --virtual-time-budget=6000 -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,450,1,0&display=block" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  .tile {
+    width: 1024px; height: 1024px;
+    border-radius: 266px;
+    background: linear-gradient(160deg, #d9ff57, #7cc414);
+    box-shadow: inset 0 8px 18px rgba(255, 255, 255, 0.28);
+    display: grid; place-items: center;
+    overflow: hidden;
+  }
+  .glyph {
+    font-family: 'Material Symbols Rounded';
+    font-weight: normal; font-style: normal;
+    line-height: 1; letter-spacing: normal; text-transform: none;
+    font-size: 512px;
+    color: #1c2a06;
+    font-variation-settings: 'FILL' 1, 'wght' 450, 'GRAD' 0, 'opsz' 24;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+  }
+</style>
+</head>
+<body>
+  <div class="tile"><span class="glyph">accessibility_new</span></div>
+</body>
+</html>

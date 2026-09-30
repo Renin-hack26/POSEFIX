@@ -22,13 +22,22 @@ Flutter · Riverpod · GoRouter · Drift · Supabase (Auth/Postgres/Storage) · 
 |---|---|
 | [docs/PLANNING.md](docs/PLANNING.md) | Full architecture & phase plan (source of truth) |
 | [docs/PROGRESS.md](docs/PROGRESS.md) | Phase-by-phase progress log |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Setup, Firebase, build |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Setup, Supabase/services, build |
 | [docs/DEFENSE_QA.md](docs/DEFENSE_QA.md) | Anticipated Q&A |
 
 ## Getting started
 ```bash
 flutter pub get
 flutter run
+```
+
+### Demo APK (Windows)
+```powershell
+# One-time env (JDK 17 + Android SDK installed — see docs/DEPLOYMENT.md)
+$env:JAVA_HOME = (Get-ChildItem 'C:\dev' -Directory -Filter 'jdk-17*').FullName
+$env:Path += ";C:\dev\flutter\bin;$env:JAVA_HOME\bin"
+flutter build apk --release
+# → build\app\outputs\flutter-apk\app-release.apk
 ```
 
 ---

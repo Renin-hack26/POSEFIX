@@ -3,8 +3,9 @@
 > Status: skeleton (filled during P1/P8). Structure from spec; swap to official template if provided (PLANNING.md §10.1).
 
 ## Requirements
-- Flutter SDK (stable 3.47.5 used in development)
-- Android SDK (minSdk 24 / Android 7+), JDK 17
+- Flutter SDK (stable 3.47.5 used in development, at `C:\dev\flutter`)
+- Android SDK: `C:\Android\Sdk` (cmdline-tools, platform-35, build-tools 35.0.0, platform-tools) — installed 2026-09-30, licenses accepted, `flutter config --android-sdk` set
+- JDK 17: `C:\dev\jdk-17*` (Temurin) — `JAVA_HOME` set at user level
 - A Supabase project (free tier)
 
 ## Supabase + services setup (P1)

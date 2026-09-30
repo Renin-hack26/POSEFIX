@@ -1,12 +1,59 @@
 ﻿import 'package:flutter/material.dart';
 
-/// PostureAvatar - P0 placeholder. Implementation: docs/PLANNING.md section 5.
+import '../../../core/theme/app_theme.dart';
+
+/// "Follow along" posture card pinned to the top-right of the vision screen
+/// (sample `.avatar-guide`): target-pose silhouette plus caption.
 class PostureAvatar extends StatelessWidget {
-  const PostureAvatar({super.key});
+  const PostureAvatar({super.key, this.caption = 'FOLLOW ALONG'});
+
+  /// Caption under the target pose.
+  final String caption;
 
   @override
   Widget build(BuildContext context) {
-    return const Placeholder();
+    return Container(
+      width: 84,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.darkPage.withAlpha(140),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withAlpha(46)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 96,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppColors.lightInk2, AppColors.lightInk],
+              ),
+            ),
+            child: const Icon(
+              Icons.accessibility_new,
+              size: 44,
+              color: AppColors.lightInk3,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+            child: Text(
+              caption,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: Colors.white.withAlpha(191),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
-
