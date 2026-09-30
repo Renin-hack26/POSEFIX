@@ -282,19 +282,21 @@ class _HomeBody extends StatelessWidget {
         Row(
           children: [
             // Progress report opens the reports flow — no route yet.
-            const Expanded(
+            Flexible(
+              flex: 1,
               child: SecondaryButton(
                 label: 'Progress report',
                 icon: Icons.description,
-                expand: false,
+                expand: true,
               ),
             ),
             const SizedBox(width: 10),
-            Expanded(
+            Flexible(
+              flex: 1,
               child: PrimaryButton(
                 label: 'Chat with VEDA',
                 icon: Icons.smart_toy,
-                expand: false,
+                expand: true,
                 onPressed: () => context.push('/veda'),
               ),
             ),

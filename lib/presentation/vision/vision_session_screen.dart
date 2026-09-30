@@ -21,8 +21,7 @@ import '../shared/primary_button.dart';
 import 'vision_hud.dart';
 
 /// Live workout vision screen: back-camera preview + [PoseAnalyzer] rep
-/// counting with spoken coaching. No skeleton overlay — per-frame landmarks
-/// are not exposed, so nothing is faked on top of the preview.
+/// counting with spoken coaching. Skeleton overlay shows ML Kit detections.
 class VisionSessionScreen extends ConsumerStatefulWidget {
   const VisionSessionScreen({super.key, required this.exerciseId});
 
@@ -67,6 +66,10 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   int _formScoreCount = 0;
   int _lastSavedRepCount = 0;
   bool _exitedEarly = false;
+
+  /// Latest raw pose from ML Kit for skeleton overlay (debug visualization).
+  Pose? _latestPose;
+  Size? _previewSize;
 
   @override
   void initState() {
@@ -252,6 +255,10 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       );
       if (result != null && mounted && !_disposed) {
         _handleResult(result);
+        // Update latest pose for skeleton overlay (throttled to ~10 fps for UI)
+        _latestPose = analyzer.latestPose;
+        _previewSize = Size(image.width.toDouble(), image.height.toDouble());
+        setState(() {}); // Trigger repaint for overlay
       }
     } catch (_) {
       // A bad frame must never break the session.
@@ -338,10 +345,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       formAccuracyPct: _formScoreCount > 0
           ? _totalFormScoreSum / _formScoreCount
           : 100,
-      durationSec: _sessionStartTime != null
-          ? DateTime.now().difference(_sessionStartTime!).inSeconds
-          : 0,
-      status: _paused ? SessionStatus.paused : SessionStatus.active,
+      status: SessionStatus.active,
     );
     _session = updatedSession;
     await repository.saveActive(updatedSession);
@@ -501,76 +505,105 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     if (!_ready || controller == null || !controller.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
-    return Padding(
-      padding: const EdgeInsets.all(14),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            CameraPreview(controller),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    final previewSize = controller.value.previewSize!;
+    final previewAspectRatio = previewSize.width / previewSize.height;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Fit camera preview to available space while maintaining aspect ratio
+        final double maxWidth = constraints.maxWidth - 28; // 14 padding each side
+        final double maxHeight = constraints.maxHeight - 28;
+        final double widgetAspectRatio = maxWidth / maxHeight;
+        final double displayWidth = widgetAspectRatio > previewAspectRatio
+            ? maxHeight * previewAspectRatio
+            : maxWidth;
+        final double displayHeight = displayWidth / previewAspectRatio;
+
+        return Center(
+          child: SizedBox(
+            width: displayWidth,
+            height: displayHeight,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      RepCounter(reps: _reps),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                  CameraPreview(controller),
+                  // Skeleton overlay (debug visualization)
+                  if (_latestPose != null && _previewSize != null)
+                    CustomPaint(
+                      painter: _SkeletonOverlayPainter(
+                        _latestPose,
+                        _previewSize,
+                        _rotation,
+                        false, // back camera
+                      ),
+                      size: Size.infinite,
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            ExerciseStateChip(state: _state),
-                            const SizedBox(height: 8),
-                            FormScoreReadout(formScore: _formScore),
+                            RepCounter(reps: _reps),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  ExerciseStateChip(state: _state),
+                                  const SizedBox(height: 8),
+                                  FormScoreReadout(formScore: _formScore),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                  if (!_personLocked) ...[
-                    const SizedBox(height: 10),
-                    PersonLockBanner(reason: _lockReason),
-                  ],
-                  if (_framing != FramingCue.ok) ...[
-                    const SizedBox(height: 10),
-                    FramingCueCard(framing: _framing),
-                  ],
-                  const Spacer(),
-                  if (_coachCue != null) ...[
-                    _CoachCueCard(text: _coachCue!),
-                    const SizedBox(height: 10),
-                  ],
-                  if (_paused) ...[
-                    const _PausedBanner(),
-                    const SizedBox(height: 10),
-                  ],
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _SessionControlButton(
-                        icon: _paused ? Icons.play_arrow : Icons.pause,
-                        label: _paused ? 'Resume' : 'Pause',
-                        primary: true,
-                        onTap: _togglePause,
-                      ),
-                      const SizedBox(width: 16),
-                      _SessionControlButton(
-                        icon: Icons.stop,
-                        label: 'End',
-                        onTap: _confirmEndSession,
-                      ),
-                    ],
+                        if (!_personLocked) ...[
+                          const SizedBox(height: 10),
+                          PersonLockBanner(reason: _lockReason),
+                        ],
+                        if (_framing != FramingCue.ok) ...[
+                          const SizedBox(height: 10),
+                          FramingCueCard(framing: _framing),
+                        ],
+                        const Spacer(),
+                        if (_coachCue != null) ...[
+                          _CoachCueCard(text: _coachCue!),
+                          const SizedBox(height: 10),
+                        ],
+                        if (_paused) ...[
+                          const _PausedBanner(),
+                          const SizedBox(height: 10),
+                        ],
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _SessionControlButton(
+                              icon: _paused ? Icons.play_arrow : Icons.pause,
+                              label: _paused ? 'Resume' : 'Pause',
+                              primary: true,
+                              onTap: _togglePause,
+                            ),
+                            const SizedBox(width: 16),
+                            _SessionControlButton(
+                              icon: Icons.stop,
+                              label: 'End',
+                              onTap: _confirmEndSession,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -754,5 +787,122 @@ class _SessionControlButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Skeleton overlay painter — draws ML Kit pose landmarks + connections on top of camera preview.
+class _SkeletonOverlayPainter extends CustomPainter {
+  _SkeletonOverlayPainter(
+    this.pose,
+    this.previewSize,
+    this.rotation,
+    this.mirrored,
+  );
+
+  final Pose? pose;
+  final Size? previewSize;
+  final InputImageRotation rotation;
+  final bool mirrored;
+
+  // MediaPipe Pose landmark connections (skeleton lines)
+  static const List<(int, int)> _connections = [
+    // Face
+    (0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8),
+    (9, 10),
+    // Torso
+    (11, 12), (11, 23), (12, 24), (23, 24),
+    // Arms
+    (11, 13), (13, 15), (15, 17), (15, 19), (15, 21), (17, 19),
+    (12, 14), (14, 16), (16, 18), (16, 20), (16, 22), (18, 20),
+    // Legs
+    (23, 25), (25, 27), (27, 29), (27, 31), (29, 31),
+    (24, 26), (26, 28), (28, 30), (28, 32), (30, 32),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (pose == null || previewSize == null) return;
+
+    final paintDot = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF00E676);
+    final paintDotLow = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFFF6D00);
+    final paintLine = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..color = const Color(0xFF00E676).withValues(alpha: 0.8);
+    final paintText = TextPainter(
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+    );
+
+    // Compute transform from preview coordinates to widget coordinates
+    final double scaleX = size.width / previewSize!.width;
+    final double scaleY = size.height / previewSize!.height;
+    final double scale = scaleX < scaleY ? scaleX : scaleY;
+    final double offsetX = (size.width - previewSize!.width * scale) / 2;
+    final double offsetY = (size.height - previewSize!.height * scale) / 2;
+
+    // Transform landmark coordinates
+    final landmarks = <int, Offset>{};
+    for (int i = 0; i < 33; i++) {
+      final lm = pose!.landmarks[PoseLandmarkType.values[i]];
+      if (lm != null && lm.likelihood > 0.3) {
+        double x = lm.x;
+        double y = lm.y;
+        switch (rotation) {
+          case InputImageRotation.rotation90deg:
+            final tmp = x; x = y; y = 1 - tmp;
+            break;
+          case InputImageRotation.rotation180deg:
+            x = 1 - x; y = 1 - y;
+            break;
+          case InputImageRotation.rotation270deg:
+            final tmp = x; x = 1 - y; y = tmp;
+            break;
+          default:
+        }
+        if (mirrored) x = 1 - x;
+        landmarks[i] = Offset(
+          offsetX + x * previewSize!.width * scale,
+          offsetY + y * previewSize!.height * scale,
+        );
+      }
+    }
+
+    // Draw connections (skeleton lines)
+    for (final (a, b) in _connections) {
+      final p1 = landmarks[a];
+      final p2 = landmarks[b];
+      if (p1 != null && p2 != null) {
+        canvas.drawLine(p1, p2, paintLine);
+      }
+    }
+
+    // Draw landmarks (dots)
+    for (int i = 0; i < 33; i++) {
+      final pt = landmarks[i];
+      if (pt != null) {
+        final lm = pose!.landmarks[PoseLandmarkType.values[i]];
+        final color = (lm != null && lm.likelihood >= 0.5) ? paintDot : paintDotLow;
+        canvas.drawCircle(pt, 6, color);
+        paintText.text = TextSpan(
+          text: '$i',
+          style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+        );
+        paintText.layout();
+        paintText.paint(canvas, pt.translate(-4, -8));
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SkeletonOverlayPainter oldDelegate) {
+    return oldDelegate.pose != pose ||
+        oldDelegate.previewSize != previewSize ||
+        oldDelegate.rotation != rotation ||
+        oldDelegate.mirrored != mirrored;
   }
 }

@@ -19,6 +19,7 @@
 ///   the live state per frame.
 library;
 
+import 'exercise_catalog_extra.dart';
 import 'exercise_definition.dart';
 
 const ExerciseDefinition squatDefinition = ExerciseDefinition(
@@ -486,7 +487,8 @@ const ExerciseDefinition lungeDefinition = ExerciseDefinition(
   formScore: FormScoreConfig(),
 );
 
-/// All 18 bundled FSMs (5 core + 13 ported below).
+/// All 46 bundled FSMs (25 here + 21 extras spread from
+/// `exercise_catalog_extra.dart`).
 const List<ExerciseDefinition> bundledDefinitions = [
   squatDefinition,
   pushUpDefinition,
@@ -513,6 +515,7 @@ const List<ExerciseDefinition> bundledDefinitions = [
   cossackSquatDefinition,
   hipThrustDefinition,
   sidePlankDefinition,
+  ...catalogExtraDefinitions,
 ];
 
 const ExerciseDefinition bicepCurlDefinition = ExerciseDefinition(

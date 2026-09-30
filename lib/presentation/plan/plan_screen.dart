@@ -617,7 +617,8 @@ class _WeekStrip extends StatelessWidget {
       children: [
         for (var i = 0; i < days.length; i++) ...[
           if (i > 0) const SizedBox(width: 7),
-          Expanded(
+          Flexible(
+            fit: FlexFit.loose,
             child: _DayCell(
               letter: letterFmt.format(days[i].date)[0],
               date: '${days[i].date.day}',

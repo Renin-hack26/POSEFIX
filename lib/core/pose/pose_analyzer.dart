@@ -117,6 +117,10 @@ class PoseAnalyzer {
   final _controller = StreamController<PoseFrameResult>.broadcast();
   Stream<PoseFrameResult> get results => _controller.stream;
 
+  /// Latest raw pose from ML Kit (for debug visualization overlay).
+  Pose? _latestPose;
+  Pose? get latestPose => _latestPose;
+
   final Map<int, pm.EmaFilter> _smoothX = {};
   final Map<int, pm.EmaFilter> _smoothY = {};
   pm.LmPoint? _torsoEma;
@@ -218,6 +222,7 @@ class PoseAnalyzer {
         );
 
     if (poses.isEmpty) {
+      _latestPose = null;
       _stableFrames = 0;
       _torsoEma = null;
       _videoSuspected = false;
@@ -237,6 +242,7 @@ class PoseAnalyzer {
     }
 
     final pose = poses.first;
+    _latestPose = pose; // Store for debug overlay
 
     // Subject continuity: torso centroid jump = someone else stepped in.
     final torso = _torsoCentroid(pose, imageWidth, imageHeight);
