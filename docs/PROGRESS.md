@@ -21,6 +21,29 @@
 
 ## Log
 
+### 2026-10-01 — Final camera vision screen fixed + all 46 FSMs wired + animation kit removed 🎯
+- **Root cause traced**: Camera preview was compressed because the widget tree forced `Stack(fit: StackFit.expand)` inside a `LayoutBuilder` that incorrectly computed display dimensions. The preview needed its natural aspect ratio preserved via `AspectRatio(previewWidth/previewHeight)` to avoid squishing/stretching.
+- **Person detection failure**: ML Kit pose detection was returning landmarks, but the HUD wasn't showing them due to:
+  1. Rotation mismatch: back camera sensor orientation (90°) requires rotating ML Kit landmarks back to display space
+  2. Overlay transform error: was using widget dimensions instead of preview pixel dimensions for coordinate mapping
+  3. Visibility threshold: was using a hard 0.5 threshold; lowered to 0.3 for skeleton overlay (HUD retains 0.5 for feedback)
+- **Complete rewrite**: `vision_session_screen.dart` now uses:
+  - `Column` → `Expanded` (AspectRatio-wrapped preview) → `Stack` (preview + skeleton overlay + pinned HUD)
+  - Exact math: landmark (x,y) in [0,1]×[0,1] → widget coords via `(offsetX + x * previewWidth * scale, offsetY + y * previewHeight * scale)`
+  - Rotation handled by inverting ML Kit's input rotation to get display-space coordinates
+  - Skeleton overlay painter draws 33 landmarks + skeleton connections, colored by confidence (green ≥0.5, orange <0.5)
+- **Animation kit removed entirely**: 
+  - `FadeSlideIn` → stateless widget that just returns `child`
+  - `Shimmer` → stateless widget that just returns `child`
+  - `AppTransitions` → simple 180ms `FadeTransition` (no complex fade+rise)
+- **UI overflow fixes applied**:
+  - Homepage: "Progress report" / "Chat with VEDA" buttons → `Flexible(flex: 1)` instead of `Expanded`
+  - Plan week strip: day cells → `Flexible(fit: FlexFit.loose)` instead of `Expanded`
+- **All 46 FSMs now wired**: 25 core + 21 extras (burpee, butt_kicks, dead_bug, bird_dog, superman, inchworm, skater_jump, bicycle_crunch, russian_twist, v_up, good_morning, flutter_kick, cat_cow, greatest_stretch, thoracic_rotation, shoulder_dislocates, warrior_flow, downward_dog, cobra_stretch, childs_pose, bear_crawl)
+- **GROQ key properly baked in**: binary verified in `kernel_blob.bin` — contains `gpt-oss-120b` and `gsk_` key, no trace of retired `llama-3.3-70b-versatile`
+- **Version bump**: 1.1.4+5 → **1.1.5+6** (patch = vision fix + animation kit removal)
+- Gate: `flutter analyze` = **0 issues** ✅ · `flutter test test/unit/ test/trace/` = **45 passed** ✅ → `releases\v1.1.5\FixPose-v1.1.5-debug.apk` (233.8 MB, vCode 6)
+
 ### 2026-10-01 — "Can't generate your plan" traced to the exact line + fixed 🔍
 - **Exact issue (reproduced locally, not guessed)**: `ContentLoader.planTemplates()` (`lib/data/datasources/content/content_loader.dart`) did `(await _read(...)).first['templates'].map(...).toList() as List<PlanTemplate>` — `.first['templates']` is `dynamic`, so `.map()` dispatched dynamically and produced `List<dynamic>` at runtime; the `as List<PlanTemplate>` cast threw a `TypeError` on **EVERY** call, for every level×goal, in every build. The onboarding `_generate()` catch turned it into "Could not generate your plan. Please try again." — the workout library was unaffected (those loaders map on statically-typed `List<dynamic>`), which is why only plan generation failed
 - **Fix**: cast to `List<dynamic>` first so `.map()` is statically typed (`Iterable<PlanTemplate>` → `List<PlanTemplate>`), wrapped to fail loud as `StorageException`; sibling `as List<…>` usages audited — all safe

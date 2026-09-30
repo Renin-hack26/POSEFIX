@@ -16,12 +16,12 @@ import '../../domain/entities/workout_session.dart';
 import '../../domain/repositories/session_repository.dart';
 import '../../engines/session_audio/session_audio_cues.dart';
 import '../shared/glass_card.dart';
-import '../shared/grid_background.dart';
 import '../shared/primary_button.dart';
 import 'vision_hud.dart';
 
 /// Live workout vision screen: back-camera preview + [PoseAnalyzer] rep
-/// counting with spoken coaching. Skeleton overlay shows ML Kit detections.
+/// counting with spoken coaching. Live skeleton overlay shows exactly what
+/// ML Kit detects on each frame.
 class VisionSessionScreen extends ConsumerStatefulWidget {
   const VisionSessionScreen({super.key, required this.exerciseId});
 
@@ -35,7 +35,7 @@ class VisionSessionScreen extends ConsumerStatefulWidget {
 class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   CameraController? _camera;
   PoseAnalyzer? _analyzer;
-  InputImageRotation _rotation = InputImageRotation.rotation0deg;
+  InputImageRotation _rotation = InputImageRotation.rotation90deg; // back cam, portrait
 
   bool _initializing = true;
   bool _permissionDenied = false;
@@ -45,20 +45,16 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   bool _inFlight = false;
   bool _disposed = false;
 
-  /// Last lock reason seen — powers the speak-once notice when a played
-  /// video (instead of the user) is detected.
   LockReason _lastLockReason = LockReason.ok;
 
   int _reps = 0;
   String _state = 'unknown';
   int _formScore = 100;
-  bool _personLocked = false;
   LockReason _lockReason = LockReason.noPerson;
   FramingCue _framing = FramingCue.ok;
   FramingCue _lastSpokenFraming = FramingCue.ok;
   String? _coachCue;
 
-  // Session lifecycle
   WorkoutSession? _session;
   SessionAudioCues? _audioCues;
   DateTime? _sessionStartTime;
@@ -67,9 +63,12 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   int _lastSavedRepCount = 0;
   bool _exitedEarly = false;
 
-  /// Latest raw pose from ML Kit for skeleton overlay (debug visualization).
+  /// Latest raw pose from ML Kit for skeleton overlay.
   Pose? _latestPose;
-  Size? _previewSize;
+
+  /// Camera preview dimensions (pixel space) for overlay transform.
+  double _previewPixelWidth = 0;
+  double _previewPixelHeight = 0;
 
   @override
   void initState() {
@@ -78,9 +77,6 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   }
 
   Future<void> _boot() async {
-    // Resolve the exercise (tolerant: `pushup` → `push_up` etc.). Unknown
-    // exercises show a friendly error — rep counting is visual-only, so an
-    // FSM is required.
     final definition = ExerciseRegistry.instance.resolve(widget.exerciseId);
     if (definition == null) {
       if (!mounted) return;
@@ -90,30 +86,23 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       });
       return;
     }
-
-    // Initialize audio cues
     final soundEngine = ref.read(soundEngineProvider);
     _audioCues = SessionAudioCues(soundEngine);
 
-    // Check for existing active session
     final sessionRepository = ref.read(sessionRepositoryProvider);
     final active = await sessionRepository.activeSession();
-
     if (active != null) {
       if (active.exercises.isNotEmpty &&
           active.exercises.first.exerciseId != widget.exerciseId) {
-        // Different exercise active — clear it before starting new
         await sessionRepository.clearActive();
         await _createNewSession(sessionRepository);
       } else {
-        // Resume existing session for same exercise
         await _resumeSession(active, sessionRepository);
       }
     } else {
       await _createNewSession(sessionRepository);
     }
 
-    // Start pose analyzer
     try {
       final analyzer = ref.read(poseAnalyzerProvider(widget.exerciseId));
       _analyzer = analyzer;
@@ -197,7 +186,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       }
       final CameraController controller = CameraController(
         selected,
-        ResolutionPreset.medium,
+        ResolutionPreset.high, // higher resolution for better ML Kit accuracy
         enableAudio: false,
       );
       await controller.initialize();
@@ -213,21 +202,29 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       await controller.startImageStream(_onImage);
       await WakelockPlus.enable();
       if (_disposed || !mounted) return;
+
+      // Store pixel-space preview size for overlay transform
+      final size = controller.value.previewSize!;
+      _previewPixelWidth = size.width;
+      _previewPixelHeight = size.height;
+
       setState(() {
         _camera = controller;
         _initializing = false;
         _ready = true;
       });
-    } catch (_) {
+    } catch (e) {
       if (_disposed || !mounted) return;
       setState(() {
         _initializing = false;
-        _cameraError = 'Could not start the camera. Try again.';
+        _cameraError = 'Could not start the camera: $e';
       });
     }
   }
 
   InputImageRotation _rotationFromSensor(int sensorOrientation) {
+    // Android camera sensor orientation (deg) → ML Kit rotation enum.
+    // Back cameras on most devices use 90 (portrait) or predict; verify on device.
     return switch (sensorOrientation) {
       90 => InputImageRotation.rotation90deg,
       180 => InputImageRotation.rotation180deg,
@@ -255,10 +252,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       );
       if (result != null && mounted && !_disposed) {
         _handleResult(result);
-        // Update latest pose for skeleton overlay (throttled to ~10 fps for UI)
+        // Throttle overlay updates to ~10 fps to avoid excessive UI rebuilds
         _latestPose = analyzer.latestPose;
-        _previewSize = Size(image.width.toDouble(), image.height.toDouble());
-        setState(() {}); // Trigger repaint for overlay
+        setState(() {});
       }
     } catch (_) {
       // A bad frame must never break the session.
@@ -277,8 +273,6 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
         _formScoreCount++;
         _formScore = (_totalFormScoreSum / _formScoreCount).round();
         _audioCues?.onRep();
-
-        // Save progress every rep
         if (_reps > _lastSavedRepCount) {
           _lastSavedRepCount = _reps;
           _saveSession();
@@ -307,8 +301,6 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     }
     if (result.lockReason == LockReason.videoPlayback &&
         _lastLockReason != LockReason.videoPlayback) {
-      // Spoken once per entry — proper message when a played video is
-      // detected instead of the user working out.
       unawaited(_audioCues?.speakUrgent(
         'Looks like a video is playing. Do the exercise yourself so your '
         'reps count.',
@@ -316,15 +308,11 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     }
     _lastLockReason = result.lockReason;
     setState(() {
-      _personLocked = result.personLocked;
       _lockReason = result.lockReason;
       _framing = result.framing;
       if (brain != null) {
         _reps = brain.repCount;
         _state = brain.currentState;
-        // Form display = running average across reps (updated on rep
-        // completion); the per-frame score feeds that average and must not
-        // clobber it here.
         _coachCue = cue;
       }
     });
@@ -393,18 +381,12 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
 
   Future<void> _endSession() async {
     _exitedEarly = _reps == 0;
-
-    // Stop camera stream
     final CameraController? controller = _camera;
     if (controller != null && controller.value.isStreamingImages) {
       try {
         await controller.stopImageStream();
-      } catch (_) {
-        // Already stopped — safe to proceed.
-      }
+      } catch (_) {}
     }
-
-    // Complete session
     if (_session != null) {
       final repository = ref.read(sessionRepositoryProvider);
       final completedSession = _session!.copyWith(
@@ -419,23 +401,17 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
             : 0,
       );
       await repository.completeSession(completedSession);
-
-      // Play completion audio
       final avgForm = _formScoreCount > 0
           ? _totalFormScoreSum / _formScoreCount
           : 0.0;
-      // Completion: treat as 100% target completion for single-exercise session
       final mood = computeMood(
         targetCompletion: 1.0,
         avgForm: avgForm,
         exitedEarly: _exitedEarly,
       );
       await _audioCues?.onComplete(mood);
-
-      // Navigate to summary
       if (mounted) {
-        final sessionId = completedSession.id;
-        context.go('/summary?session=$sessionId');
+        context.go('/summary?session=${completedSession.id}');
       }
     } else if (mounted) {
       context.go('/summary');
@@ -450,9 +426,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     if (controller != null) {
       try {
         controller.stopImageStream();
-      } catch (_) {
-        // Stream already stopped.
-      }
+      } catch (_) {}
       unawaited(controller.dispose());
     }
     unawaited(WakelockPlus.disable());
@@ -461,7 +435,6 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     if (analyzer != null) {
       unawaited(analyzer.dispose());
     }
-    // SoundEngine is disposed by the provider; no need to dispose here.
     super.dispose();
   }
 
@@ -471,9 +444,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     final String title = definition?.displayName ?? 'Live session';
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: GridBackground(
-        child: SafeArea(child: _buildBody()),
-      ),
+      body: _buildBody(),
     );
   }
 
@@ -505,110 +476,144 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     if (!_ready || controller == null || !controller.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
-    final previewSize = controller.value.previewSize!;
-    final previewAspectRatio = previewSize.width / previewSize.height;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Fit camera preview to available space while maintaining aspect ratio
-        final double maxWidth = constraints.maxWidth - 28; // 14 padding each side
-        final double maxHeight = constraints.maxHeight - 28;
-        final double widgetAspectRatio = maxWidth / maxHeight;
-        final double displayWidth = widgetAspectRatio > previewAspectRatio
-            ? maxHeight * previewAspectRatio
-            : maxWidth;
-        final double displayHeight = displayWidth / previewAspectRatio;
 
-        return Center(
-          child: SizedBox(
-            width: displayWidth,
-            height: displayHeight,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CameraPreview(controller),
-                  // Skeleton overlay (debug visualization)
-                  if (_latestPose != null && _previewSize != null)
-                    CustomPaint(
-                      painter: _SkeletonOverlayPainter(
-                        _latestPose,
-                        _previewSize,
-                        _rotation,
-                        false, // back camera
-                      ),
-                      size: Size.infinite,
+    // Use full available space — no padding around the preview itself.
+    // The preview widget internally fits the camera feed correctly.
+    return Column(
+      children: [
+        // Camera preview occupies the majority of the screen
+        Expanded(
+          child: AspectRatio(
+            aspectRatio: _previewPixelWidth / _previewPixelHeight,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CameraPreview(controller),
+                // Skeleton overlay — positioned exactly over the preview region
+                if (_latestPose != null)
+                  CustomPaint(
+                    painter: SkeletonOverlayPainter(
+                      _latestPose,
+                      _previewPixelWidth,
+                      _previewPixelHeight,
+                      _rotation,
+                      false, // back camera
                     ),
-                  Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            RepCounter(reps: _reps),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  ExerciseStateChip(state: _state),
-                                  const SizedBox(height: 8),
-                                  FormScoreReadout(formScore: _formScore),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (!_personLocked) ...[
-                          const SizedBox(height: 10),
-                          PersonLockBanner(reason: _lockReason),
-                        ],
-                        if (_framing != FramingCue.ok) ...[
-                          const SizedBox(height: 10),
-                          FramingCueCard(framing: _framing),
-                        ],
-                        const Spacer(),
-                        if (_coachCue != null) ...[
-                          _CoachCueCard(text: _coachCue!),
-                          const SizedBox(height: 10),
-                        ],
-                        if (_paused) ...[
-                          const _PausedBanner(),
-                          const SizedBox(height: 10),
-                        ],
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _SessionControlButton(
-                              icon: _paused ? Icons.play_arrow : Icons.pause,
-                              label: _paused ? 'Resume' : 'Pause',
-                              primary: true,
-                              onTap: _togglePause,
-                            ),
-                            const SizedBox(width: 16),
-                            _SessionControlButton(
-                              icon: Icons.stop,
-                              label: 'End',
-                              onTap: _confirmEndSession,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                    size: Size.infinite,
                   ),
-                ],
-              ),
+                // HUD overlay — fixed-height column pinned to bottom
+                Positioned(
+                  left: 14,
+                  right: 14,
+                  bottom: 14,
+                  child: _HudOverlay(
+                    reps: _reps,
+                    state: _state,
+                    formScore: _formScore,
+                    lockReason: _lockReason,
+                    framing: _framing,
+                    coachCue: _coachCue,
+                    paused: _paused,
+                    onPause: _togglePause,
+                    onEnd: _confirmEndSession,
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }
 
-/// Permission / camera failure card with a retry action. Never blank.
+/// HUD overlay — rep counter, state, form score, lock/framing banners, controls.
+class _HudOverlay extends StatelessWidget {
+  const _HudOverlay({
+    required this.reps,
+    required this.state,
+    required this.formScore,
+    required this.lockReason,
+    required this.framing,
+    required this.coachCue,
+    required this.paused,
+    required this.onPause,
+    required this.onEnd,
+  });
+
+  final int reps;
+  final String state;
+  final int formScore;
+  final LockReason lockReason;
+  final FramingCue framing;
+  final String? coachCue;
+  final bool paused;
+  final VoidCallback onPause;
+  final VoidCallback onEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Top row: rep counter + state/form score
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RepCounter(reps: reps),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  ExerciseStateChip(state: state),
+                  const SizedBox(height: 8),
+                  FormScoreReadout(formScore: formScore),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (lockReason != LockReason.ok) ...[
+          const SizedBox(height: 10),
+          PersonLockBanner(reason: lockReason),
+        ],
+        if (framing != FramingCue.ok) ...[
+          const SizedBox(height: 10),
+          FramingCueCard(framing: framing),
+        ],
+        const SizedBox(height: 10),
+        if (coachCue != null) ...[
+          _CoachCueCard(text: coachCue!),
+          const SizedBox(height: 10),
+        ],
+        if (paused) ...[
+          const _PausedBanner(),
+          const SizedBox(height: 10),
+        ],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _SessionControlButton(
+              icon: paused ? Icons.play_arrow : Icons.pause,
+              label: paused ? 'Resume' : 'Pause',
+              primary: true,
+              onTap: onPause,
+            ),
+            const SizedBox(width: 16),
+            _SessionControlButton(
+              icon: Icons.stop,
+              label: 'End',
+              onTap: onEnd,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Permission / camera failure card with a retry action.
 class _ErrorCard extends StatelessWidget {
   const _ErrorCard({
     required this.permissionDenied,
@@ -672,7 +677,7 @@ class _ErrorCard extends StatelessWidget {
   }
 }
 
-/// Latest spoken coaching cue, shown above the session controls.
+/// Latest spoken coaching cue.
 class _CoachCueCard extends StatelessWidget {
   const _CoachCueCard({required this.text});
 
@@ -790,45 +795,64 @@ class _SessionControlButton extends StatelessWidget {
   }
 }
 
-/// Skeleton overlay painter — draws ML Kit pose landmarks + connections on top of camera preview.
-class _SkeletonOverlayPainter extends CustomPainter {
-  _SkeletonOverlayPainter(
+/// Skeleton overlay painter — draws ML Kit pose landmarks + connections on top
+/// of the camera preview, transformed from camera pixel-space to widget coordinates.
+///
+/// Mathematical model:
+/// - pose landmarks are in camera pixel coordinates: (px, py) in [0, Wc] × [0, Hc]
+/// - preview widget is Wd × Hd with the same aspect ratio as the camera feed
+///   (this screen constrains the AspectRatio so the preview is never stretched)
+/// - widget coordinates for a landmark: (px / Wc * Wd, py / Hc * Hd)
+/// - rotation is applied to the input image for ML Kit; the raw pose landmarks
+///   are in the ROTATED frame, so we map back to the display frame.
+class SkeletonOverlayPainter extends CustomPainter {
+  SkeletonOverlayPainter(
     this.pose,
-    this.previewSize,
+    this.previewPixelWidth,
+    this.previewPixelHeight,
     this.rotation,
     this.mirrored,
   );
 
   final Pose? pose;
-  final Size? previewSize;
+  final double previewPixelWidth;
+  final double previewPixelHeight;
   final InputImageRotation rotation;
   final bool mirrored;
 
-  // MediaPipe Pose landmark connections (skeleton lines)
+  /// MediaPipe Pose landmark connections (33-body model, skeleton lines).
+  /// Pairs are (fromIndex, toIndex).
   static const List<(int, int)> _connections = [
-    // Face
-    (0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8),
+    // Face: nose → eyes → ears → mouth
+    (0, 1), (1, 2), (2, 3), (3, 7),
+    (0, 4), (4, 5), (5, 6), (6, 8),
     (9, 10),
-    // Torso
-    (11, 12), (11, 23), (12, 24), (23, 24),
-    // Arms
+    // Torso: shoulders → hips
+    (11, 12),
+    (11, 23), (12, 24), (23, 24),
+    // Left arm: shoulder → elbow → wrist → hand
     (11, 13), (13, 15), (15, 17), (15, 19), (15, 21), (17, 19),
+    // Right arm
     (12, 14), (14, 16), (16, 18), (16, 20), (16, 22), (18, 20),
-    // Legs
+    // Left leg: hip → knee → ankle → heel/foot
     (23, 25), (25, 27), (27, 29), (27, 31), (29, 31),
+    // Right leg
     (24, 26), (26, 28), (28, 30), (28, 32), (30, 32),
   ];
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (pose == null || previewSize == null) return;
+    if (pose == null || previewPixelWidth <= 0 || previewPixelHeight <= 0) {
+      return;
+    }
 
+    // Colors
     final paintDot = Paint()
       ..style = PaintingStyle.fill
-      ..color = const Color(0xFF00E676);
+      ..color = const Color(0xFF00E676); // chartreuse accent
     final paintDotLow = Paint()
       ..style = PaintingStyle.fill
-      ..color = const Color(0xFFFF6D00);
+      ..color = const Color(0xFFFF6D00); // low confidence
     final paintLine = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
@@ -838,41 +862,58 @@ class _SkeletonOverlayPainter extends CustomPainter {
       textAlign: TextAlign.center,
     );
 
-    // Compute transform from preview coordinates to widget coordinates
-    final double scaleX = size.width / previewSize!.width;
-    final double scaleY = size.height / previewSize!.height;
+    // Transform camera pixel coordinates → widget coordinates.
+    // For rotation90deg (portrait, back camera), the native frame is
+    // landscape (W=1280, H=720) but we display portrait (Wd × Hd).
+    // The landmark (px, py) is in the ROTATED space that ML Kit sees.
+    // We need to map that back to the un-rotated display space.
+    final double scaleX = size.width / previewPixelWidth;
+    final double scaleY = size.height / previewPixelHeight;
     final double scale = scaleX < scaleY ? scaleX : scaleY;
-    final double offsetX = (size.width - previewSize!.width * scale) / 2;
-    final double offsetY = (size.height - previewSize!.height * scale) / 2;
+    final double offsetX = (size.width - previewPixelWidth * scale) / 2;
+    final double offsetY = (size.height - previewPixelHeight * scale) / 2;
 
-    // Transform landmark coordinates
+    // Build world-space landmark coordinates (widget space)
     final landmarks = <int, Offset>{};
     for (int i = 0; i < 33; i++) {
       final lm = pose!.landmarks[PoseLandmarkType.values[i]];
-      if (lm != null && lm.likelihood > 0.3) {
-        double x = lm.x;
-        double y = lm.y;
-        switch (rotation) {
-          case InputImageRotation.rotation90deg:
-            final tmp = x; x = y; y = 1 - tmp;
-            break;
-          case InputImageRotation.rotation180deg:
-            x = 1 - x; y = 1 - y;
-            break;
-          case InputImageRotation.rotation270deg:
-            final tmp = x; x = 1 - y; y = tmp;
-            break;
-          default:
-        }
-        if (mirrored) x = 1 - x;
-        landmarks[i] = Offset(
-          offsetX + x * previewSize!.width * scale,
-          offsetY + y * previewSize!.height * scale,
-        );
+      if (lm == null || lm.likelihood < 0.3) continue; // skip invisible
+
+      // Raw camera coordinates (normalized to 0..1 in ML Kit)
+      final double nx = lm.x; // normalized [0,1]
+      final double ny = lm.y;
+
+      // Apply rotation inverse to get display-space coordinates.
+      // ML Kit rotates the input image for inference; the landmarks come back
+      // in that rotated frame. We want the portrait-display frame.
+      final double dx;
+      final double dy;
+      switch (rotation) {
+        case InputImageRotation.rotation90deg:
+          // Portrait display: x ← y (rotated), y ← 1-x (rotated)
+          dx = ny;
+          dy = 1 - nx;
+        case InputImageRotation.rotation180deg:
+          dx = 1 - nx;
+          dy = 1 - ny;
+        case InputImageRotation.rotation270deg:
+          dx = 1 - ny;
+          dy = nx;
+        default:
+          dx = nx;
+          dy = ny;
       }
+
+      // Mirror happens implicitly via camera orientation on back camera; skip explicit mirror.
+      final double finalDx = mirrored ? 1 - dx : dx;
+
+      // Denormalize to widget coordinates
+      final wx = offsetX + finalDx * previewPixelWidth * scale;
+      final wy = offsetY + dy * previewPixelHeight * scale;
+      landmarks[i] = Offset(wx, wy);
     }
 
-    // Draw connections (skeleton lines)
+    // Draw connections (lines between joints)
     for (final (a, b) in _connections) {
       final p1 = landmarks[a];
       final p2 = landmarks[b];
@@ -881,27 +922,32 @@ class _SkeletonOverlayPainter extends CustomPainter {
       }
     }
 
-    // Draw landmarks (dots)
+    // Draw landmark dots + index labels
     for (int i = 0; i < 33; i++) {
       final pt = landmarks[i];
-      if (pt != null) {
-        final lm = pose!.landmarks[PoseLandmarkType.values[i]];
-        final color = (lm != null && lm.likelihood >= 0.5) ? paintDot : paintDotLow;
-        canvas.drawCircle(pt, 6, color);
-        paintText.text = TextSpan(
-          text: '$i',
-          style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
-        );
-        paintText.layout();
-        paintText.paint(canvas, pt.translate(-4, -8));
-      }
+      if (pt == null) continue;
+      final lm = pose!.landmarks[PoseLandmarkType.values[i]];
+      final dotPaint =
+          (lm != null && lm.likelihood >= 0.5) ? paintDot : paintDotLow;
+      canvas.drawCircle(pt, 6, dotPaint);
+      paintText.text = TextSpan(
+        text: '$i',
+        style: const TextStyle(
+          fontSize: 9,
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      );
+      paintText.layout();
+      paintText.paint(canvas, pt.translate(-4, -9));
     }
   }
 
   @override
-  bool shouldRepaint(covariant _SkeletonOverlayPainter oldDelegate) {
+  bool shouldRepaint(covariant SkeletonOverlayPainter oldDelegate) {
     return oldDelegate.pose != pose ||
-        oldDelegate.previewSize != previewSize ||
+        oldDelegate.previewPixelWidth != previewPixelWidth ||
+        oldDelegate.previewPixelHeight != previewPixelHeight ||
         oldDelegate.rotation != rotation ||
         oldDelegate.mirrored != mirrored;
   }
