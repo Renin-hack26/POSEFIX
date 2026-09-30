@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>FixPose — Demo GIF review (36)</title>
+<style>
+  body { background: #f4f4f0; font-family: 'Segoe UI', sans-serif; padding: 24px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { color: #666; font-size: 13px; margin: 0 0 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .card { background: #fff; border-radius: 14px; padding: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+  .card img { width: 100%; border-radius: 8px; background: #eee; display: block; }
+  .name { font-size: 12.5px; font-weight: 700; margin-top: 8px; }
+  .meta { font-size: 11px; color: #888; margin-top: 2px; }
+</style>
+</head>
+<body>
+<h1>FixPose — Demo GIF review (36)</h1>
+<p class="sub">Source: Kaggle "Fitness Exercises with Animations" (MIT-licensed host omercotkd/exercises-gifs) · all valid GIF89a · 11.2 MB total · review before integration into assets/demo/</p>
+<div class="grid" id="grid"></div>
+<script>
+const gifs = [
+  ['squat', 'Squat (Bodyweight Squat demo)', '1462 — barbell full squat (side pov)'],
+  ['push_up', 'Push-Up', '0662 — push-up'],
+  ['jumping_jack', 'Jumping Jack', '3223 — star jump (male)'],
+  ['forward_lunge', 'Forward Lunge', '3470 — forward lunge (male)'],
+  ['glute_bridge', 'Glute Bridge', '3561 — glute bridge march'],
+  ['forearm_plank', 'Forearm Plank', '0464 — front plank with twist'],
+  ['mountain_climber', 'Mountain Climber', '0630 — mountain climber'],
+  ['burpee', 'Burpee', '1160 — burpee'],
+  ['high_knees', 'High Knees', '3636 — high knee against wall'],
+  ['butt_kicks', 'Butt Kicks', '0870 — butt-ups'],
+  ['dead_bug', 'Dead Bug', '0276 — dead bug'],
+  ['bird_dog', 'Bird Dog', '1512 — all fours squad stretch'],
+  ['superman_hold', 'Superman Hold', '0573 — lever back extension'],
+  ['side_plank', 'Side Plank', '1775 — side plank hip adduction'],
+  ['standing_calf_raise', 'Standing Calf Raise', '0999 — band single leg calf raise'],
+  ['wall_sit', 'Wall Sit', '0624 — march sit (wall)'],
+  ['chair_dip', 'Chair Dip', '0129 — bench dip (knees bent)'],
+  ['knee_push_up', 'Knee Push-Up', '3211 — kneeling push-up (male)'],
+  ['incline_push_up', 'Incline Push-Up', '0493 — incline push-up'],
+  ['pike_push_up', 'Pike Push-Up', '1296 — exercise ball pike push up'],
+  ['inchworm', 'Inchworm', '1471 — inchworm'],
+  ['skater_jump', 'Skater Jump', '3361 — skater hops'],
+  ['sumo_squat', 'Sumo Squat', '0117 — barbell sumo deadlift'],
+  ['good_morning', 'Bodyweight Good Morning', '0044 — barbell good morning'],
+  ['hip_thrust', 'Elevated Hip Thrust', '1409 — barbell glute bridge'],
+  ['cossack_squat', 'Cossack Squat', '3643 — weighted cossack squats (male)'],
+  ['bicycle_crunch', 'Bicycle Crunch', '0972 — band bicycle crunch'],
+  ['lying_leg_raise', 'Lying Leg Raise', '1002 — band lying straight leg raise'],
+  ['russian_twist', 'Russian Twist', '0687 — russian twist'],
+  ['flutter_kick', 'Flutter Kick', '0459 — flutter kicks'],
+  ['cat_cow', 'Cat-Cow', '1363 — spine stretch'],
+  ['worlds_greatest_stretch', "World's Greatest Stretch", '1604 — world greatest stretch'],
+  ['thoracic_rotation', 'Thoracic Rotation', '2329 — spine twist'],
+  ['shoulder_dislocates', 'Towel Shoulder Dislocates', '1271 — chest and front of shoulder stretch'],
+  ['childs_pose', "Child's Pose", '1346 — kneeling lat stretch'],
+  ['bear_crawl', 'Bear Crawl In Place', '3360 — bear crawl'],
+];
+const grid = document.getElementById('grid');
+for (const [file, label, source] of gifs) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = '<img src="' + file + '.gif" alt="' + label + '">' +
+    '<div class="name">' + label + '</div><div class="meta">' + source + '</div>';
+  grid.appendChild(card);
+}
+</script>
+</body>
+</html>

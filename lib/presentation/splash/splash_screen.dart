@@ -1,6 +1,9 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/di/app_dependencies.dart';
+import '../../core/permissions/permission_flow.dart';
 import '../../core/theme/app_theme.dart';
 import '../shared/anim/fade_slide_in.dart';
 import '../shared/app_logo.dart';
@@ -8,23 +11,60 @@ import '../shared/grid_background.dart';
 
 /// 01 — Splash (sample/index.html).
 ///
-/// UI-first: holds ~1.7s then enters the auth stack.
-/// P1: replace the delay with a session check — straight to /home when
-/// a session exists (mock source → Supabase).
-class SplashScreen extends StatefulWidget {
+/// 1.7 s entrance → routes to permissions (first install), onboarding (signed-in
+/// with no plan), sign-in (signed-in with plan) or sign-in (signed-out).
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future<void>.delayed(const Duration(milliseconds: 1700), () {
+    _startSync();
+    Future<void>.delayed(const Duration(milliseconds: 1700), _route);
+  }
+
+  void _startSync() {
+    // Account sync starts at boot (15-min sweep + auth listener). Best-effort:
+    // the widget-test harness has no Supabase initialized.
+    try {
+      ref.read(syncEngineProvider).start();
+    } catch (_) {
+      return;
+    }
+  }
+
+  Future<void> _route() async {
+    if (!mounted) return;
+    if (!_permissionsAsked()) {
+      if (mounted) context.go('/permissions');
+      return;
+    }
+    if (await _signedIn()) {
+      if (mounted) context.go('/onboarding');
+    } else {
       if (mounted) context.go('/signin');
-    });
+    }
+  }
+
+  bool _permissionsAsked() {
+    try {
+      return PermissionFlow.askedBefore;
+    } catch (_) {
+      return true; // treat uninitialized box as "asked" (test harness)
+    }
+  }
+
+  Future<bool> _signedIn() async {
+    try {
+      return await ref.read(userRepositoryProvider).currentUser() != null;
+    } catch (_) {
+      return false; // auth stack unavailable (test harness)
+    }
   }
 
   @override
@@ -37,7 +77,6 @@ class _SplashScreenState extends State<SplashScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Staggered entrance: logo first, headline copy after.
                 const FadeSlideIn(
                   child: AppLogo(size: 88, radius: 28, iconSize: 44),
                 ),

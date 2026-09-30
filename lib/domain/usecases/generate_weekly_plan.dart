@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart' show debugPrint;
+
+import '../../core/groq/groq_plan_service.dart';
 import '../../core/utils/extensions.dart';
 import '../../core/utils/id_gen.dart';
 import '../entities/exercise.dart';
@@ -8,26 +11,55 @@ import '../repositories/content_repository.dart';
 import '../repositories/plan_repository.dart';
 import '../repositories/workout_repository.dart';
 
-/// Generates the weekly plan from bundled templates + the workout library
-/// (PLANNING §5.4 — local rules offline; deterministic per week so
-/// regeneration never surprises the user within the same week).
+/// Generates the weekly plan (PLANNING §5.4 — AI-first).
+///
+/// GROQ-first: the [openai/gpt-oss-120b] LLM builds the 7-day plan from
+/// the user's level + goal, grounded in the real workout library. When GROQ
+/// is unavailable (no key baked into this build, offline, timeout, malformed
+/// reply) the use case falls back to the deterministic local templates —
+/// onboarding never bricks, and the plan source is labeled honestly
+/// (AI generated vs Manual plan).
 class GenerateWeeklyPlan {
-  GenerateWeeklyPlan(this._content, this._workouts, this._plan);
+  GenerateWeeklyPlan(this._content, this._workouts, this._plan, this._groq);
 
   final ContentRepository _content;
   final WorkoutRepository _workouts;
   final PlanRepository _plan;
+  final GroqPlanService _groq;
 
   Future<TrainingPlan> call({
     required Difficulty level,
     required String goal,
   }) async {
-    final templates = await _content.planTemplates();
-    final template = _pickTemplate(templates, level, goal);
     final library = await _workouts.library();
-
     final now = DateTime.now();
     final weekStart = now.startOfWeek;
+
+    // 1) GROQ (proper LLM) generates the plan when available.
+    try {
+      final aiDays = await _groq.generatePlan(
+        level: level,
+        goal: goal,
+        library: library,
+      );
+      if (aiDays != null) {
+        final generated = TrainingPlan(
+          id: newId(),
+          weekStart: weekStart,
+          days: aiDays,
+          source: PlanSource.ai,
+          lastUpdated: now,
+        );
+        await _plan.savePlan(generated);
+        return generated;
+      }
+    } catch (e) {
+      debugPrint('GROQ plan generation failed, using local templates: $e');
+    }
+
+    // 2) Honest fallback: deterministic local templates (labeled manual).
+    final templates = await _content.planTemplates();
+    final template = _pickTemplate(templates, level, goal);
     final weekIndex = now.startOfWeek.difference(DateTime(2026)).inDays ~/ 7;
 
     final used = <String>{};
@@ -64,7 +96,7 @@ class GenerateWeeklyPlan {
       id: newId(),
       weekStart: weekStart,
       days: days,
-      source: PlanSource.ai,
+      source: PlanSource.manual,
       lastUpdated: now,
     );
     await _plan.savePlan(generated);

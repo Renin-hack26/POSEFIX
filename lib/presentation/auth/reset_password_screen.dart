@@ -52,7 +52,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         newPassword: _password.text,
       );
       if (!mounted) return;
-      context.go('/home');
+      context.go('/onboarding');
     } on AppException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

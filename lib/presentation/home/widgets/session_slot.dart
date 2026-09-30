@@ -11,6 +11,7 @@ class SessionSlot extends StatelessWidget {
     required this.title,
     required this.details,
     required this.onStart,
+    this.actionLabel = 'Start session',
   });
 
   /// Schedule chip text, e.g. "TODAY · 17:00".
@@ -24,6 +25,10 @@ class SessionSlot extends StatelessWidget {
 
   /// Starts today's session.
   final VoidCallback onStart;
+
+  /// CTA label — "Start session" by default, "Resume session" when a session
+  /// is already in flight (PLANNING §5.2 slot state machine).
+  final String actionLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +131,7 @@ class SessionSlot extends StatelessWidget {
                     child: InkWell(
                       onTap: onStart,
                       borderRadius: BorderRadius.circular(999),
-                      child: const Padding(
+                      child: Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: 18,
                           vertical: 11,
@@ -141,8 +146,8 @@ class SessionSlot extends StatelessWidget {
                             ),
                             SizedBox(width: 8),
                             Text(
-                              'Start session',
-                              style: TextStyle(
+                              actionLabel,
+                              style: const TextStyle(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.accentBright,

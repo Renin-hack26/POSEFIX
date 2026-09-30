@@ -44,7 +44,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         password: _password.text,
       );
       if (!mounted) return;
-      context.go('/home');
+      context.go('/onboarding');
     } on AppException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

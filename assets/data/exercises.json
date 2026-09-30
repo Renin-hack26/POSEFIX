@@ -15,7 +15,7 @@
       "Drive through the whole foot and finish with the glutes squeezed."
     ],
     "met": 5.0,
-    "demoVideoAsset": "assets/videos/ex_squat.mp4",
+    "demoVideoAsset": "assets/demo/squat.gif",
     "defaultSets": 3,
     "defaultReps": 12,
     "isTimed": false,
@@ -37,7 +37,7 @@
       "Press the floor away and finish with the shoulder blades spread at the top."
     ],
     "met": 6.0,
-    "demoVideoAsset": "assets/videos/ex_pushup.mp4",
+    "demoVideoAsset": "assets/demo/pushup.gif",
     "defaultSets": 3,
     "defaultReps": 10,
     "isTimed": false,
@@ -59,7 +59,7 @@
       "Return to the start position and settle into a steady breathing rhythm."
     ],
     "met": 8.0,
-    "demoVideoAsset": "assets/videos/ex_jumping_jack.mp4",
+    "demoVideoAsset": "assets/demo/jumpingJack.gif",
     "defaultSets": 3,
     "defaultReps": 30,
     "isTimed": false,
@@ -81,7 +81,7 @@
       "Push back to the start through the front foot and alternate legs."
     ],
     "met": 6.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/lunge.gif",
     "defaultSets": 3,
     "defaultReps": 10,
     "isTimed": false,
@@ -103,7 +103,7 @@
       "Lower slowly under control and avoid resting on the floor between reps."
     ],
     "met": 3.5,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/glute-bridge.gif",
     "defaultSets": 3,
     "defaultReps": 15,
     "isTimed": false,
@@ -125,7 +125,7 @@
       "Breathe steadily and keep the hips from rising or sagging."
     ],
     "met": 3.5,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/plank.gif",
     "defaultSets": 3,
     "defaultReps": 0,
     "isTimed": true,
@@ -147,7 +147,7 @@
       "Keep the shoulders stacked over the wrists and the head neutral."
     ],
     "met": 8.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/mountain-climber.gif",
     "defaultSets": 3,
     "defaultReps": 30,
     "isTimed": false,
@@ -169,7 +169,7 @@
       "Finish with a small jump and land softly with bent knees."
     ],
     "met": 10.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/burpee.gif",
     "defaultSets": 3,
     "defaultReps": 10,
     "isTimed": false,
@@ -191,7 +191,7 @@
       "Land softly and immediately switch to the opposite leg."
     ],
     "met": 8.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/high-knees.gif",
     "defaultSets": 3,
     "defaultReps": 40,
     "isTimed": false,
@@ -213,7 +213,7 @@
       "Swing the arms naturally and keep the breathing rhythmic."
     ],
     "met": 7.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/butt-kicks.gif",
     "defaultSets": 3,
     "defaultReps": 40,
     "isTimed": false,
@@ -235,7 +235,7 @@
       "Repeat on the opposite side while exhaling on the reach."
     ],
     "met": 3.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/dead-bug.gif",
     "defaultSets": 3,
     "defaultReps": 12,
     "isTimed": false,
@@ -257,7 +257,7 @@
       "Pause briefly, return with control and alternate sides."
     ],
     "met": 3.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/bird-dog.gif",
     "defaultSets": 3,
     "defaultReps": 10,
     "isTimed": false,
@@ -279,7 +279,7 @@
       "Hold for a count, then lower slowly without dropping the limbs."
     ],
     "met": 3.5,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/superman.gif",
     "defaultSets": 3,
     "defaultReps": 12,
     "isTimed": false,
@@ -301,7 +301,7 @@
       "Hold the position while breathing steadily and keep the hips high."
     ],
     "met": 3.5,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/side-plank.gif",
     "defaultSets": 3,
     "defaultReps": 0,
     "isTimed": true,
@@ -323,7 +323,7 @@
       "Lower slowly until the heels reach the floor and repeat."
     ],
     "met": 3.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/calf-raise.gif",
     "defaultSets": 3,
     "defaultReps": 18,
     "isTimed": false,
@@ -345,7 +345,7 @@
       "Hold steady while breathing and avoid resting the weight on the hands."
     ],
     "met": 4.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/wall-sit.gif",
     "defaultSets": 3,
     "defaultReps": 0,
     "isTimed": true,
@@ -367,7 +367,7 @@
       "Press through the palms to lock out without shrugging at the top."
     ],
     "met": 5.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/chair-dip.gif",
     "defaultSets": 3,
     "defaultReps": 12,
     "isTimed": false,
@@ -389,7 +389,7 @@
       "Press back up fully and keep the elbows from flaring wide."
     ],
     "met": 4.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/knee-push-up.gif",
     "defaultSets": 3,
     "defaultReps": 10,
     "isTimed": false,
@@ -411,7 +411,7 @@
       "Push away from the surface and fully extend the arms at the top."
     ],
     "met": 4.5,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/incline-push-up.gif",
     "defaultSets": 3,
     "defaultReps": 12,
     "isTimed": false,
@@ -433,7 +433,7 @@
       "Press back to the start and keep the hips lifted throughout."
     ],
     "met": 5.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/pike-push-up.gif",
     "defaultSets": 3,
     "defaultReps": 10,
     "isTimed": false,
@@ -455,7 +455,7 @@
       "Roll up through the spine one vertebra at a time to stand."
     ],
     "met": 5.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/inchworm.gif",
     "defaultSets": 3,
     "defaultReps": 8,
     "isTimed": false,
@@ -477,7 +477,7 @@
       "Bound back and forth with quiet, controlled landings."
     ],
     "met": 7.5,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/skater-jump.gif",
     "defaultSets": 3,
     "defaultReps": 20,
     "isTimed": false,
@@ -499,7 +499,7 @@
       "Push the floor apart through the heels and squeeze the glutes to stand."
     ],
     "met": 5.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/sumo-squat.gif",
     "defaultSets": 3,
     "defaultReps": 14,
     "isTimed": false,
@@ -521,7 +521,7 @@
       "Drive the hips forward to stand tall and finish with the glutes."
     ],
     "met": 4.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/good-morning.gif",
     "defaultSets": 3,
     "defaultReps": 15,
     "isTimed": false,
@@ -543,7 +543,7 @@
       "Hold the squeeze for one second and lower without losing tension."
     ],
     "met": 4.5,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/hip-thrust.gif",
     "defaultSets": 3,
     "defaultReps": 15,
     "isTimed": false,
@@ -565,7 +565,7 @@
       "Push back through the loaded heel and repeat on the other side."
     ],
     "met": 5.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/cossack-squat.gif",
     "defaultSets": 3,
     "defaultReps": 10,
     "isTimed": false,
@@ -587,7 +587,7 @@
       "Move smoothly and avoid pulling on the neck during the twist."
     ],
     "met": 4.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/bicycle-crunch.gif",
     "defaultSets": 3,
     "defaultReps": 20,
     "isTimed": false,
@@ -609,7 +609,7 @@
       "Exhale on the lift and avoid arching the back on the descent."
     ],
     "met": 4.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/leg-raise.gif",
     "defaultSets": 3,
     "defaultReps": 14,
     "isTimed": false,
@@ -631,7 +631,7 @@
       "Keep the chest tall and the breathing continuous through each twist."
     ],
     "met": 4.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/russian-twist.gif",
     "defaultSets": 3,
     "defaultReps": 24,
     "isTimed": false,
@@ -675,7 +675,7 @@
       "Point the toes and keep the movement from the hips, not the knees."
     ],
     "met": 3.5,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/flutter-kick.gif",
     "defaultSets": 3,
     "defaultReps": 40,
     "isTimed": false,
@@ -697,7 +697,7 @@
       "Match one full breath to each direction of the movement."
     ],
     "met": 3.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/cat-cow.gif",
     "defaultSets": 2,
     "defaultReps": 10,
     "isTimed": false,
@@ -719,7 +719,7 @@
       "Return to the start and repeat on the opposite side."
     ],
     "met": 3.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/greatest-stretch.gif",
     "defaultSets": 2,
     "defaultReps": 8,
     "isTimed": false,
@@ -741,7 +741,7 @@
       "Pause at the top and repeat before switching sides."
     ],
     "met": 3.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/thoracic-rotation.gif",
     "defaultSets": 2,
     "defaultReps": 10,
     "isTimed": false,
@@ -763,7 +763,7 @@
       "Reverse the path to the front and narrow the grip only when it feels easy."
     ],
     "met": 3.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/shoulder-dislocates.gif",
     "defaultSets": 2,
     "defaultReps": 12,
     "isTimed": false,
@@ -851,7 +851,7 @@
       "Breathe deeply into the back of the ribs and soften the shoulders."
     ],
     "met": 3.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/childs-pose.gif",
     "defaultSets": 2,
     "defaultReps": 0,
     "isTimed": true,
@@ -873,7 +873,7 @@
       "Alternate directions within your space and keep the breathing steady."
     ],
     "met": 7.0,
-    "demoVideoAsset": null,
+    "demoVideoAsset": "assets/demo/bear-crawl.gif",
     "defaultSets": 3,
     "defaultReps": 12,
     "isTimed": false,

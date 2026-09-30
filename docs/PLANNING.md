@@ -306,16 +306,17 @@ Profile (view/edit incl. weight/height) · Units (kg/lb) · Theme (light/dark/sy
 ### 10.1 Open Items — Awaiting User Input (updated at every phase gate)
 | Item | Status |
 |---|---|
-| Pose-fixing / workout details user reserved ("later I will tell you") | ⏳ awaiting |
+| Pose-fixing / workout details user reserved ("later I will tell you") | ⏳ awaiting (Phase J — FSM rules already ported from Model samples; final vision rules/model still to come) |
 | Exact form-rule overrides (defaults active meanwhile) | ⏳ awaiting |
-| App icon asset (OTP watermark + branding) | ⏳ awaiting |
-| Instruction videos (per exercise) | ⏳ awaiting |
-| Rive/Lottie posture avatar files | ⏳ awaiting |
-| Final HTML/CSS designs (via §9 workflow) | 🟡 Direction A sample in `sample/` — awaiting user's pick + change list |
+| App icon asset (OTP watermark + branding) | ✅ built 2026-09-30 from the sample logo (adaptive + legacy layers) |
+| Instruction videos (per exercise) | ✅ resolved 2026-10-01 — **real-person demo GIFs** sourced from the open Kaggle "Fitness Exercises with Animations" dataset (MIT-licensed host `omercotkd/exercises-gifs`, 1,324 exercises); 36 GIFs downloaded for the bundled bodyweight catalog → user review before integration; no ffmpeg needed (GIFs play natively via `Image.asset`) |
+| Equipment-based gym exercises (barbell/dumbbell/cable/machine) | ⏳ planned later ("for now keep what we had; later we will plan for all in wider aspect") — dataset has 1,300+ equipment exercises with GIFs ready when scope expands |
+| Rive/Lottie posture avatar files | ⏳ stale — rive/lottie removed from the stack (documented deviation); avatar slots render without them |
+| Final HTML/CSS designs (via §9 workflow) | ✅ converted — screens 01–14 built from `sample/` Direction A |
 | Supabase project (URL + anon key) | ✅ provided 2026-09-30 — URL + publishable key (app) + secret key (**server-only, never in app**) in `secrets/local.env` |
-| GROQ API key (VEDA chat) | ✅ provided 2026-09-30 (`secrets/local.env`) |
+| GROQ API key (VEDA chat) | ✅ provided 2026-09-30 (`secrets/local.env`) — wired via `--dart-define` |
 | Gmail App Password (OTP email) | ✅ provided 2026-09-30 (`secrets/local.env`: address + App Password) |
-| Pose rules + camera/detection reference (18-exercise FSM: YAML angles, state machines, feedback + audio cues) | ✅ received 2026-09-30 — `Model samples/fitness-trainer-pose-estimation`; porting source for P2 rules; camera/detection requirements (person-lock multi-person handling, per-exercise framing incl. wide push-up view, spoken camera-adjustment cues, low-latency sound feedback) folded into §4.1/§4.3/§5.3 |
+| Pose rules + camera/detection reference (18-exercise FSM: YAML angles, state machines, feedback + audio cues) | ✅ received 2026-09-30 — `Model samples/fitness-trainer-pose-estimation`; **ported 2026-10-01 into `exercise_catalog.dart` (all 18 FSMs)**; camera/detection requirements (person-lock multi-person handling, per-exercise framing incl. wide push-up view, spoken camera-adjustment cues, low-latency sound feedback) folded into §4.1/§4.3/§5.3 |
 | Official doc templates (if provided later) | ⏳ optional |
 
 ### 10.2 Reserved Pages — slots inside the 4 tabs (user fills later)
@@ -347,7 +348,9 @@ Profile (view/edit incl. weight/height) · Units (kg/lb) · Theme (light/dark/sy
 | **P5 Plan** | Planning tab | AI generation (onboarding) + editing, session start times, notification re-scheduling, exercise library slots, meal slots, progress + body metrics, session history list |
 | **P6 VEDA + Nutrition + Export** | Assistant & outputs | Hybrid chat with full user context, calorie target + manual logging, PDF/CSV/share |
 | **P7 Notifications + Settings** | System integration | Scheduler, full settings incl. voice status, delete account cascade, privacy screen |
-| **P8 Polish + Release** | v1.0 | HTML/CSS → Flutter translation (§9), i18n/a11y pass, 25+ FPS validation on mid-range, full test suite, APK build, all 5 hackathon docs finalized |
+| **P8 Polish** | v1.0 pre-release | HTML/CSS → Flutter translation (§9), i18n/a11y pass, 25+ FPS validation on mid-range, full test suite, all 5 hackathon docs finalized |
+| **P9 (Phase J) Vision model** | Final vision rules/model | User-delivered final FSM rules/model integrated + tuned for minimum latency & accuracy (all engines fine-tuned, bad-camera quality covered) — **before any release build** |
+| **P10 (Phase I) Release build** | Final APK — LAST | Named APKs (`FixPose-v1.0.1-release.apk` etc.) built only AFTER Phase J; then user Q&A |
 
 ---
 

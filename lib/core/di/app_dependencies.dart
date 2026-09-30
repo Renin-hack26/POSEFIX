@@ -43,6 +43,11 @@ import '../../domain/usecases/sign_up.dart';
 import '../../domain/usecases/start_session.dart';
 import '../../domain/usecases/verify_otp.dart';
 import '../../engines/strike_engine/strike_engine.dart';
+import '../audio/sound_engine.dart';
+import '../groq/groq_plan_service.dart';
+import '../notification/notification_engine.dart';
+import '../pose/exercise_definition.dart';
+import '../pose/pose_analyzer.dart';
 import '../storage/app_database.dart';
 import '../storage/sync_engine.dart';
 
@@ -180,6 +185,31 @@ final strikeEngineProvider = Provider<StrikeEngine>(
   (ref) => const StrikeEngine(),
 );
 
+/// Spoken cues + synthesized SFX (TTS pre-warmed at boot for <0.5 s cues).
+final soundEngineProvider = Provider<SoundEngine>((ref) {
+  final engine = SoundEngine();
+  ref.onDispose(engine.dispose);
+  return engine;
+});
+
+/// Scheduled workout reminders (device-local, timezone-aware).
+final notificationEngineProvider = Provider<NotificationEngine>((ref) {
+  return NotificationEngine.instance;
+});
+
+/// Live vision pipeline per exercise — isolated analyzer + FSM each.
+/// Reads the bundled catalog registered at boot; unknown ids throw.
+/// Resolves content-pack ids (`pushup`, `jumpingJack`, `glute-bridge`) to the
+/// FSM ids (`push_up`, `jumping_jack`, `glute_bridge`) via [ExerciseRegistry.resolve].
+final poseAnalyzerProvider =
+    Provider.family<PoseAnalyzer, String>((ref, exerciseId) {
+  final def = ExerciseRegistry.instance.resolve(exerciseId);
+  if (def == null) throw ArgumentError('Unknown exercise: $exerciseId');
+  final analyzer = PoseAnalyzer(def);
+  ref.onDispose(analyzer.dispose);
+  return analyzer;
+});
+
 final syncEngineProvider = Provider<SyncEngine>((ref) {
   final engine = SyncEngine(
     ref.watch(appDatabaseProvider),
@@ -221,6 +251,7 @@ final generateWeeklyPlanProvider = Provider(
     ref.watch(contentRepositoryProvider),
     ref.watch(workoutRepositoryProvider),
     ref.watch(planRepositoryProvider),
+    ref.watch(groqPlanServiceProvider),
   ),
 );
 

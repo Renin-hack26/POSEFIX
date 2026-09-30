@@ -8,14 +8,16 @@ import '../auth/reset_password_screen.dart';
 import '../auth/sign_in_screen.dart';
 import '../auth/sign_up_screen.dart';
 import '../home/home_screen.dart';
+import '../onboarding/onboarding_screen.dart';
+import '../permissions/permission_screen.dart';
 import '../plan/plan_screen.dart';
 import '../settings/settings_screen.dart';
 import '../shared/anim/app_transitions.dart';
 import '../splash/splash_screen.dart';
 import '../veda/veda_chat_screen.dart';
+import '../vision/vision_session_screen.dart';
 import '../workout/instruction_video_screen.dart';
 import '../workout/session_summary_screen.dart';
-import '../workout/vision_screen.dart';
 import '../workout/workout_details_screen.dart';
 import '../workout/workout_screen.dart';
 import 'app_shell.dart';
@@ -49,33 +51,59 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
+      // --- First-launch permissions (before auth stack) ---
+      GoRoute(
+        path: '/permissions',
+        pageBuilder: (context, state) => AppTransitions.fadeRise(
+          state: state,
+          child: const PermissionScreen(),
+        ),
+      ),
+
+      // --- Onboarding (post-auth, pre-home) ---
+      GoRoute(
+        path: '/onboarding',
+        pageBuilder: (context, state) => AppTransitions.fadeRise(
+          state: state,
+          child: const OnboardingScreen(),
+        ),
+      ),
+
       // --- Reserved full-screen pages (PLANNING §10.2) ---
       GoRoute(
         path: '/workout-details',
         pageBuilder: (context, state) => AppTransitions.fadeRise(
           state: state,
-          child: const WorkoutDetailsScreen(),
+          child: WorkoutDetailsScreen(
+            workoutId: state.uri.queryParameters['id'],
+          ),
         ),
       ),
       GoRoute(
         path: '/instruction-video',
         pageBuilder: (context, state) => AppTransitions.fadeRise(
           state: state,
-          child: const InstructionVideoScreen(),
+          child: InstructionVideoScreen(
+            exerciseId: state.uri.queryParameters['ex'] ?? 'squat',
+          ),
         ),
       ),
       GoRoute(
         path: '/vision',
         pageBuilder: (context, state) => AppTransitions.fadeRise(
           state: state,
-          child: const VisionScreen(),
+          child: VisionSessionScreen(
+            exerciseId: state.uri.queryParameters['ex'] ?? 'squat',
+          ),
         ),
       ),
       GoRoute(
         path: '/summary',
         pageBuilder: (context, state) => AppTransitions.fadeRise(
           state: state,
-          child: const SessionSummaryScreen(),
+          child: SessionSummaryScreen(
+            sessionId: state.uri.queryParameters['session'],
+          ),
         ),
       ),
       GoRoute(

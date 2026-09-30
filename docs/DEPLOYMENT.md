@@ -36,6 +36,22 @@ Artifact: `build/app/outputs/flutter-apk/app-release.apk`
 Deliverable: copy → `releases/v<version>/FixPose-v<version>-<buildtype>.apk` (naming + size budget in `releases/README.md`)
 CI: tag push (`v*`) → GitHub Actions builds APK automatically.
 
+### R8 / ProGuard (release crash fix, applied 2026-10-01)
+The Flutter Gradle plugin force-enables `isMinifyEnabled` + `isShrinkResources` for release builds
+(debug builds are unminified — debug ✅ / release ❌ crash). With AGP 9.x **R8 fullMode**, plugins
+without consumer rules lose reflection/JNI wiring at runtime. Fix in place (auto-included by the
+plugin — no `build.gradle` edit needed):
+- `android/app/proguard-rules.pro` — keeps for `io.flutter.embedding.**`, `MainActivity`,
+  `GeneratedPluginRegistrant`, `com.google.mlkit.**`, `com.google.android.gms.**`, `androidx.camera.**`,
+  `io.flutter.plugins.camerax.**`, GSON TypeAdapter/TypeToken/`@SerializedName` (flutter_local_notifications
+  vendor requirement), `com.github.dart_lang.jni.**` (drift/sqlite), `androidx.security.crypto` +
+  `com.it_nomads.fluttersecurestorage`, `app.cash.sqldelight`; plus `-keepattributes Signature, *Annotation*, InnerClasses, EnclosingMethod`
+- `android/app/src/main/res/raw/keep.xml` — `tools:keep` for `@drawable/*`, `@mipmap/*`, `@raw/*`
+
+If a future release still crashes on startup, bisect with `-Pshrink=false` (disables resource shrink)
+or set `android.enableR8.fullMode=false` in `gradle.properties`, then narrow the missing keep from the
+stack trace. Verify a release build with `apksigner verify` + a cold-start smoke test on-device.
+
 ## Secrets checklist (NEVER in repo)
 - [ ] Gmail App Password
 - [ ] GROQ API key

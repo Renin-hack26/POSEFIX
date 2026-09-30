@@ -11,7 +11,8 @@ import '../datasources/local/chat_dao.dart';
 /// VEDA chat — local history (account-synced via the sweep) + GROQ transport.
 ///
 /// The API key is injected at build time (`--dart-define=GROQ_API_KEY=...`)
-/// from `secrets/local.env` — never hardcoded, never committed.
+/// from `secrets/local.env` — never hardcoded, never committed. Model:
+/// `openai/gpt-oss-120b`.
 class VedaRepositoryImpl implements VedaRepository {
   VedaRepositoryImpl(this._dao, {http.Client? client})
       : _client = client ?? http.Client();
@@ -21,7 +22,7 @@ class VedaRepositoryImpl implements VedaRepository {
 
   static const String _endpoint =
       'https://api.groq.com/openai/v1/chat/completions';
-  static const String _model = 'llama-3.3-70b-versatile';
+  static const String _model = 'openai/gpt-oss-120b';
   static const String _apiKey = String.fromEnvironment('GROQ_API_KEY');
 
   @override
@@ -38,11 +39,14 @@ class VedaRepositoryImpl implements VedaRepository {
     required List<ChatMessage> turns,
     required String systemPrompt,
   }) async {
-    if (_apiKey.isEmpty) throw const VedaUnavailableException();
+    if (_apiKey.isEmpty) {
+      throw const VedaUnavailableException('API key not configured for this build');
+    }
     final body = jsonEncode({
       'model': _model,
       'temperature': 0.4,
-      'max_tokens': 512,
+      'max_tokens': 1024,
+      'reasoning_effort': 'low',
       'messages': [
         {'role': 'system', 'content': systemPrompt},
         for (final t in turns)

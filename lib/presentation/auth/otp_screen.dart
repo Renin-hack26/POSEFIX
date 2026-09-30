@@ -146,8 +146,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         );
       } else {
         // Signup verified: account created + session established inside the
-        // use case → straight to HOME.
-        context.go('/home');
+        // use case → onboarding picks level/goal then generates first plan.
+        context.go('/onboarding');
       }
     } on AppException catch (e) {
       if (!mounted) return;

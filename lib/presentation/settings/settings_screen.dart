@@ -1,79 +1,91 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/di/app_dependencies.dart';
+import '../../core/notification/notification_engine.dart';
+import '../../core/storage/hive_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_mode_provider.dart';
+import '../../data/mappers/session_json.dart';
+import '../../domain/entities/user_profile.dart';
+import '../../domain/entities/workout_session.dart';
 import '../shared/glass_card.dart';
 import '../shared/grid_background.dart';
 
-// UI-first toggle — phase P7/P1 wires the real behavior.
-const _unitOptions = [('kg · cm', 'metric'), ('lb · ft', 'imperial')];
+/// Theme choices for the Appearance picker (device-follow by default).
 const _themeOptions = [
   ('Auto (device)', ThemeMode.system),
   ('Light', ThemeMode.light),
   ('Dark', ThemeMode.dark),
 ];
-const _profileName = 'Alex Carter';
-const _profileMeta = 'alex.carter@gmail.com · Male · 72 kg · 178 cm';
-const _reminderTimes = '07:00 · 17:00';
-const _quietHoursRange = '22:00 – 07:00';
 
-/// 14 — Settings tab (sample/index.html): profile, preferences (units,
-/// appearance, language), notifications, coach voice, data and account.
+/// Device-local keys for flags not listed among [HiveService]'s constants.
+/// The settings box is open key/value storage — these survive restarts.
+const String _kReminderMinuteOfDay =
+    'reminderMinuteOfDay'; // int — minutes since 00:00
+const String _kCoachMuted = 'coachMuted'; // bool — true = spoken cues off
+
+/// Default daily reminder time (07:00) until the user picks one.
+const int _defaultReminderMinuteOfDay = 7 * 60;
+
+/// 14 — Settings tab (sample/index.html): profile, preferences, notifications,
+/// coach voice, data and account.
 ///
-/// The Appearance picker is bound to `themeModeProvider` — it defaults to
-/// "Auto (device)" and follows the device until the user picks a side.
+/// Every row is wired to real behavior:
+/// - Appearance → `themeModeProvider` (Hive-backed).
+/// - Workout reminders → `NotificationEngine` (permission + daily schedule).
+/// - Reminder time → `showTimePicker` + daily reminder reschedule.
+/// - Spoken cues → `SoundEngine.setMuted` (Hive-backed).
+/// - Export workouts → session history serialized to JSON via share_plus.
+/// - Privacy → clears VEDA chat history through `VedaRepository`.
+/// - Sign out → `signOutProvider` + redirect to sign-in.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(themeModeProvider);
     return Scaffold(
       body: GridBackground(
         child: SafeArea(
-          child: _SettingsBody(
-            themeMode: themeMode,
-            onThemeModeChanged: (mode) =>
-                ref.read(themeModeProvider.notifier).set(mode),
-            onSignOut: () async {
-              try {
-                await ref.read(signOutProvider)();
-              } catch (_) {
-                // Best effort — session may already be cleared locally.
-              }
-              if (context.mounted) context.go('/signin');
-            },
-          ),
+          child: const _SettingsBody(),
         ),
       ),
     );
   }
 }
 
-/// Holds the UI-first toggles (units, reminders, quiet hours) while the
-/// Settings screen stays open; the theme choice lives in [themeModeProvider].
-class _SettingsBody extends StatefulWidget {
-  const _SettingsBody({
-    required this.themeMode,
-    required this.onThemeModeChanged,
-    required this.onSignOut,
-  });
-
-  final ThemeMode themeMode;
-  final ValueChanged<ThemeMode> onThemeModeChanged;
-  final VoidCallback onSignOut;
+class _SettingsBody extends ConsumerStatefulWidget {
+  const _SettingsBody();
 
   @override
-  State<_SettingsBody> createState() => _SettingsBodyState();
+  ConsumerState<_SettingsBody> createState() => _SettingsBodyState();
 }
 
-class _SettingsBodyState extends State<_SettingsBody> {
-  String _units = 'metric';
-  bool _workoutReminders = true;
-  bool _quietHours = true;
+class _SettingsBodyState extends ConsumerState<_SettingsBody> {
+  late bool _remindersEnabled =
+      HiveService.getBool(HiveService.kNotificationsEnabled);
+  late bool _coachMuted = HiveService.getBool(_kCoachMuted);
+  UserProfile? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    // Apply the persisted coach-voice flag to the live engine (real mute API).
+    ref.read(soundEngineProvider).setMuted(_coachMuted);
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final user = await ref.read(userRepositoryProvider).currentUser();
+    if (!mounted) return;
+    setState(() => _profile = user);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,108 +109,246 @@ class _SettingsBodyState extends State<_SettingsBody> {
           const SizedBox(height: 20),
           const _SectionLabel('Preferences'),
           const SizedBox(height: 9),
-          _LRow(
-            icon: Icons.scale,
-            title: 'Units',
-            trailing: SizedBox(
-              width: 130,
-              child: _Segmented<String>(
-                options: _unitOptions,
-                value: _units,
-                onChanged: (value) => setState(() => _units = value),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
           _appearanceRow(p),
-          const SizedBox(height: 10),
-          _LRow(
-            icon: Icons.translate,
-            title: 'Language',
-            value: 'English',
-            chevron: true,
-          ),
           const SizedBox(height: 20),
           const _SectionLabel('Notifications'),
           const SizedBox(height: 9),
           _LRow(
             icon: Icons.notifications_active,
             title: 'Workout reminders',
-            subtitle: 'Sent at plan session times',
+            subtitle: 'Daily reminder at your chosen time',
             trailing: Switch(
-              value: _workoutReminders,
-              onChanged: (value) =>
-                  setState(() => _workoutReminders = value),
+              value: _remindersEnabled,
+              onChanged: _setReminders,
             ),
           ),
           const SizedBox(height: 10),
           _LRow(
             icon: Icons.schedule,
-            title: "Today's times",
-            subtitle: _reminderTimes,
-            trailing: const _Chip(label: 'Edit'),
-          ),
-          const SizedBox(height: 10),
-          _LRow(
-            icon: Icons.bedtime,
-            title: 'Quiet hours',
-            subtitle: _quietHoursRange,
-            trailing: Switch(
-              value: _quietHours,
-              onChanged: (value) => setState(() => _quietHours = value),
-            ),
+            title: 'Reminder time',
+            value: _reminderLabel(),
+            onTap: _pickReminderTime,
           ),
           const SizedBox(height: 20),
           const _SectionLabel('Coach voice'),
           const SizedBox(height: 9),
           _LRow(
             icon: Icons.graphic_eq,
-            title: 'Offline voice ready',
-            subtitle: 'Voice pack installed — works without internet',
-            iconColor: p.accentDeep,
-            trailing: Icon(Icons.check_circle, size: 20, color: p.accentDeep),
+            title: 'Spoken cues',
+            subtitle: 'Coaching voice and form corrections',
+            trailing: Switch(
+              value: !_coachMuted,
+              onChanged: _setCoachVoice,
+            ),
           ),
           const SizedBox(height: 20),
           const _SectionLabel('Data'),
           const SizedBox(height: 9),
           _LRow(
             icon: Icons.ios_share,
-            title: 'Export reports',
-            subtitle: 'PDF · CSV',
-            chevron: true,
+            title: 'Export workouts',
+            subtitle: 'Share your history as JSON',
+            onTap: _exportWorkouts,
           ),
           const SizedBox(height: 10),
           _LRow(
             icon: Icons.shield,
             title: 'Privacy',
-            subtitle: 'On-device processing · clear cache',
-            chevron: true,
+            subtitle: 'On-device processing · clear VEDA chat',
+            onTap: _clearVedaChat,
           ),
           const SizedBox(height: 20),
           const _SectionLabel('Account'),
           const SizedBox(height: 9),
           _LRow(
-            icon: Icons.delete,
-            title: 'Delete account',
-            danger: true,
-            chevron: true,
-          ),
-          const SizedBox(height: 10),
-          _LRow(
             icon: Icons.logout,
             title: 'Sign out',
             danger: true,
-            chevron: true,
-            onTap: widget.onSignOut,
+            onTap: _signOut,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
+          Center(
+            child: Text(
+              'FixPose 1.1.0', // keep in sync with pubspec.yaml version
+              style: TextStyle(fontSize: 11.5, color: p.ink3),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  /// Profile summary card (sample profile `.glass.pad.row`).
+  // --- actions -------------------------------------------------------------
+
+  /// Enables/removes the daily reminder through the NotificationEngine.
+  /// Turning it on requests the OS permission first; a denial is honest —
+  /// the toggle stays off and the user is told where to unblock it.
+  Future<void> _setReminders(bool enabled) async {
+    final engine = ref.read(notificationEngineProvider);
+    if (enabled) {
+      await engine.initialize(); // channels + OS permission request
+      final granted = await engine.areNotificationsEnabled();
+      if (!mounted) return;
+      if (!granted) {
+        ScaffoldMessenger.of(context).showSnackBar(_snack(
+          'Notifications are blocked — allow them in system settings',
+        ));
+        return;
+      }
+      await _scheduleDailyReminder(engine);
+    } else {
+      await engine.cancelAll();
+    }
+    await HiveService.setBool(HiveService.kNotificationsEnabled, enabled);
+    if (!mounted) return;
+    setState(() => _remindersEnabled = enabled);
+  }
+
+  Future<void> _scheduleDailyReminder(NotificationEngine engine) async {
+    final minuteOfDay =
+        HiveService.getInt(_kReminderMinuteOfDay) ?? _defaultReminderMinuteOfDay;
+    await engine.scheduleDailyReminder(
+      hour: minuteOfDay ~/ 60,
+      minute: minuteOfDay % 60,
+      workoutName: 'Your workout',
+      workoutId: 'settings-daily-reminder',
+    );
+  }
+
+  Future<void> _pickReminderTime() async {
+    final minuteOfDay =
+        HiveService.getInt(_kReminderMinuteOfDay) ?? _defaultReminderMinuteOfDay;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: minuteOfDay ~/ 60, minute: minuteOfDay % 60),
+    );
+    if (picked == null) return;
+    await HiveService.setInt(
+        _kReminderMinuteOfDay, picked.hour * 60 + picked.minute);
+    if (_remindersEnabled) {
+      await _scheduleDailyReminder(ref.read(notificationEngineProvider));
+    }
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  String _reminderLabel() {
+    final minuteOfDay =
+        HiveService.getInt(_kReminderMinuteOfDay) ?? _defaultReminderMinuteOfDay;
+    final hour = minuteOfDay ~/ 60;
+    final minute = (minuteOfDay % 60).toString().padLeft(2, '0');
+    final suffix = hour < 12 ? 'AM' : 'PM';
+    final display = hour % 12 == 0 ? 12 : hour % 12;
+    return '$display:$minute $suffix';
+  }
+
+  /// Coach voice toggle → SoundEngine.setMuted, persisted in Hive.
+  void _setCoachVoice(bool spoken) {
+    ref.read(soundEngineProvider).setMuted(!spoken);
+    HiveService.setBool(_kCoachMuted, !spoken);
+    setState(() => _coachMuted = !spoken);
+  }
+
+  /// Serializes workout history to JSON and hands the file to the share sheet.
+  Future<void> _exportWorkouts() async {
+    try {
+      final sessions = await ref.read(sessionRepositoryProvider).history();
+      final payload = jsonEncode({
+        'exportedAt': DateTime.now().toIso8601String(),
+        'sessions': [for (final s in sessions) _sessionToJson(s)],
+      });
+      final dir = await getTemporaryDirectory();
+      final stamp = DateTime.now().millisecondsSinceEpoch;
+      final file = File('${dir.path}/fixpose_workouts_$stamp.json');
+      await file.writeAsString(payload);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: 'My FixPose workout history',
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(_snack('Export failed — please try again'));
+    }
+  }
+
+  /// Session → JSON (nested exercises via the shared mappers).
+  Map<String, dynamic> _sessionToJson(WorkoutSession s) => {
+        'id': s.id,
+        'workoutId': s.workoutId,
+        'startedAt': s.startedAt.toIso8601String(),
+        'endedAt': s.endedAt?.toIso8601String(),
+        'status': s.status.name,
+        'durationSec': s.durationSec,
+        'totalReps': s.totalReps,
+        'avgCadenceRpm': s.avgCadenceRpm,
+        'formAccuracyPct': s.formAccuracyPct,
+        'exercises': [for (final e in s.exercises) exerciseToMap(e)],
+      };
+
+  /// Clears VEDA chat history (real repository API) after a confirmation.
+  Future<void> _clearVedaChat() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Clear VEDA chat?'),
+        content: const Text(
+          'This deletes your VEDA conversation history on this device. '
+          'It cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(vedaRepositoryProvider).clearHistory();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(_snack('VEDA chat history cleared'));
+  }
+
+  Future<void> _signOut() async {
+    try {
+      await ref.read(signOutProvider)();
+    } catch (_) {
+      // Best effort — the local session may already be cleared.
+    }
+    if (!mounted) return;
+    context.go('/signin');
+  }
+
+  SnackBar _snack(String message) => SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      );
+
+  // --- widgets -------------------------------------------------------------
+
+  /// Profile summary card — real signed-in user (no placeholder identities).
   Widget _profileCard(AppPalette p) {
+    final user = _profile;
+    final name = user == null
+        ? 'Not signed in'
+        : (user.fullName.isNotEmpty ? user.fullName : user.email);
+    final details = <String>[
+      if (user != null) user.email,
+      if (user != null) user.gender.label,
+      if (user?.weightKg != null) '${user!.weightKg!.round()} kg',
+      if (user?.heightCm != null) '${user!.heightCm!.round()} cm',
+    ];
+    final meta = user == null
+        ? 'Sign in to sync your plan and progress'
+        : details.join(' · ');
     return GlassCard(
       padding: const EdgeInsets.all(18),
       child: Row(
@@ -226,7 +376,7 @@ class _SettingsBodyState extends State<_SettingsBody> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _profileName,
+                  name,
                   style: TextStyle(
                     fontSize: 15.5,
                     fontWeight: FontWeight.w800,
@@ -235,21 +385,21 @@ class _SettingsBodyState extends State<_SettingsBody> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _profileMeta,
+                  meta,
                   style: TextStyle(fontSize: 11.5, color: p.ink3),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          const _Chip(label: 'Edit'),
         ],
       ),
     );
   }
 
-  /// Appearance row: Auto (device) / Light / Dark segmented picker.
+  /// Appearance row: Auto (device) / Light / Dark segmented picker, bound to
+  /// `themeModeProvider` (the notifier persists the choice in Hive).
   Widget _appearanceRow(AppPalette p) {
+    final themeMode = ref.watch(themeModeProvider);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -284,8 +434,9 @@ class _SettingsBodyState extends State<_SettingsBody> {
           const SizedBox(height: 10),
           _Segmented<ThemeMode>(
             options: _themeOptions,
-            value: widget.themeMode,
-            onChanged: widget.onThemeModeChanged,
+            value: themeMode,
+            onChanged: (mode) =>
+                ref.read(themeModeProvider.notifier).set(mode),
           ),
         ],
       ),
@@ -325,8 +476,6 @@ class _LRow extends StatelessWidget {
     this.subtitle,
     this.value,
     this.trailing,
-    this.iconColor,
-    this.chevron = false,
     this.danger = false,
     this.onTap,
   });
@@ -336,8 +485,6 @@ class _LRow extends StatelessWidget {
   final String? subtitle;
   final String? value;
   final Widget? trailing;
-  final Color? iconColor;
-  final bool chevron;
   final bool danger;
   final VoidCallback? onTap;
 
@@ -360,7 +507,7 @@ class _LRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: iconColor ?? p.ink2),
+          Icon(icon, size: 20, color: p.ink2),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -394,10 +541,6 @@ class _LRow extends StatelessWidget {
           if (trailing != null) ...[
             const SizedBox(width: 10),
             trailing!,
-          ],
-          if (chevron) ...[
-            const SizedBox(width: 4),
-            Icon(Icons.chevron_right, size: 20, color: p.ink3),
           ],
         ],
       ),
@@ -474,34 +617,6 @@ class _Segmented<T> extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-/// Static glass chip (sample `.chip`) — decorative row action.
-class _Chip extends StatelessWidget {
-  const _Chip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-      decoration: BoxDecoration(
-        color: p.glassHi,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: p.border, width: 1.2),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w700,
-          color: p.ink,
-        ),
       ),
     );
   }
