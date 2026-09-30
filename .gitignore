@@ -1,0 +1,33 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+# pubspec.lock IS committed (this is an app, not a package)
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Android
+android/.gradle/
+android/local.properties
+android/app/debug/*.keystore
+android/app/profile/*.keystore
+android/app/release/*.keystore
+*.jks
+*.keystore
+
+# Secrets — NEVER commit (Gmail App Password, Gemini key)
+.env
+secrets/
+google-services.json # Firebase config — add manually, see DEPLOYMENT.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Reports generated at runtime
+*.pdf.reports/

@@ -1,0 +1,19 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - build/**
+    - android/**
+  errors:
+    unused_import: error
+    dead_code: error
+
+linter:
+  rules:
+    prefer_final_locals: true
+    unawaited_futures: true
+    always_declare_return_types: true
+    avoid_print: true
+    directives_ordering: true
