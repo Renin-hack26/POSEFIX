@@ -29,9 +29,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/signin', builder: (context, state) => const SignInScreen()),
       GoRoute(path: '/signup', builder: (context, state) => const SignUpScreen()),
-      GoRoute(path: '/otp', builder: (context, state) => const OtpScreen()),
+      GoRoute(
+        path: '/otp',
+        builder: (context, state) => OtpScreen(
+          args: state.extra is OtpArgs ? state.extra as OtpArgs : null,
+        ),
+      ),
       GoRoute(path: '/forgot', builder: (context, state) => const ForgotPasswordScreen()),
-      GoRoute(path: '/reset-password', builder: (context, state) => const ResetPasswordScreen()),
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) => ResetPasswordScreen(
+          args: state.extra is OtpArgs ? state.extra as OtpArgs : null,
+        ),
+      ),
 
       // --- 4-tab shell ---
       StatefulShellRoute.indexedStack(

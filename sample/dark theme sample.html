@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Posefix – Home screen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap">
+<style>
+:root{--bg:#0c1022;--ink:#eef0ff;--mute:#9aa3c7;--glass:rgba(255,255,255,.07);--line:rgba(255,255,255,.14);--a:#5eead4;--b:#7c6cff;--warn:#ff7a6b;--ok:#5eead4;
+--grad:linear-gradient(135deg,#5eead4,#7c6cff);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:500 15px/1.45 'DM Sans',system-ui,sans-serif;min-height:100vh;display:flex;justify-content:center;
+background-image:radial-gradient(60% 40% at 15% 0%,rgba(124,108,255,.45),transparent 70%),radial-gradient(50% 35% at 100% 30%,rgba(94,234,212,.25),transparent 70%),radial-gradient(60% 40% at 0% 100%,rgba(255,122,107,.18),transparent 70%);background-attachment:fixed}
+h1,h2,.num{font-family:'Sora',system-ui,sans-serif}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+button:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.app{width:100%;max-width:420px;padding:20px 18px 110px;position:relative}
+.glass{background:linear-gradient(160deg,rgba(255,255,255,.13),rgba(255,255,255,.04));border:1px solid var(--line);border-radius:26px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 18px 40px rgba(4,6,20,.45)}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+header h1{font-size:24px;font-weight:700;letter-spacing:-.02em}
+header p{color:var(--mute);font-size:13px}
+.streak{padding:8px 12px;border-radius:99px;font-size:13px;font-weight:600;display:flex;gap:6px;align-items:center}
+.streak i{width:8px;height:8px;border-radius:50%;background:var(--warn);box-shadow:0 0 10px var(--warn)}
+.hero{padding:16px;overflow:hidden}
+.hero-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.hero-top h2{font-size:16px;font-weight:600}
+.seg{display:flex;padding:3px;border-radius:99px;background:rgba(0,0,0,.28)}
+.seg button{padding:6px 12px;border-radius:99px;font-size:13px;color:var(--mute);transition:.25s}
+.seg button[aria-pressed=true]{background:var(--grad);color:#0c1022;font-weight:600;box-shadow:0 4px 14px rgba(124,108,255,.5)}
+.stage{position:relative;border-radius:20px;background:rgba(6,9,26,.55);border:1px solid var(--line);overflow:hidden}
+svg{display:block;width:100%;height:auto}
+.rep{position:absolute;left:14px;top:10px}
+.rep .num{font-size:52px;font-weight:700;line-height:1;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.rep small{display:block;color:var(--mute);font-size:12px}
+.rep .num.pop{animation:pop .35s}
+@keyframes pop{40%{transform:scale(1.18)}}
+.cue{position:absolute;left:12px;right:12px;bottom:12px;display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:16px;background:rgba(12,16,34,.75);border:1px solid var(--line);font-size:14px;transition:.3s;opacity:0;transform:translateY(8px)}
+.cue.show{opacity:1;transform:none}
+.cue.warn{border-color:var(--warn);color:#ffd3cd}.cue.ok{border-color:rgba(94,234,212,.5)}
+.cue b{width:9px;height:9px;border-radius:50%;flex:none;background:var(--ok);box-shadow:0 0 10px var(--ok)}
+.cue.warn b{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+.voice{margin-left:auto;font-size:12px;padding:4px 10px;border-radius:99px;border:1px solid var(--line);color:var(--mute)}
+.voice[aria-pressed=true]{color:#0c1022;background:var(--a);border-color:var(--a)}
+.go{position:relative;overflow:hidden;width:100%;margin:16px 0 22px;padding:18px;border-radius:22px;background:var(--grad);color:#0c1022;font:700 17px 'Sora',sans-serif;box-shadow:inset 0 2px 0 rgba(255,255,255,.55),0 14px 34px rgba(124,108,255,.5);transition:transform .2s}
+.go::after{content:"";position:absolute;inset:0 auto 0 -60%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);transform:skewX(-20deg);animation:sheen 3.6s 1s infinite}
+@keyframes sheen{to{left:130%}}
+.go:active{transform:scale(.97)}
+.stats{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;margin-bottom:22px}
+.stat{padding:14px 12px;border-radius:20px;text-align:center}
+.stat .num{font-size:24px;font-weight:700}.stat small{color:var(--mute);font-size:12px}
+.ring{width:64px;height:64px;margin:0 auto 4px;display:block}
+h3{font-size:15px;font-weight:600;margin:0 2px 10px}
+.row{display:flex;gap:12px;overflow-x:auto;padding:2px 2px 14px;scroll-snap-type:x mandatory;scrollbar-width:none}
+.row::-webkit-scrollbar{display:none}
+.ex{flex:none;width:150px;padding:14px;border-radius:22px;text-align:left;scroll-snap-align:start;transition:transform .2s,border-color .2s}
+.ex:active{transform:scale(.96)}
+.ex:hover{border-color:rgba(94,234,212,.6)}
+.ex strong{display:block;font:600 16px 'Sora',sans-serif;margin:10px 0 2px}
+.ex span{color:var(--mute);font-size:12.5px}
+.ex .ic{width:38px;height:38px;border-radius:12px;background:var(--grad);display:grid;place-items:center}
+.ex.soon{opacity:.55}
+.priv{display:flex;gap:12px;padding:14px 16px;border-radius:20px;font-size:13.5px;color:var(--mute);align-items:center}
+.priv svg{width:26px;flex:none}
+nav{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:calc(100% - 28px);max-width:392px;display:grid;grid-template-columns:repeat(4,1fr);padding:6px;border-radius:26px;z-index:5;background:rgba(16,20,44,.72)}
+nav .ind{position:absolute;top:6px;bottom:6px;left:6px;width:calc((100% - 12px)/4);border-radius:20px;background:rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.3);transition:transform .35s cubic-bezier(.3,1.3,.5,1)}
+nav button{position:relative;padding:9px 0 7px;font-size:11.5px;color:var(--mute);display:flex;flex-direction:column;align-items:center;gap:3px;transition:color .2s}
+nav button[aria-current=page]{color:var(--ink)}
+nav svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sheet-bg{position:fixed;inset:0;background:rgba(4,6,20,.6);opacity:0;pointer-events:none;transition:.3s;z-index:8}
+.sheet{position:fixed;left:50%;bottom:0;width:100%;max-width:420px;transform:translate(-50%,105%);transition:transform .45s cubic-bezier(.2,.9,.3,1);z-index:9;padding:20px 18px calc(24px + env(safe-area-inset-bottom,0px));border-radius:30px 30px 0 0;background:rgba(18,22,50,.92)}
+body.open .sheet-bg{opacity:1;pointer-events:auto}body.open .sheet{transform:translate(-50%,0)}
+.sheet h2{font-size:20px;margin-bottom:4px}.sheet p{color:var(--mute);font-size:13.5px;margin-bottom:14px}
+.opt{display:flex;width:100%;justify-content:space-between;align-items:center;padding:14px 16px;border-radius:18px;margin-bottom:10px;border:1px solid var(--line);background:var(--glass);text-align:left}
+.opt[aria-pressed=true]{border-color:var(--a);box-shadow:0 0 0 3px rgba(94,234,212,.18)}
+.opt span{color:var(--mute);font-size:12.5px}
+.toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translate(-50%,-140%);padding:11px 18px;border-radius:99px;z-index:20;font-size:13.5px;transition:transform .4s cubic-bezier(.2,.9,.3,1);background:rgba(20,24,52,.92)}
+.toast.on{transform:translate(-50%,0)}
+.view{display:none}.view.on{display:block;animation:vin .35s}
+@keyframes vin{from{opacity:0;transform:translateY(8px)}}
+.view>h1{font-size:24px;margin-bottom:4px}.sub{color:var(--mute);font-size:13.5px;margin-bottom:16px}
+.item{display:flex;align-items:center;gap:12px;padding:14px;border-radius:20px;margin-bottom:10px}
+.item div{flex:1}.item strong{display:block;font:600 15px 'Sora',sans-serif}.item span{color:var(--mute);font-size:12.5px}
+.pill{padding:9px 16px;border-radius:99px;background:var(--grad);color:#0c1022;font-weight:700;font-size:13px}
+.pill[disabled]{background:rgba(255,255,255,.1);color:var(--mute);cursor:default}
+.plan{padding:18px;margin-bottom:16px}.plan h2{font-size:18px;margin-bottom:4px}.plan p{color:var(--mute);font-size:13.5px;margin-bottom:14px}
+.big{padding:18px 18px 0;margin-bottom:12px}.big .num{font-size:40px;font-weight:700}.big small{color:var(--mute);font-size:13px;margin-left:6px}
+.bars{display:flex;gap:8px;align-items:flex-end;height:120px;padding-top:14px}
+.bars i{flex:1;border-radius:10px 10px 4px 4px;background:var(--grad);height:0;transition:height .7s cubic-bezier(.2,.9,.3,1)}
+.days{display:flex;gap:8px;padding:6px 0 14px;color:var(--mute);font-size:11.5px}.days span{flex:1;text-align:center}
+.avatar{width:72px;height:72px;border-radius:50%;background:var(--grad);display:grid;place-items:center;font:700 26px 'Sora',sans-serif;color:#0c1022;margin:4px 0 12px;box-shadow:0 10px 30px rgba(124,108,255,.5)}
+.sw{width:46px;height:28px;border-radius:99px;background:rgba(255,255,255,.14);position:relative;flex:none;transition:.25s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.25s}
+.sw[aria-pressed=true]{background:var(--a)}.sw[aria-pressed=true]::after{left:21px}
+.endset{display:none}.go.endset{margin:12px 0 0}
+.form{padding:18px;margin-bottom:12px}.form h2{font-size:18px;margin-bottom:2px}.form .sub{margin-bottom:0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+label{display:block;font-size:12px;color:var(--mute)}
+input{width:100%;margin-top:6px;padding:12px 10px;border-radius:14px;border:1px solid var(--line);background:rgba(0,0,0,.28);color:var(--ink);font:600 16px 'Sora',sans-serif;outline:0;transition:.2s}
+input:focus{border-color:var(--a);box-shadow:0 0 0 3px rgba(94,234,212,.18)}
+.lbl{font-size:12px;color:var(--mute);margin-bottom:6px}
+#gender{display:flex}#gender button{flex:1;padding:9px 4px}
+.bmi{margin-top:12px;font-size:13.5px;color:var(--mute)}.bmi b{color:var(--ink)}
+#sum{margin-bottom:14px}
+body.cam .endset{display:block}body.cam nav{display:none}
+body.cam .hero{position:fixed;inset:0;z-index:15;border-radius:0;display:flex;flex-direction:column;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px));background:var(--bg)}
+body.cam .stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+body.cam .stage svg{height:100%;max-height:100%}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main class="app">
+<div class="view on" id="v0">
+  <header>
+    <div><p>Good evening</p><h1>Ready to move?</h1></div>
+    <div class="glass streak"><i></i>4-day streak</div>
+  </header>
+
+  <section class="glass hero" aria-label="Live form check demo">
+    <div class="hero-top"><h2>Live form check</h2>
+      <div class="seg" role="group" aria-label="Exercise">
+        <button data-ex="squat" aria-pressed="true">Squat</button>
+        <button data-ex="pushup" aria-pressed="false">Push-up</button>
+      </div></div>
+    <div class="stage">
+      <svg viewBox="0 0 320 340" aria-hidden="true">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#5eead4"/><stop offset="1" stop-color="#7c6cff"/></linearGradient>
+        <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="rgba(255,255,255,.05)"/></pattern></defs>
+        <rect width="320" height="340" fill="url(#grid)"/>
+        <line x1="20" y1="304" x2="300" y2="304" stroke="rgba(255,255,255,.2)" stroke-dasharray="4 6"/>
+        <g id="bones" stroke="url(#g)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"></g>
+        <g id="joints"></g>
+        <text id="ang" fill="#eef0ff" font-family="Sora" font-size="15" font-weight="600"></text>
+      </svg>
+      <div class="rep"><div class="num" id="reps">0</div><small>reps counted</small></div>
+      <div class="cue" id="cue"><b></b><span id="cueTxt"></span><button class="voice" id="voice" aria-pressed="false">Voice off</button></div>
+    </div>
+    <button class="go endset" id="end">End set</button>
+  </section>
+
+  <button class="go" id="start">Start workout</button>
+
+  <section class="stats" aria-label="Today">
+    <div class="glass stat">
+      <svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="7"/><circle cx="32" cy="32" r="26" fill="none" stroke="url(#g)" stroke-width="7" stroke-linecap="round" stroke-dasharray="163.4" stroke-dashoffset="19.6" transform="rotate(-90 32 32)"/><text x="32" y="37" text-anchor="middle" fill="#eef0ff" font-family="Sora" font-weight="700" font-size="15">88</text></svg>
+      <small>Form score</small></div>
+    <div class="glass stat"><div class="num">126</div><small>Reps today</small></div>
+    <div class="glass stat"><div class="num">14</div><small>Minutes</small></div>
+  </section>
+
+  <h3>Pick an exercise</h3>
+  <div class="row">
+    <button class="glass ex" data-pick="squat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0c1022" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="4.5" r="2"/><path d="M12 7v5l-4 3v5M12 12l4 3v5"/></svg></div><strong>Squat</strong><span>Depth and knee tracking</span></button>
+    <button class="glass ex" data-pick="pushup"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0c1022" stroke-width="2.2" stroke-linecap="round"><circle cx="19" cy="7" r="2"/><path d="M3 17l14-8M6 20v-3M15 20v-7"/></svg></div><strong>Push-up</strong><span>Full range of motion</span></button>
+    <button class="glass ex soon" data-pick="soon"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0c1022" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><strong>Lunge</strong><span>Coming soon</span></button>
+  </div>
+
+  <div class="glass priv"><svg viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span>Everything runs on your phone. Your camera video never leaves the device.</span></div>
+</div>
+
+<section class="view" id="v1"><h1>Workouts</h1><p class="sub">Pick a move and the coach starts watching your form.</p>
+  <div class="glass plan"><h2>Hostel room routine</h2><p>10 min. 3 sets of squats, then 3 sets of push-ups. No equipment.</p><button class="pill" data-go="squat">Start routine</button></div>
+  <div class="glass item"><div><strong>Squat</strong><span>Knee and depth check</span></div><button class="pill" data-go="squat">Start</button></div>
+  <div class="glass item"><div><strong>Push-up</strong><span>Elbow angle and range</span></div><button class="pill" data-go="pushup">Start</button></div>
+  <div class="glass item"><div><strong>Lunge</strong><span>Balance and knee tracking</span></div><button class="pill" disabled>Soon</button></div>
+  <div class="glass item"><div><strong>Plank</strong><span>Hip and back alignment</span></div><button class="pill" disabled>Soon</button></div>
+</section>
+
+<section class="view" id="v2"><h1>Progress</h1><p class="sub">How your form is changing this week.</p>
+  <div class="glass big"><span class="num">88</span><small>average form score, up 12</small>
+    <div class="bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="days"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></div>
+  <div class="glass item"><div><strong>Most common fix</strong><span>Knees caving in on 6 squat reps</span></div></div>
+  <div class="glass item"><div><strong>Best session</strong><span>Thursday, 42 clean reps</span></div></div>
+</section>
+
+<section class="view" id="v3"><h1>Your profile</h1><p class="sub">Set up how the coach talks to you.</p>
+  <div class="avatar">Y</div>
+  <p class="sub" id="sum">Add your details below.</p>
+  <div class="glass form"><h2>Body details</h2><p class="sub">The coach uses these to fit angle limits to your body. Saved on this phone only.</p>
+    <div class="grid">
+      <label>Age<input id="age" type="number" inputmode="numeric" min="13" max="99" placeholder="21"></label>
+      <label>Height (cm)<input id="ht" type="number" inputmode="decimal" min="100" max="230" placeholder="170"></label>
+      <label>Weight (kg)<input id="wt" type="number" inputmode="decimal" min="25" max="250" placeholder="65"></label>
+    </div>
+    <div class="lbl">Gender</div>
+    <div class="seg" id="gender" role="group" aria-label="Gender">
+      <button data-g="Female" aria-pressed="false">Female</button><button data-g="Male" aria-pressed="false">Male</button><button data-g="Other" aria-pressed="false">Other</button><button data-g="Not shared" aria-pressed="false">Skip</button>
+    </div>
+    <div class="bmi" id="bmi">Add height and weight to see your BMI.</div>
+    <button class="go" id="save" style="margin:14px 0 0;padding:14px;font-size:15px">Save details</button>
+  </div>
+  <div class="glass item"><div><strong>Voice coaching</strong><span>Spoken corrections during a set</span></div><button class="sw" id="sw1" aria-pressed="false" aria-label="Voice coaching"></button></div>
+  <div class="glass item"><div><strong>Count reps aloud</strong><span>Say each rep as it counts</span></div><button class="sw" aria-pressed="true" aria-label="Count reps aloud"></button></div>
+  <div class="glass item"><div><strong>Camera</strong><span>Front camera, phone propped at hip height</span></div></div>
+  <div class="glass item"><div><strong>Privacy</strong><span>All tracking happens on this phone</span></div></div>
+</section>
+</main>
+
+<nav class="glass" aria-label="Main">
+  <div class="ind" id="ind"></div>
+  <button aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z"/></svg>Home</button>
+  <button><svg viewBox="0 0 24 24"><path d="M6 8v8M18 8v8M3 10v4M21 10v4M6 12h12"/></svg>Workouts</button>
+  <button><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l4-4 3 3 5-6"/></svg>Progress</button>
+  <button><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Profile</button>
+</nav>
+
+<div class="sheet-bg" id="bg"></div>
+<section class="glass sheet" aria-label="Start workout">
+  <h2>What are we training?</h2><p>Prop your phone up so your whole body is in frame.</p>
+  <button class="opt" data-sel="squat" aria-pressed="true">Squat<span>Knee and depth check</span></button>
+  <button class="opt" data-sel="pushup" aria-pressed="false">Push-up<span>Elbow angle check</span></button>
+  <button class="go" id="cam" style="margin:6px 0 0">Open camera</button>
+</section>
+<div class="toast glass" id="toast" role="status"></div>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const NS='http://www.w3.org/2000/svg';
+let ex='squat',reps=0,start=performance.now(),lastCycle=0,shown=null,talk=false;
+const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const rad=x=>x*Math.PI/180;
+function amp(e,c){return c%3===2?.5:1}
+function cueFor(e,c){
+  if(amp(e,c)<1) return e==='squat'?['warn','Knees caving in. Push them out over your toes.']:['warn','Go lower. Bring your elbows to 90°.'];
+  return ['ok',e==='squat'?'Great depth. Keep your chest up.':'Full range. Nice and steady.'];
+}
+function pose(e,d){
+  if(e==='squat'){
+    const f=rad(30*d),p=rad(75*d),t=rad(35*d),A=[120,304];
+    const K=[A[0]+70*Math.sin(f),A[1]-70*Math.cos(f)],H=[K[0]-70*Math.sin(p),K[1]-70*Math.cos(p)];
+    const S=[H[0]+75*Math.sin(t),H[1]-75*Math.cos(t)],Hd=[S[0]+22*Math.sin(t),S[1]-22*Math.cos(t)],W=[S[0]+48,S[1]+12];
+    return {bones:[[[A[0]-10,A[1]],[A[0]+34,A[1]]],[A,K],[K,H],[H,S],[S,W]],joints:[A,K,H,S,W],head:Hd,key:K,angle:Math.round(180-30*d-75*d),bad:'K',n:{ank:A,kn:K,hip:H,sh:S,el:[(S[0]+W[0])/2,(S[1]+W[1])/2],wr:W}};
+  }
+  const W=[250,304],T=[30,304],S=[240,304-(118-33*d)],D=Math.hypot(S[0]-W[0],S[1]-W[1]);
+  const u=[(S[0]-W[0])/D,(S[1]-W[1])/D],h=Math.sqrt(3600-(D/2)**2),M=[(W[0]+S[0])/2,(W[1]+S[1])/2];
+  const E=[M[0]+u[1]*h,M[1]-u[0]*h],L=Math.hypot(S[0]-T[0],S[1]-T[1]),v=[(S[0]-T[0])/L,(S[1]-T[1])/L];
+  const Hp=[T[0]+v[0]*L*.5,T[1]+v[1]*L*.5],Hd=[S[0]+v[0]*28,S[1]+v[1]*28];
+  return {bones:[[T,S],[S,E],[E,W]],joints:[T,Hp,S,E,W],head:Hd,key:E,angle:Math.round(2*Math.asin(D/120)*180/Math.PI),bad:'E',n:{ank:T,kn:[(T[0]+Hp[0])/2,(T[1]+Hp[1])/2],hip:Hp,sh:S,el:E,wr:W}};
+}
+function draw(e,d,warn){
+  const P=pose(e,d),b=$('#bones'),j=$('#joints');
+  b.innerHTML=P.bones.map(([a,c])=>`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}"/>`).join('');
+  j.innerHTML=P.joints.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="#0c1022" stroke="#fff" stroke-width="2.5"/>`).join('')+
+   `<circle cx="${P.head[0]}" cy="${P.head[1]}" r="13" fill="none" stroke="url(#g)" stroke-width="5"/>`+
+   `<circle cx="${P.key[0]}" cy="${P.key[1]}" r="${warn?15:11}" fill="${warn?'rgba(255,122,107,.35)':'rgba(94,234,212,.3)'}" stroke="${warn?'#ff7a6b':'#5eead4'}" stroke-width="2"/>`;
+  const a=$('#ang');a.textContent=P.angle+'°';a.setAttribute('x',P.key[0]+18);a.setAttribute('y',P.key[1]-12);a.setAttribute('fill',warn?'#ffb3aa':'#eef0ff');
+}
+function setCue(c){
+  const el=$('#cue');
+  if(!c){el.classList.remove('show');shown=null;return}
+  if(shown===c[1])return;shown=c[1];
+  el.className='cue show '+c[0];$('#cueTxt').textContent=c[1];
+  if(talk&&'speechSynthesis' in window){speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(c[1]))}
+}
+function frame(now){
+  const t=(now-start)/3200,c=Math.floor(t),p=t-c;
+  if(c>lastCycle){ if(amp(ex,lastCycle)>=.7){reps++;const n=$('#reps');n.textContent=reps;n.classList.remove('pop');void n.offsetWidth;n.classList.add('pop')} lastCycle=c }
+  const a=amp(ex,c),d=a*(.5-.5*Math.cos(2*Math.PI*p)),cue=(p>.42&&p<.95)?cueFor(ex,c):null;
+  draw(ex,d,!!cue&&cue[0]==='warn');setCue(cue);
+  if(!reduce)requestAnimationFrame(frame);
+}
+function setEx(e){ex=e;reps=0;$('#reps').textContent=0;start=performance.now();lastCycle=0;shown=null;
+  $$('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.ex===e));
+  $$('.opt').forEach(b=>b.setAttribute('aria-pressed',b.dataset.sel===e))}
+$$('.seg button').forEach(b=>b.onclick=()=>setEx(b.dataset.ex));
+$$('.opt').forEach(b=>b.onclick=()=>setEx(b.dataset.sel));
+function setVoice(v){talk=v;const b=$('#voice');b.setAttribute('aria-pressed',v);b.textContent=v?'Voice on':'Voice off';$('#sw1').setAttribute('aria-pressed',v)}
+$('#voice').onclick=()=>setVoice(!talk);$('#sw1').onclick=()=>setVoice(!talk);
+$$('.sw').forEach(s=>{if(s.id!=='sw1')s.onclick=()=>s.setAttribute('aria-pressed',s.getAttribute('aria-pressed')!=='true')});
+let gender='';
+function bmi(){const h=+$('#ht').value,w=+$('#wt').value;$('#bmi').innerHTML=h&&w?`BMI <b>${(w/(h/100)**2).toFixed(1)}</b>. A rough guide only.`:'Add height and weight to see your BMI.'}
+function sum(){const a=$('#age').value,h=$('#ht').value,w=$('#wt').value;const s=[a&&a+' yrs',h&&h+' cm',w&&w+' kg',gender&&gender!=='Not shared'&&gender].filter(Boolean);$('#sum').textContent=s.length?s.join(', '):'Add your details below.'}
+function pickG(g){gender=g;$$('#gender button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.g===g))}
+['#age','#ht','#wt'].forEach(s=>$(s).oninput=bmi);
+$$('#gender button').forEach(b=>b.onclick=()=>pickG(b.dataset.g));
+$('#save').onclick=()=>{const a=+$('#age').value,h=+$('#ht').value,w=+$('#wt').value;
+  if(a<13||a>99)return toast('Enter an age between 13 and 99');
+  if(h<100||h>230)return toast('Enter a height between 100 and 230 cm');
+  if(w<25||w>250)return toast('Enter a weight between 25 and 250 kg');
+  if(!gender)return toast('Choose a gender option');
+  try{localStorage.setItem('rl',JSON.stringify({a,h,w,gender}))}catch(e){}
+  sum();toast('Details saved')};
+try{const d=JSON.parse(localStorage.getItem('rl')||'null');if(d){$('#age').value=d.a;$('#ht').value=d.h;$('#wt').value=d.w;pickG(d.gender)}}catch(e){}
+bmi();sum();
+const H=[62,70,66,78,84,80,88];
+function show(i){
+  $$('.view').forEach((v,k)=>v.classList.toggle('on',k===i));
+  $('#ind').style.transform=`translateX(${i*100}%)`;
+  $$('nav button').forEach((b,k)=>k===i?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current'));
+  $$('.bars i').forEach((e,k)=>{e.style.height=0;if(i===2)setTimeout(()=>e.style.height=H[k]+'%',60+k*60)});
+  scrollTo({top:0});
+}
+$$('[data-go]').forEach(b=>b.onclick=()=>{setEx(b.dataset.go);document.body.classList.add('open')});
+$('#end').onclick=()=>{document.body.classList.remove('cam');toast(reps+' reps counted. Nice set.')};
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2200)}
+$('#start').onclick=()=>document.body.classList.add('open');
+$('#bg').onclick=()=>document.body.classList.remove('open');
+$('#cam').onclick=()=>{document.body.classList.remove('open');show(0);setEx(ex);document.body.classList.add('cam')};
+$$('[data-pick]').forEach(b=>b.onclick=()=>{if(b.dataset.pick==='soon')return toast('Lunge is coming soon');setEx(b.dataset.pick);scrollTo({top:0,behavior:'smooth'})});
+$$('nav button').forEach((b,i)=>b.onclick=()=>show(i));
+if(reduce){draw('squat',1,false);setCue(['ok','Great depth. Keep your chest up.'])}else requestAnimationFrame(frame);
+</script>
+</body>
+</html>

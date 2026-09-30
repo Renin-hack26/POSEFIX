@@ -1,14 +1,17 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/theme/app_theme.dart';
+import 'core/theme/theme_mode_provider.dart';
 import 'presentation/navigation/app_router.dart';
 
 /// FixPose app entry point.
 ///
-/// P0 bootstrap responsibilities (docs/PLANNING.md §11):
-///  - Firebase init (P1)
-///  - Drift/Hive init (P0)
-///  - Dependency wiring (core/di)
+/// Bootstrap responsibilities (docs/PLANNING.md §11):
+///  - Theme: liquid-glass light + dark, follows the device by default;
+///    manual Auto/Light/Dark picker lives in Settings (Hive-backed, P1).
+///  - Supabase auth init (P1) — app boots offline-first on mock source.
+///  - Drift/Hive init (P1)
 ///  - Permission flow happens after splash (core/permissions)
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,14 +24,14 @@ class FixPoseApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
       title: 'FixPose',
       debugShowCheckedModeBanner: false,
       routerConfig: router,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00C853)),
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: themeMode, // default = follow device; Settings can override (§9)
     );
   }
 }

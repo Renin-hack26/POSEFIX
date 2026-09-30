@@ -20,10 +20,10 @@ android/app/release/*.keystore
 *.jks
 *.keystore
 
-# Secrets — NEVER commit (Gmail App Password, Gemini key)
+# Secrets — NEVER commit (Gmail App Password, GROQ key, Supabase keys, GitHub token)
 .env
 secrets/
-google-services.json # Firebase config — add manually, see DEPLOYMENT.md
+google-services.json # legacy Firebase config — replaced by Supabase, see DEPLOYMENT.md
 
 # OS
 .DS_Store

@@ -15,7 +15,7 @@
 - 🔐 **Full auth** — signup, OTP, password reset, offline-first sync
 
 ## Tech
-Flutter · Riverpod · GoRouter · Drift · Firebase (Auth/Firestore) · ML Kit Pose Detection · Gemini (free tier)
+Flutter · Riverpod · GoRouter · Drift · Supabase (Auth/Postgres/Storage) · ML Kit Pose Detection · GROQ (VEDA chat)
 
 ## Docs
 | Doc | Purpose |

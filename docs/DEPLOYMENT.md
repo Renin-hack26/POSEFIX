@@ -5,19 +5,18 @@
 ## Requirements
 - Flutter SDK (stable 3.47.5 used in development)
 - Android SDK (minSdk 24 / Android 7+), JDK 17
-- A Firebase project (free Spark tier)
+- A Supabase project (free tier)
 
-## Firebase setup (P1)
-1. Create project at console.firebase.google.com (Spark/free plan)
-2. Enable **Authentication → Email/Password**
-3. Create **Cloud Firestore** (offline persistence enabled in app)
-4. Download `google-services.json` → `android/app/` (git-ignored)
-5. **OTP email (Gmail SMTP):**
+## Supabase + services setup (P1)
+1. Create project at supabase.com (free tier) → copy **Project URL + anon key** (git-ignored local config)
+2. Enable **Authentication → Email/Password** (and disable open signups if desired)
+3. Create Postgres tables + Storage bucket per §7 (sync mirror of local Drift data)
+4. **OTP email (Gmail SMTP):**
    - Create Gmail **App Password** (Google Account → Security → 2-Step Verification → App passwords)
-   - Install Firebase extension **"Trigger Email"** → configure SMTP with the App Password
+   - Deploy the **Supabase Edge Function** (`send-otp`) that sends the branded mail via SMTP with the App Password — secret lives in Supabase, **never in the app**
    - ⚠️ **Sending limits:** ~500 emails/day (normal accounts), ~100/day (newer accounts) — Gmail-only decision (PLANNING.md §5.1)
    - Spam-folder safety: multipart plain+HTML, No-Reply sender, SPF-aligned (implemented in email_service)
-6. **Gemini API key** (VEDA + plan generation) → GitHub Secrets / Firebase params — **never commit**
+5. **GROQ API key** (VEDA chat + plan generation) → GitHub Secrets / secure config — **never commit**
 
 ## Asset pipeline (FFmpeg, before bundling)
 ```
@@ -37,6 +36,6 @@ CI: tag push (`v*`) → GitHub Actions builds APK automatically.
 
 ## Secrets checklist (NEVER in repo)
 - [ ] Gmail App Password
-- [ ] Gemini API key
-- [ ] `google-services.json`
+- [ ] GROQ API key
+- [ ] Supabase Project URL + anon key (local config / GitHub Secrets)
 - [ ] Upload keystore (`*.jks`)

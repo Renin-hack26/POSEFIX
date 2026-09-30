@@ -11,12 +11,9 @@ dependencies:
     sdk: flutter
   audio_session: ^0.2.4
   camera: ^0.12.1
-  cloud_firestore: ^6.10.0
   csv: ^8.0.0
   drift: ^2.35.0
   drift_flutter: ^0.3.1
-  firebase_auth: ^6.7.0
-  firebase_core: ^4.15.0
   fl_chart: ^1.2.0
   flutter_local_notifications: ^8.2.0
   flutter_riverpod: ^3.4.3
@@ -39,6 +36,7 @@ dependencies:
   timezone: ^0.8.0
   video_player: ^2.14.0
   wakelock_plus: ^1.8.1
+  supabase_flutter: ^2.18.0
 
 dev_dependencies:
   flutter_test:

@@ -31,4 +31,4 @@ A: It's a deliberate free-tier decision (documented limits ~100–500/day); the 
 
 ## Product
 **Q: How is content personalized?**
-A: Strike Engine (streaks/badges), rule-based greeting/suggestions + VEDA (hybrid: local rules offline, Gemini free tier online) with full user context (plan, reports, activity logs).
+A: Strike Engine (streaks/badges), rule-based greeting/suggestions + VEDA (hybrid: local rules offline, GROQ online) with full user context (plan, reports, activity logs).

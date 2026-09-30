@@ -38,12 +38,12 @@ Auth (signup/login/OTP/forgot/reset), 4-tab navigation (HOME/WORKOUT/PLAN/SETTIN
 | Models | Freezed + json_serializable | immutable entities, copyWith, JSON |
 | Local DB | Drift (SQLite) | relational queries for history/graphs, migrations |
 | KV cache | Hive | UI prefs, seen-flags, drafts |
-| Auth | Firebase Auth | email/password + OTP verification |
-| Cloud DB | Cloud Firestore (offline persistence ON) | sync layer only; local-first writes |
-| OTP email | Gmail SMTP (App Password) via Firebase "Trigger Email" extension | **Gmail only, simple**; daily limits (~100–500/day) documented in DEPLOYMENT.md |
+| Auth | **Supabase Auth** (`supabase_flutter`) | email/password + OTP verification; user provides project URL + anon key |
+| Cloud DB | **Supabase Postgres + Storage** | sync layer only; local-first writes (Drift primary) |
+| OTP email | Gmail SMTP (**App Password** provided by user) sent via **Supabase Edge Function** (secret stays server-side, never in app) | **Gmail only, simple**; daily limits (~100–500/day) documented in DEPLOYMENT.md |
 | Pose detection | **Google ML Kit Pose Detection** (on-device) | free, well-tested, accurate; Accurate mode → Balanced fallback if FPS < 25 |
 | TTS | flutter_tts (system on-device voices) | offline; **first-launch check prompts one-time voice-pack download if no offline voice**; status in Settings |
-| AI (plan gen + VEDA) | Hybrid: local rules/retrieval offline + **Gemini free tier** online | never blocks core features |
+| AI (plan gen + VEDA) | Hybrid: local rules/retrieval offline + **GROQ** online (VEDA chat) | never blocks core features; key provided by user |
 | Instruction videos | video_player (local assets) | bundled, zero network |
 | Video compression | FFmpeg (PC, build-time) | see §8 |
 | Animations | Lottie / Rive | auth background loop, **posture avatars (user-provided rive/lottie json)**, micro-interactions |
@@ -84,7 +84,7 @@ lib/
 ├── data/
 │   ├── models/                   # Freezed DTOs (§7)
 │   ├── datasources/local/        # Drift DAOs, Hive
-│   ├── datasources/remote/       # Firestore, Auth, Gemini, Gmail-email service
+│   ├── datasources/remote/       # Supabase, GROQ, Gmail-email service
 │   └── repositories/             # offline-first implementations
 ├── domain/
 │   ├── entities/                 # pure entities
@@ -226,7 +226,7 @@ Today's plan exercises (or free picker)
 ### 5.4 PLAN TAB
 | Section | Specification |
 |---|---|
-| Weekly schedule | **AI-generated after signup (onboarding)**; **user-editable** (day, exercise, sets/reps, **session start time**); regenerate/adjust anytime (local rules offline; Gemini when online) |
+| Weekly schedule | **AI-generated after signup (onboarding)**; **user-editable** (day, exercise, sets/reps, **session start time**); regenerate/adjust anytime (local rules offline; GROQ when online) |
 | Today's session card | Curved slot → same flow as Workout tab |
 | Exercise library | **Curved square slots: thumbnail image + icon + name** → detail (video + form rules + muscles + difficulty) |
 | Meal tracking | Also here: **curved square slots (thumbnail + icon + name)** per meal of the day. **Minimal scope:** daily **calorie target** + **manual entry** (search/log, totals vs target) |
@@ -239,7 +239,7 @@ Profile (view/edit incl. weight/height) · Units (kg/lb) · Theme (light/dark/sy
 
 ### 5.6 VEDA (AI assistant)
 - Name: **VEDA** — holds full context: **personal details, name, plan, all reports, activity logs**
-- Hybrid: fast local rules/retrieval (offline) → **Gemini free tier** for complex (graceful offline message)
+- Hybrid: fast local rules/retrieval (offline) → **GROQ** for complex (graceful offline message)
 - Capabilities: explain reports, form-fix advice, modify plan (with confirmation), weekly summaries, workout/nutrition Q&A
 - Entry points: Home bottom slot + dedicated chat screen with history
 
@@ -289,6 +289,16 @@ Profile (view/edit incl. weight/height) · Units (kg/lb) · Theme (light/dark/sy
 4. Agent converts HTML/CSS → Flutter widgets (pixel-matched, themed) — slot spec guarantees no feature loss
 5. Until then: `shared/` placeholders with agreed slot structure
 
+**Confirmed design decisions (2026-09-30, user):**
+- Navigation stays the planned **4 tabs: HOME / WORKOUT / PLAN / SETTINGS** (a 5-item reference design was rejected for nav — style reference only)
+- Visual direction: **liquid glass** — cream-tinted translucent cards + subtle grid-line background in **light**; near-black green-tinted glass in **dark**
+- **Accent: chartreuse green with gradient shading** (bright highlight → deep shade) for a dynamic look; text on chartreuse = near-black green, accent text on surfaces = deep chartreuse (light) / bright chartreuse (dark)
+- **Themes:** follows the device by default (`prefers-color-scheme`) **and** manually switchable (Auto / Light / Dark) — maps to Flutter `ThemeMode.system` + a Settings theme picker
+- **No emoji anywhere in the UI** — Material Symbols icons only
+- **OTP:** the code is never displayed in-app — it goes to the email only (copy button lives in the email). In-app copy exactly: *"The code was sent to your email. Check spam if it's missing."*
+- Candidate set authored by agent at **`sample/index.html` + `sample/styles.css`** — **14 screens** (splash, sign-in, sign-up, OTP, reset, home, workout library, workout details, instruction, vision, summary, plan, VEDA, settings), each rendered in **both themes** → user picks/edits → chosen direction becomes the final HTML/CSS for step 4
+- Every suggestion/workout card opens its own **Workout Details** page (hero, stats, Start, exercise plan, goal) — full flow: suggestion → detail page → session → report + Home feed + Plan history (user confirmed)
+
 ---
 
 ## 10. PLAN PROCESS SECTIONS
@@ -301,7 +311,10 @@ Profile (view/edit incl. weight/height) · Units (kg/lb) · Theme (light/dark/sy
 | App icon asset (OTP watermark + branding) | ⏳ awaiting |
 | Instruction videos (per exercise) | ⏳ awaiting |
 | Rive/Lottie posture avatar files | ⏳ awaiting |
-| Final HTML/CSS designs (via §9 workflow) | ⏳ awaiting |
+| Final HTML/CSS designs (via §9 workflow) | 🟡 Direction A sample in `sample/` — awaiting user's pick + change list |
+| Supabase project (URL + anon key) | ⏳ awaiting — user creates + provides (auth/storage/sync) |
+| GROQ API key (VEDA chat) | ⏳ awaiting — user provides (P6) |
+| Gmail App Password (OTP email) | ⏳ awaiting — user provides (P1) |
 | Official doc templates (if provided later) | ⏳ optional |
 
 ### 10.2 Reserved Pages — slots inside the 4 tabs (user fills later)
@@ -358,7 +371,7 @@ Profile (view/edit incl. weight/height) · Units (kg/lb) · Theme (light/dark/sy
 ## 14. SECURITY & PRIVACY
 - Firestore rules: user-scoped read/write, Auth required everywhere
 - **Zero video frames leave device** (hard guarantee, checked in DEFENSE_QA)
-- Secrets (Gmail App Password, Gemini key) in GitHub Secrets / Firebase params — never in repo
+- Secrets (Gmail App Password, GROQ key, Supabase credentials) in GitHub Secrets / secure config — never in repo
 - flutter_secure_storage for tokens; privacy screen (hidden in app switcher)
 - Delete account → local cascade + Firestore delete
 - OTP email: rate-limited, expiring codes, no-reply
@@ -371,7 +384,7 @@ Profile (view/edit incl. weight/height) · Units (kg/lb) · Theme (light/dark/sy
 | FPS < 25 mid-range | Fallback ladder (Accurate→Balanced→resolution→overlay), profiling at P2 |
 | Person-lock failure | Tap to re-select, confidence auto re-lock |
 | Gmail deliverability/limits | Spam-safe multipart template; documented limits; provider kept simple per user decision |
-| VEDA/Gemini offline or quota | Hybrid local-first; cache; graceful degradation |
+| VEDA/GROQ offline or quota | Hybrid local-first; cache; graceful degradation |
 | Avatar phase-sync complexity | Renderer interface built P3 with no-op fallback; swap in Rive when assets arrive |
 | Scope creep | Phases P0–P8 enforced; new ideas → §10 Open Items, never interleaved |
 | Asset bloat | FFmpeg ≤3 MB/exercise budget + CI check |
