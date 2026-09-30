@@ -34,3 +34,7 @@ Thumbs.db
 
 # Named APK deliverables (too large for git)
 /FixPose-*.apk
+
+# User reference material (3rd-party sample repo + raw source videos — inputs, not app code)
+/Model samples/
+/Source Animated Video/

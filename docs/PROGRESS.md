@@ -8,6 +8,7 @@
 |---|---|---|---|
 | P0 | Foundation (scaffold, structure, CI) | ✅ Complete | 2026-09-30 |
 | P1 | Auth (signup/OTP/forgot/reset/sign-out) | 🟡 In progress | 2026-09-30 |
+| DC | Data core (Drift DB, content, account sync, use cases) | ✅ Complete | 2026-09-30 |
 | P2 | Pose Core (FR-1..FR-6 engines) | ⬜ Not started | |
 | P3 | Workout Flow (video → camera → report) | ⬜ Not started | |
 | P4 | Home (strike, greeting, graph, slots) | ⬜ Not started | |
@@ -17,6 +18,16 @@
 | P8 | Polish + Release (docs, APK, FPS validation) | ⬜ Not started | |
 
 ## Log
+
+### 2026-09-30 — DC: Data core — offline DB + content + account sync + use cases 🗄️
+- **Local store (Drift)**: 8 tables / 6 DAOs / schema v1; drift row classes renamed `@DataClassName('*Row')` to avoid clashing with domain entities · **freezed + json_serializable dropped → hand-written entities + JSON mappers** (documented deviation from PLANNING §1 "Models" — no build-time codegen; PLANNING updated)
+- **Bundled content authored** (`assets/data/*.json`, validated): 40 exercises (core-3 with demo-clip paths), **52 unique workouts**, 100 foods, 14 tips, 7 plan templates covering all 9 level×goal combos — cross-ref, coverage, emoji and schema-key scans pass
+- **Domain**: 11 entities, 8 repository interfaces, 6 use cases (Start/EndSession · GetStrikeState · GenerateWeeklyPlan · GetHomeDashboard · AskVeda), pure time-injected `StrikeEngine` (tiers 3/7/14/30/100 + form-mastery badge, ≥60 s credit rule)
+- **Account sync (Supabase, zero spend)**: `SyncEngine` — 15-min sweep + sign-in trigger; uploads dirty rows (`syncedAt IS NULL`), download+merge with LWW approximation, **sign-out wipes local account tables** (privacy boundary); server schema applied live: 7 tables + triggers + RLS + grants (`supabase/schema_account_sync.sql`, idempotent)
+- **VEDA**: GROQ when online + data-grounded offline fallback (never a dead-end chat)
+- **Model samples received (user)** → `Model samples/fitness-trainer-pose-estimation`: 18-exercise YAML FSM reference (angles/states/counter/feedback/audio cues) = porting source for P2 rules; **camera/detection requirements folded into PLANNING**: person-lock multi-person handling (§4.1), per-exercise framing zones incl. wide push-up view + spoken camera-adjustment cues (§5.3), low-latency sound feedback < 0.5 s (§4.3)
+- Encoding incident (internal): PowerShell ANSI writes had corrupted non-ASCII in ~20 files → repaired; repo-wide strict-UTF-8 + mojibake scans now **clean**; rule adopted: file writes via write/edit tools only
+- Gate: `flutter analyze` = **0 issues** ✅ · `flutter test` = **all passed** ✅ · §10.1 re-synced (Model samples added, stale flagged) · §10.2 unchanged (no reserved pages) → named debug APK
 
 ### 2026-09-30 — P1: OTP backend LIVE + full auth wiring + animation kit 🎯
 - **Supabase Edge Function `send-otp` deployed** (Deno + nodemailer → Gmail SMTP App Password — the user's Gmail flow, NOT Supabase email; secrets server-side only): actions `send`/`verify`/`check-user`/`create-user`/`reset-password`; SHA-256 `email:code` rows in `otp_codes` (RLS on, no policies), 60s resend cooldown · 10-min expiry · max 5 attempts — matches `AppConstants`

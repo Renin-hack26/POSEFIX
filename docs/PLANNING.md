@@ -35,7 +35,7 @@ Auth (signup/login/OTP/forgot/reset), 4-tab navigation (HOME/WORKOUT/PLAN/SETTIN
 | Framework | Flutter (Dart 3.x) | Android only target |
 | State management | Riverpod | compile-safe, testable |
 | Navigation | GoRouter | tab shell + auth redirects + deep links |
-| Models | Freezed + json_serializable | immutable entities, copyWith, JSON |
+| Models | Plain Dart entities + hand-written JSON mappers | immutable classes + `copyWith`; **freezed/json_serializable dropped** (build-time codegen removed — documented deviation, see PROGRESS) |
 | Local DB | Drift (SQLite) | relational queries for history/graphs, migrations |
 | KV cache | Hive | UI prefs, seen-flags, drafts |
 | Auth | **Supabase Auth** (`supabase_flutter`) | email/password + OTP verification; user provides project URL + anon key |
@@ -82,7 +82,7 @@ lib/
 │   ├── tts_engine/               # voice queue, cooldowns, rep-count voice, voice-setup check
 │   └── notification_engine/      # plan-driven reminders
 ├── data/
-│   ├── models/                   # Freezed DTOs (§7)
+│   ├── models/                   # DTOs + hand-written mappers (§7; no codegen)
 │   ├── datasources/local/        # Drift DAOs, Hive
 │   ├── datasources/remote/       # Supabase, GROQ, Gmail-email service
 │   └── repositories/             # offline-first implementations
@@ -168,7 +168,7 @@ Camera ──▶ FixPose_VISION_ENGINE ──▶ FixPose_BRAIN_ENGINE ──▶ 
 ### 4.3 Supporting engines
 | Engine | Responsibility |
 |---|---|
-| **TTS_ENGINE** | Ordered voice queue, per-cue-type cooldown (default 2 s), live rep counting voice, audio-focus **ducking** of background music, offline voice-pack readiness check (prompt download if missing; status in Settings) |
+| **TTS_ENGINE** | Ordered voice queue with **low latency — first cue spoken < 0.5 s after detection (rep counts, framing warnings, form errors speak immediately; only same-cue repeats rate-limited, default 2 s)**, live rep counting voice, audio-focus **ducking** of background music, offline voice-pack readiness check (prompt download if missing; status in Settings) |
 | **STRIKE_ENGINE** | Continuous-day strike: day-rollover logic, timezone-aware gap detection, strike + badge tier computation (3/7/14/30/100 days) |
 | **NOTIFICATION_ENGINE** | Reads plan session start times → schedules local reminders; re-schedules on any plan edit; quiet hours 22:00–07:00 default; respect settings toggles |
 | **SYNC_ENGINE** | Local-first: all writes → Drift → Firestore sync when online; conflict policy last-writer-wins per record; sessions append-only |
@@ -211,7 +211,7 @@ Today's plan exercises (or free picker)
 - **No plan?** → App asks user to generate one first (prompt flow to Plan/onboarding)
 - Videos shown **only the first time** an exercise is ever performed; skipped afterward (transition card only)
 - **Vision screen (full-screen live camera):**
-  - **Framing guide (shaded region)** showing where to position body — aids detection & posture judgment
+  - **Framing guide (shaded region)** showing where to position body — aids detection & posture judgment. **Zone is per-exercise** (push-up → wide low horizontal zone for the full body side-on; squat/jumping-jack → tall portrait zone), and misalignment is **spoken aloud** ("step back", "move left", "raise the phone") so the camera can be corrected hands-free, without delay
   - **Top-left HUD:** rep count (large) + round (e.g., 2/4) + elapsed time
   - **Real-time posture avatar:** full-body, gym attire, **gender-matched (unspecified→male)**, Rive/Lottie **synced to detected movement phase** (pose-phase → animation trigger mapping)
   - Green/red skeletal overlay (FR-5)
@@ -315,6 +315,7 @@ Profile (view/edit incl. weight/height) · Units (kg/lb) · Theme (light/dark/sy
 | Supabase project (URL + anon key) | ✅ provided 2026-09-30 — URL + publishable key (app) + secret key (**server-only, never in app**) in `secrets/local.env` |
 | GROQ API key (VEDA chat) | ✅ provided 2026-09-30 (`secrets/local.env`) |
 | Gmail App Password (OTP email) | ✅ provided 2026-09-30 (`secrets/local.env`: address + App Password) |
+| Pose rules + camera/detection reference (18-exercise FSM: YAML angles, state machines, feedback + audio cues) | ✅ received 2026-09-30 — `Model samples/fitness-trainer-pose-estimation`; porting source for P2 rules; camera/detection requirements (person-lock multi-person handling, per-exercise framing incl. wide push-up view, spoken camera-adjustment cues, low-latency sound feedback) folded into §4.1/§4.3/§5.3 |
 | Official doc templates (if provided later) | ⏳ optional |
 
 ### 10.2 Reserved Pages — slots inside the 4 tabs (user fills later)

@@ -1,0 +1,1062 @@
+[
+  {
+    "id": "w001",
+    "name": "Sunrise Mobility Flow",
+    "category": "mobility",
+    "level": "beginner",
+    "goal": "Mobilise joints and wake up the posterior chain",
+    "durationMin": 15,
+    "description": "A gentle full-body sequence for early risers who feel stiff after sleep. It opens the hips, spine and shoulders before the day begins.",
+    "focusMuscles": ["mobility", "back"],
+    "estimatedCalories": 60,
+    "tags": ["home", "no-equipment", "morning", "mobility"],
+    "demoVideoAsset": "assets/videos/w001.mp4",
+    "blocks": [
+      { "exerciseId": "cat-cow", "sets": 2, "reps": 10, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "greatest-stretch", "sets": 2, "reps": 8, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "thoracic-rotation", "sets": 2, "reps": 10, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "downward-dog", "sets": 2, "reps": 0, "seconds": 30, "restSec": 20 },
+      { "exerciseId": "childs-pose", "sets": 1, "reps": 0, "seconds": 45, "restSec": 15 }
+    ]
+  },
+  {
+    "id": "w002",
+    "name": "Metabolic Morning Burn",
+    "category": "hiit",
+    "level": "intermediate",
+    "goal": "Elevate heart rate early to drive all-day calorie burn",
+    "durationMin": 25,
+    "description": "A fast circuits session for people who train better before breakfast. It stacks jumping drills with squat and core work for a full metabolic stimulus.",
+    "focusMuscles": ["cardio", "legs", "fullBody"],
+    "estimatedCalories": 200,
+    "tags": ["home", "no-equipment", "morning", "hiit", "sweat"],
+    "demoVideoAsset": "assets/videos/w002.mp4",
+    "blocks": [
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 40, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "squat", "sets": 4, "reps": 15, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "mountain-climber", "sets": 4, "reps": 30, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "burpee", "sets": 3, "reps": 10, "seconds": 0, "restSec": 60 },
+      { "exerciseId": "high-knees", "sets": 3, "reps": 40, "seconds": 0, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w003",
+    "name": "Lower Body Foundation",
+    "category": "strength",
+    "level": "beginner",
+    "goal": "Build base strength through the quads, glutes and calves",
+    "durationMin": 30,
+    "description": "A first month strength plan for newcomers to training. Every set focuses on clean technique before fatigue sets in.",
+    "focusMuscles": ["legs", "glutes"],
+    "estimatedCalories": 180,
+    "tags": ["home", "no-equipment", "strength", "beginner-friendly"],
+    "demoVideoAsset": "assets/videos/w003.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 3, "reps": 12, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "lunge", "sets": 3, "reps": 10, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "glute-bridge", "sets": 3, "reps": 15, "seconds": 0, "restSec": 35 },
+      { "exerciseId": "wall-sit", "sets": 3, "reps": 0, "seconds": 40, "restSec": 45 },
+      { "exerciseId": "calf-raise", "sets": 3, "reps": 18, "seconds": 0, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w004",
+    "name": "Steady State Cardio Base",
+    "category": "cardio",
+    "level": "beginner",
+    "goal": "Improve aerobic base with low-skill continuous movement",
+    "durationMin": 20,
+    "description": "An approachable cardio session for anyone returning to exercise after a break. The pace stays conversational while the legs keep moving.",
+    "focusMuscles": ["cardio", "legs"],
+    "estimatedCalories": 120,
+    "tags": ["home", "no-equipment", "cardio", "low-skill"],
+    "demoVideoAsset": "assets/videos/w004.mp4",
+    "blocks": [
+      { "exerciseId": "butt-kicks", "sets": 4, "reps": 40, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "high-knees", "sets": 4, "reps": 30, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "skater-jump", "sets": 3, "reps": 20, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "inchworm", "sets": 3, "reps": 8, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "shoulder-dislocates", "sets": 2, "reps": 12, "seconds": 0, "restSec": 15 }
+    ]
+  },
+  {
+    "id": "w005",
+    "name": "Core Foundation Circuit",
+    "category": "core",
+    "level": "beginner",
+    "goal": "Learn to brace the trunk before adding load or speed",
+    "durationMin": 15,
+    "description": "A short introduction to core training for beginners who want a flatter, firmer midsection without crunch-heavy volume.",
+    "focusMuscles": ["core"],
+    "estimatedCalories": 75,
+    "tags": ["home", "no-equipment", "core", "quick"],
+    "demoVideoAsset": "assets/videos/w005.mp4",
+    "blocks": [
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 30, "restSec": 25 },
+      { "exerciseId": "dead-bug", "sets": 3, "reps": 12, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "bird-dog", "sets": 3, "reps": 10, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "superman", "sets": 3, "reps": 12, "seconds": 0, "restSec": 20 }
+    ]
+  },
+  {
+    "id": "w006",
+    "name": "Push Strength Ladder",
+    "category": "strength",
+    "level": "intermediate",
+    "goal": "Progress from standard push-ups toward harder pressing variations",
+    "durationMin": 30,
+    "description": "A pushing session for trainees who already manage sets of standard push-ups. The ladder of angles keeps the chest, shoulders and triceps working hard.",
+    "focusMuscles": ["chest", "arms", "shoulders"],
+    "estimatedCalories": 190,
+    "tags": ["home", "no-equipment", "strength", "upper-body"],
+    "demoVideoAsset": "assets/videos/w006.mp4",
+    "blocks": [
+      { "exerciseId": "pushup", "sets": 4, "reps": 10, "seconds": 0, "restSec": 60 },
+      { "exerciseId": "pike-push-up", "sets": 3, "reps": 10, "seconds": 0, "restSec": 60 },
+      { "exerciseId": "chair-dip", "sets": 3, "reps": 12, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "incline-push-up", "sets": 3, "reps": 12, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 45, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w007",
+    "name": "Tabata Ignition",
+    "category": "hiit",
+    "level": "advanced",
+    "goal": "Maximise conditioning with short, near-maximal work intervals",
+    "durationMin": 20,
+    "description": "A demanding interval session for experienced athletes who can hold form under fatigue. Expect heavy breathing from the second block onward.",
+    "focusMuscles": ["cardio", "fullBody"],
+    "estimatedCalories": 180,
+    "tags": ["home", "no-equipment", "hiit", "intervals", "sweat"],
+    "demoVideoAsset": "assets/videos/w007.mp4",
+    "blocks": [
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 40, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "burpee", "sets": 4, "reps": 12, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "squat", "sets": 4, "reps": 20, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "mountain-climber", "sets": 4, "reps": 40, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "high-knees", "sets": 3, "reps": 45, "seconds": 0, "restSec": 25 }
+    ]
+  },
+  {
+    "id": "w008",
+    "name": "Desk Reset Mobility",
+    "category": "mobility",
+    "level": "beginner",
+    "goal": "Undo the effects of prolonged sitting in twelve minutes",
+    "durationMin": 12,
+    "description": "A lunchtime routine for office workers with tight hips and a stiff upper back. Everything can be done beside a desk in ordinary clothes.",
+    "focusMuscles": ["mobility", "shoulders"],
+    "estimatedCalories": 55,
+    "tags": ["home", "no-equipment", "mobility", "quick", "office"],
+    "demoVideoAsset": "assets/videos/w008.mp4",
+    "blocks": [
+      { "exerciseId": "shoulder-dislocates", "sets": 2, "reps": 12, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "thoracic-rotation", "sets": 2, "reps": 10, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "cat-cow", "sets": 2, "reps": 10, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "cobra-stretch", "sets": 2, "reps": 0, "seconds": 30, "restSec": 15 },
+      { "exerciseId": "downward-dog", "sets": 2, "reps": 0, "seconds": 30, "restSec": 15 }
+    ]
+  },
+  {
+    "id": "w009",
+    "name": "Posterior Chain Primer",
+    "category": "strength",
+    "level": "beginner",
+    "goal": "Wake up the glutes, hamstrings and spinal erectors",
+    "durationMin": 25,
+    "description": "A corrective strength session for people whose glutes switch off from sitting all day. It restores the hinge pattern and back endurance.",
+    "focusMuscles": ["glutes", "back", "legs"],
+    "estimatedCalories": 130,
+    "tags": ["home", "no-equipment", "strength", "posture"],
+    "demoVideoAsset": "assets/videos/w009.mp4",
+    "blocks": [
+      { "exerciseId": "good-morning", "sets": 3, "reps": 15, "seconds": 0, "restSec": 35 },
+      { "exerciseId": "glute-bridge", "sets": 3, "reps": 15, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "superman", "sets": 3, "reps": 12, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "bird-dog", "sets": 3, "reps": 10, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "dead-bug", "sets": 3, "reps": 12, "seconds": 0, "restSec": 20 }
+    ]
+  },
+  {
+    "id": "w010",
+    "name": "Lateral Quickness Cardio",
+    "category": "cardio",
+    "level": "intermediate",
+    "goal": "Develop side-to-side agility while holding an elevated heart rate",
+    "durationMin": 25,
+    "description": "A multi-directional cardio session for field-sport players and anyone bored of straight-line training. Lateral bounds and crawls build usable athleticism.",
+    "focusMuscles": ["cardio", "legs"],
+    "estimatedCalories": 190,
+    "tags": ["home", "no-equipment", "cardio", "agility"],
+    "demoVideoAsset": "assets/videos/w010.mp4",
+    "blocks": [
+      { "exerciseId": "skater-jump", "sets": 4, "reps": 20, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "high-knees", "sets": 4, "reps": 40, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 40, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "bear-crawl", "sets": 3, "reps": 12, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "butt-kicks", "sets": 3, "reps": 45, "seconds": 0, "restSec": 25 }
+    ]
+  },
+  {
+    "id": "w011",
+    "name": "Oblique Focus Flow",
+    "category": "core",
+    "level": "intermediate",
+    "goal": "Carve rotational strength through the waist and lateral trunk",
+    "durationMin": 20,
+    "description": "A rotation-heavy core plan for intermediate trainees who have mastered the basic plank. It targets the obliques from several angles.",
+    "focusMuscles": ["core"],
+    "estimatedCalories": 110,
+    "tags": ["home", "no-equipment", "core", "obliques"],
+    "demoVideoAsset": "assets/videos/w011.mp4",
+    "blocks": [
+      { "exerciseId": "side-plank", "sets": 3, "reps": 0, "seconds": 30, "restSec": 25 },
+      { "exerciseId": "bicycle-crunch", "sets": 3, "reps": 20, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "russian-twist", "sets": 3, "reps": 24, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "v-up", "sets": 3, "reps": 12, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 45, "restSec": 25 }
+    ]
+  },
+  {
+    "id": "w012",
+    "name": "Single-Leg Strength Block",
+    "category": "strength",
+    "level": "intermediate",
+    "goal": "Fix left-to-right strength gaps with unilateral leg work",
+    "durationMin": 35,
+    "description": "A balanced lower-body session built around split stances and deep squat patterns. It suits lifters chasing symmetrical, injury-resistant legs.",
+    "focusMuscles": ["legs", "glutes"],
+    "estimatedCalories": 220,
+    "tags": ["home", "no-equipment", "strength", "legs"],
+    "demoVideoAsset": "assets/videos/w012.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 3, "reps": 12, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "lunge", "sets": 4, "reps": 12, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "cossack-squat", "sets": 3, "reps": 10, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "hip-thrust", "sets": 3, "reps": 15, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "calf-raise", "sets": 3, "reps": 20, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "wall-sit", "sets": 3, "reps": 0, "seconds": 45, "restSec": 45 }
+    ]
+  },
+  {
+    "id": "w013",
+    "name": "Full Body Fat Blaster",
+    "category": "fullBody",
+    "level": "intermediate",
+    "goal": "Burn fat by training every major muscle group in one session",
+    "durationMin": 30,
+    "description": "A complete workout for busy people who only have time to train three times a week. Each block hits a different region while the heart rate stays high.",
+    "focusMuscles": ["fullBody", "cardio"],
+    "estimatedCalories": 250,
+    "tags": ["home", "no-equipment", "full-body", "fat-loss"],
+    "demoVideoAsset": "assets/videos/w013.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 4, "reps": 15, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "pushup", "sets": 4, "reps": 10, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 40, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "mountain-climber", "sets": 3, "reps": 30, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "glute-bridge", "sets": 3, "reps": 15, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 45, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w014",
+    "name": "Hip and Hamstring Mobility",
+    "category": "mobility",
+    "level": "intermediate",
+    "goal": "Open tight hips and lengthen the hamstrings for deeper squatting",
+    "durationMin": 18,
+    "description": "A focused mobility block for lifters whose squat depth stalls because of tight hips. It pairs dynamic holds with active stretching.",
+    "focusMuscles": ["mobility", "legs"],
+    "estimatedCalories": 85,
+    "tags": ["home", "no-equipment", "mobility", "hips"],
+    "demoVideoAsset": "assets/videos/w014.mp4",
+    "blocks": [
+      { "exerciseId": "greatest-stretch", "sets": 3, "reps": 8, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "cossack-squat", "sets": 2, "reps": 8, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "downward-dog", "sets": 2, "reps": 0, "seconds": 35, "restSec": 20 },
+      { "exerciseId": "warrior-flow", "sets": 2, "reps": 0, "seconds": 40, "restSec": 20 },
+      { "exerciseId": "childs-pose", "sets": 1, "reps": 0, "seconds": 45, "restSec": 15 },
+      { "exerciseId": "cat-cow", "sets": 2, "reps": 10, "seconds": 0, "restSec": 15 }
+    ]
+  },
+  {
+    "id": "w015",
+    "name": "Upper Body Push Circuit",
+    "category": "strength",
+    "level": "advanced",
+    "goal": "Push pressing volume to build chest, shoulder and tricep endurance",
+    "durationMin": 40,
+    "description": "A high-volume upper-body session for advanced trainees with no equipment. The six blocks demand real pacing discipline to finish.",
+    "focusMuscles": ["chest", "shoulders", "arms"],
+    "estimatedCalories": 300,
+    "tags": ["home", "no-equipment", "strength", "upper-body", "volume"],
+    "demoVideoAsset": "assets/videos/w015.mp4",
+    "blocks": [
+      { "exerciseId": "pushup", "sets": 5, "reps": 15, "seconds": 0, "restSec": 75 },
+      { "exerciseId": "pike-push-up", "sets": 4, "reps": 12, "seconds": 0, "restSec": 60 },
+      { "exerciseId": "chair-dip", "sets": 4, "reps": 15, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "incline-push-up", "sets": 3, "reps": 15, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 60, "restSec": 30 },
+      { "exerciseId": "bear-crawl", "sets": 3, "reps": 12, "seconds": 0, "restSec": 45 }
+    ]
+  },
+  {
+    "id": "w016",
+    "name": "Sprint Interval Cardio",
+    "category": "cardio",
+    "level": "advanced",
+    "goal": "Raise top-end conditioning through repeated sprint efforts",
+    "durationMin": 22,
+    "description": "A running-based interval workout done entirely on the spot. It suits conditioned athletes preparing for stop-start sports.",
+    "focusMuscles": ["cardio", "legs"],
+    "estimatedCalories": 190,
+    "tags": ["home", "no-equipment", "cardio", "intervals", "sweat"],
+    "demoVideoAsset": "assets/videos/w016.mp4",
+    "blocks": [
+      { "exerciseId": "high-knees", "sets": 5, "reps": 40, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "butt-kicks", "sets": 4, "reps": 40, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 45, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "skater-jump", "sets": 4, "reps": 20, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "mountain-climber", "sets": 3, "reps": 40, "seconds": 0, "restSec": 25 }
+    ]
+  },
+  {
+    "id": "w017",
+    "name": "Morning Wake-Up Stretch",
+    "category": "mobility",
+    "level": "beginner",
+    "goal": "Loosen the whole body within twelve quiet minutes",
+    "durationMin": 12,
+    "description": "A soft flow to run before coffee for anyone who wakes up tight. It moves the spine through every direction in a short, calming sequence.",
+    "focusMuscles": ["mobility"],
+    "estimatedCalories": 50,
+    "tags": ["home", "no-equipment", "morning", "mobility", "quick"],
+    "demoVideoAsset": "assets/videos/w017.mp4",
+    "blocks": [
+      { "exerciseId": "cat-cow", "sets": 2, "reps": 10, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "cobra-stretch", "sets": 2, "reps": 0, "seconds": 30, "restSec": 15 },
+      { "exerciseId": "childs-pose", "sets": 2, "reps": 0, "seconds": 30, "restSec": 15 },
+      { "exerciseId": "warrior-flow", "sets": 2, "reps": 0, "seconds": 35, "restSec": 15 },
+      { "exerciseId": "shoulder-dislocates", "sets": 2, "reps": 12, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "downward-dog", "sets": 2, "reps": 0, "seconds": 30, "restSec": 15 }
+    ]
+  },
+  {
+    "id": "w018",
+    "name": "Glute and Hamstring Builder",
+    "category": "strength",
+    "level": "intermediate",
+    "goal": "Grow stronger hips and hamstrings with high-rep loading",
+    "durationMin": 30,
+    "description": "A posterior-chain session for lifters chasing stronger hips without a barbell. Volume and tempo do the work instead of external load.",
+    "focusMuscles": ["glutes", "legs"],
+    "estimatedCalories": 185,
+    "tags": ["home", "no-equipment", "strength", "glutes"],
+    "demoVideoAsset": "assets/videos/w018.mp4",
+    "blocks": [
+      { "exerciseId": "hip-thrust", "sets": 4, "reps": 15, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "good-morning", "sets": 3, "reps": 15, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "glute-bridge", "sets": 3, "reps": 20, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "sumo-squat", "sets": 3, "reps": 14, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "wall-sit", "sets": 3, "reps": 0, "seconds": 45, "restSec": 45 },
+      { "exerciseId": "calf-raise", "sets": 3, "reps": 18, "seconds": 0, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w019",
+    "name": "HIIT Total Torcher",
+    "category": "hiit",
+    "level": "advanced",
+    "goal": "Drive maximum calorie burn in half an hour of hard work",
+    "durationMin": 30,
+    "description": "An unforgiving circuit for experienced trainees who want a serious sweat. Six blocks combine explosive jumps with a long core finisher.",
+    "focusMuscles": ["fullBody", "cardio"],
+    "estimatedCalories": 270,
+    "tags": ["home", "no-equipment", "hiit", "fat-loss", "sweat"],
+    "demoVideoAsset": "assets/videos/w019.mp4",
+    "blocks": [
+      { "exerciseId": "burpee", "sets": 4, "reps": 15, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "squat", "sets": 4, "reps": 20, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "mountain-climber", "sets": 4, "reps": 40, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "skater-jump", "sets": 4, "reps": 24, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 50, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 60, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w020",
+    "name": "Beginner Core Stability",
+    "category": "core",
+    "level": "beginner",
+    "goal": "Develop anti-movement control before attempting dynamic abs work",
+    "durationMin": 15,
+    "description": "A gentle core session that teaches the trunk to stay still while the limbs move. It is safe for beginners and kind to the lower back.",
+    "focusMuscles": ["core"],
+    "estimatedCalories": 70,
+    "tags": ["home", "no-equipment", "core", "beginner-friendly"],
+    "demoVideoAsset": "assets/videos/w020.mp4",
+    "blocks": [
+      { "exerciseId": "dead-bug", "sets": 3, "reps": 10, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "bird-dog", "sets": 3, "reps": 10, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 25, "restSec": 20 },
+      { "exerciseId": "glute-bridge", "sets": 3, "reps": 12, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "flutter-kick", "sets": 2, "reps": 20, "seconds": 0, "restSec": 20 }
+    ]
+  },
+  {
+    "id": "w021",
+    "name": "Total Body Strength Reset",
+    "category": "strength",
+    "level": "beginner",
+    "goal": "Rebuild training habits with simple, effective full-body lifts",
+    "durationMin": 30,
+    "description": "A returning-to-training session built on five familiar movements. It restores strength quickly without overwhelming recovery.",
+    "focusMuscles": ["fullBody", "legs", "chest"],
+    "estimatedCalories": 175,
+    "tags": ["home", "no-equipment", "strength", "full-body", "beginner-friendly"],
+    "demoVideoAsset": "assets/videos/w021.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 3, "reps": 12, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "knee-push-up", "sets": 3, "reps": 10, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "lunge", "sets": 3, "reps": 10, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "glute-bridge", "sets": 3, "reps": 15, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 30, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w022",
+    "name": "Calorie Crush Circuits",
+    "category": "hiit",
+    "level": "intermediate",
+    "goal": "Chain short bursts together to keep calorie expenditure high",
+    "durationMin": 25,
+    "description": "A circuit-style session that never lets the heart rate drop for long. Ideal for intermediate trainees chasing fat loss four days a week.",
+    "focusMuscles": ["cardio", "fullBody"],
+    "estimatedCalories": 220,
+    "tags": ["home", "no-equipment", "hiit", "circuits", "fat-loss"],
+    "demoVideoAsset": "assets/videos/w022.mp4",
+    "blocks": [
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 45, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "squat", "sets": 4, "reps": 18, "seconds": 0, "restSec": 35 },
+      { "exerciseId": "burpee", "sets": 3, "reps": 10, "seconds": 0, "restSec": 60 },
+      { "exerciseId": "high-knees", "sets": 3, "reps": 45, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "mountain-climber", "sets": 3, "reps": 35, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 45, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w023",
+    "name": "Ropeless Jump Rope Cardio",
+    "category": "cardio",
+    "level": "beginner",
+    "goal": "Simulate skipping mechanics to build calf endurance and timing",
+    "durationMin": 18,
+    "description": "A low-skill cardio session that mimics jump rope footwork without needing a rope or much space. Great for small rooms and shared flats.",
+    "focusMuscles": ["cardio", "legs"],
+    "estimatedCalories": 120,
+    "tags": ["home", "no-equipment", "cardio", "small-space"],
+    "demoVideoAsset": "assets/videos/w023.mp4",
+    "blocks": [
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 40, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "high-knees", "sets": 4, "reps": 30, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "butt-kicks", "sets": 3, "reps": 40, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "calf-raise", "sets": 3, "reps": 20, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "shoulder-dislocates", "sets": 2, "reps": 12, "seconds": 0, "restSec": 15 }
+    ]
+  },
+  {
+    "id": "w024",
+    "name": "Core Sculpt Express",
+    "category": "core",
+    "level": "beginner",
+    "goal": "Strengthen the abdominals and back in a fifteen-minute block",
+    "durationMin": 15,
+    "description": "A fast core routine that fits into any lunch break. It balances flexion, rotation and extension so no part of the trunk is neglected.",
+    "focusMuscles": ["core"],
+    "estimatedCalories": 80,
+    "tags": ["home", "no-equipment", "core", "quick"],
+    "demoVideoAsset": "assets/videos/w024.mp4",
+    "blocks": [
+      { "exerciseId": "russian-twist", "sets": 3, "reps": 24, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "bicycle-crunch", "sets": 3, "reps": 20, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "superman", "sets": 3, "reps": 12, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 30, "restSec": 20 },
+      { "exerciseId": "side-plank", "sets": 2, "reps": 0, "seconds": 25, "restSec": 20 }
+    ]
+  },
+  {
+    "id": "w025",
+    "name": "Hip Mobility Deep Dive",
+    "category": "mobility",
+    "level": "intermediate",
+    "goal": "Gain usable hip range for deeper, more comfortable squatting",
+    "durationMin": 20,
+    "description": "A dedicated hip session for runners and lifters who feel blocked at the bottom of a squat. It alternates active strength with long holds.",
+    "focusMuscles": ["mobility", "legs"],
+    "estimatedCalories": 90,
+    "tags": ["home", "no-equipment", "mobility", "hips"],
+    "demoVideoAsset": "assets/videos/w025.mp4",
+    "blocks": [
+      { "exerciseId": "greatest-stretch", "sets": 3, "reps": 8, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "cossack-squat", "sets": 3, "reps": 8, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "cat-cow", "sets": 2, "reps": 10, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "warrior-flow", "sets": 2, "reps": 0, "seconds": 45, "restSec": 20 },
+      { "exerciseId": "downward-dog", "sets": 2, "reps": 0, "seconds": 40, "restSec": 20 },
+      { "exerciseId": "childs-pose", "sets": 1, "reps": 0, "seconds": 45, "restSec": 15 }
+    ]
+  },
+  {
+    "id": "w026",
+    "name": "Advanced Push Progression",
+    "category": "strength",
+    "level": "advanced",
+    "goal": "Approach one-arm push-up strength through relentless volume",
+    "durationMin": 35,
+    "description": "A serious pressing workout for advanced bodyweight athletes. Twenty-six hard sets separate those who finish from those who do not.",
+    "focusMuscles": ["chest", "shoulders", "arms"],
+    "estimatedCalories": 270,
+    "tags": ["home", "no-equipment", "strength", "upper-body", "volume"],
+    "demoVideoAsset": "assets/videos/w026.mp4",
+    "blocks": [
+      { "exerciseId": "pushup", "sets": 5, "reps": 20, "seconds": 0, "restSec": 75 },
+      { "exerciseId": "pike-push-up", "sets": 4, "reps": 15, "seconds": 0, "restSec": 60 },
+      { "exerciseId": "chair-dip", "sets": 4, "reps": 20, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "incline-push-up", "sets": 4, "reps": 15, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "bear-crawl", "sets": 3, "reps": 14, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 60, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w027",
+    "name": "Express HIIT 12",
+    "category": "hiit",
+    "level": "beginner",
+    "goal": "Fit a genuine conditioning session into twelve minutes",
+    "durationMin": 12,
+    "description": "A bite-size interval workout for people who claim they have no time. Five short blocks raise the heart rate without any complicated choreography.",
+    "focusMuscles": ["cardio", "legs"],
+    "estimatedCalories": 105,
+    "tags": ["home", "no-equipment", "hiit", "quick", "beginner-friendly"],
+    "demoVideoAsset": "assets/videos/w027.mp4",
+    "blocks": [
+      { "exerciseId": "jumpingJack", "sets": 3, "reps": 30, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "squat", "sets": 3, "reps": 12, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "high-knees", "sets": 3, "reps": 30, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "mountain-climber", "sets": 2, "reps": 20, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "plank", "sets": 2, "reps": 0, "seconds": 30, "restSec": 20 }
+    ]
+  },
+  {
+    "id": "w028",
+    "name": "Endurance Cardio Ladder",
+    "category": "cardio",
+    "level": "intermediate",
+    "goal": "Extend work capacity with progressively longer cardio blocks",
+    "durationMin": 35,
+    "description": "A long-form conditioning session that raises the ceiling on sustained effort. Rep counts climb through the first four blocks before a mobility cool-down.",
+    "focusMuscles": ["cardio", "legs"],
+    "estimatedCalories": 250,
+    "tags": ["home", "no-equipment", "cardio", "endurance"],
+    "demoVideoAsset": "assets/videos/w028.mp4",
+    "blocks": [
+      { "exerciseId": "high-knees", "sets": 5, "reps": 50, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "butt-kicks", "sets": 4, "reps": 50, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 45, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "skater-jump", "sets": 4, "reps": 24, "seconds": 0, "restSec": 35 },
+      { "exerciseId": "inchworm", "sets": 3, "reps": 10, "seconds": 0, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w029",
+    "name": "Deep Core Burn",
+    "category": "core",
+    "level": "intermediate",
+    "goal": "Attack the lower abdominals with long-lever loading",
+    "durationMin": 20,
+    "description": "A lower-ab focused session for intermediate trainees who want visible definition and real trunk control. Pace matters more than speed here.",
+    "focusMuscles": ["core"],
+    "estimatedCalories": 120,
+    "tags": ["home", "no-equipment", "core", "abs"],
+    "demoVideoAsset": "assets/videos/w029.mp4",
+    "blocks": [
+      { "exerciseId": "v-up", "sets": 3, "reps": 12, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "leg-raise", "sets": 3, "reps": 14, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "flutter-kick", "sets": 3, "reps": 40, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "russian-twist", "sets": 3, "reps": 24, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "side-plank", "sets": 3, "reps": 0, "seconds": 35, "restSec": 20 }
+    ]
+  },
+  {
+    "id": "w030",
+    "name": "Full Body Express",
+    "category": "fullBody",
+    "level": "beginner",
+    "goal": "Train the whole body once in twenty efficient minutes",
+    "durationMin": 20,
+    "description": "A compact full-body option for beginners with busy schedules. It covers push, hinge, squat and core without a single complicated movement.",
+    "focusMuscles": ["fullBody", "legs", "core"],
+    "estimatedCalories": 130,
+    "tags": ["home", "no-equipment", "full-body", "quick", "beginner-friendly"],
+    "demoVideoAsset": "assets/videos/w030.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 3, "reps": 12, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "knee-push-up", "sets": 3, "reps": 10, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "glute-bridge", "sets": 3, "reps": 15, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "dead-bug", "sets": 3, "reps": 12, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "jumpingJack", "sets": 3, "reps": 30, "seconds": 0, "restSec": 25 }
+    ]
+  },
+  {
+    "id": "w031",
+    "name": "Yoga-Inspired Wind Down",
+    "category": "mobility",
+    "level": "beginner",
+    "goal": "Settle the nervous system and lengthen tight muscles before bed",
+    "durationMin": 15,
+    "description": "An evening flow for anyone who struggles to switch off after work. Slow holds and longer breathing calm the body for better sleep.",
+    "focusMuscles": ["mobility", "back"],
+    "estimatedCalories": 60,
+    "tags": ["home", "no-equipment", "evening", "mobility", "yoga"],
+    "demoVideoAsset": "assets/videos/w031.mp4",
+    "blocks": [
+      { "exerciseId": "cat-cow", "sets": 2, "reps": 10, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "downward-dog", "sets": 2, "reps": 0, "seconds": 40, "restSec": 20 },
+      { "exerciseId": "warrior-flow", "sets": 2, "reps": 0, "seconds": 45, "restSec": 20 },
+      { "exerciseId": "cobra-stretch", "sets": 2, "reps": 0, "seconds": 30, "restSec": 15 },
+      { "exerciseId": "childs-pose", "sets": 2, "reps": 0, "seconds": 60, "restSec": 15 }
+    ]
+  },
+  {
+    "id": "w032",
+    "name": "Metabolic Strength Circuits",
+    "category": "fullBody",
+    "level": "intermediate",
+    "goal": "Pair heavy strength blocks with metabolic fillers for dual benefit",
+    "durationMin": 35,
+    "description": "A hybrid session that lifts and conditions at once, saving time without sacrificing results. It works well for four-day intermediate splits.",
+    "focusMuscles": ["fullBody", "legs", "chest"],
+    "estimatedCalories": 280,
+    "tags": ["home", "no-equipment", "full-body", "circuits", "fat-loss"],
+    "demoVideoAsset": "assets/videos/w032.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 4, "reps": 15, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "pushup", "sets": 4, "reps": 12, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "lunge", "sets": 4, "reps": 12, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "good-morning", "sets": 3, "reps": 15, "seconds": 0, "restSec": 35 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 45, "restSec": 30 },
+      { "exerciseId": "burpee", "sets": 3, "reps": 10, "seconds": 0, "restSec": 60 }
+    ]
+  },
+  {
+    "id": "w033",
+    "name": "Lunge and Squat Lab",
+    "category": "strength",
+    "level": "advanced",
+    "goal": "Push leg strength and depth through varied squat patterns",
+    "durationMin": 35,
+    "description": "A lower-body session that rotates four squat variations to keep the stimulus fresh. Advanced trainees should slow every descent for full control.",
+    "focusMuscles": ["legs", "glutes"],
+    "estimatedCalories": 260,
+    "tags": ["home", "no-equipment", "strength", "legs", "volume"],
+    "demoVideoAsset": "assets/videos/w033.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 4, "reps": 20, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "lunge", "sets": 4, "reps": 16, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "cossack-squat", "sets": 4, "reps": 12, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "sumo-squat", "sets": 3, "reps": 18, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "wall-sit", "sets": 3, "reps": 0, "seconds": 60, "restSec": 60 },
+      { "exerciseId": "calf-raise", "sets": 3, "reps": 25, "seconds": 0, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w034",
+    "name": "Ladder Sprint Cardio",
+    "category": "cardio",
+    "level": "advanced",
+    "goal": "Hold high intensity across five escalating cardio rounds",
+    "durationMin": 25,
+    "description": "A hard conditioning ladder for athletes who need game-ready fitness. Each round adds reps while rest stays short.",
+    "focusMuscles": ["cardio", "fullBody"],
+    "estimatedCalories": 210,
+    "tags": ["home", "no-equipment", "cardio", "intervals", "sweat"],
+    "demoVideoAsset": "assets/videos/w034.mp4",
+    "blocks": [
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 50, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "high-knees", "sets": 4, "reps": 50, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "burpee", "sets": 3, "reps": 12, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "skater-jump", "sets": 4, "reps": 24, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "mountain-climber", "sets": 4, "reps": 45, "seconds": 0, "restSec": 25 }
+    ]
+  },
+  {
+    "id": "w035",
+    "name": "Midline Strength Core",
+    "category": "core",
+    "level": "advanced",
+    "goal": "Build a trunk that resists extension, rotation and flexion under fatigue",
+    "durationMin": 25,
+    "description": "A high-volume core session that pairs dynamic abs work with long isometric holds. It is designed for advanced trainees chasing a rock-solid midline.",
+    "focusMuscles": ["core", "back"],
+    "estimatedCalories": 140,
+    "tags": ["home", "no-equipment", "core", "volume"],
+    "demoVideoAsset": "assets/videos/w035.mp4",
+    "blocks": [
+      { "exerciseId": "v-up", "sets": 4, "reps": 15, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "leg-raise", "sets": 4, "reps": 16, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "bicycle-crunch", "sets": 3, "reps": 30, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 60, "restSec": 30 },
+      { "exerciseId": "side-plank", "sets": 3, "reps": 0, "seconds": 40, "restSec": 25 },
+      { "exerciseId": "russian-twist", "sets": 3, "reps": 30, "seconds": 0, "restSec": 25 }
+    ]
+  },
+  {
+    "id": "w036",
+    "name": "Deep Stretch Reset",
+    "category": "mobility",
+    "level": "advanced",
+    "goal": "Restore range after heavy training weeks with long static holds",
+    "durationMin": 22,
+    "description": "A recovery-session for advanced athletes whose volume has tightened them up. Long holds and slow breathing undo accumulated tension.",
+    "focusMuscles": ["mobility", "back"],
+    "estimatedCalories": 100,
+    "tags": ["home", "no-equipment", "recovery", "mobility", "evening"],
+    "demoVideoAsset": "assets/videos/w036.mp4",
+    "blocks": [
+      { "exerciseId": "greatest-stretch", "sets": 3, "reps": 10, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "thoracic-rotation", "sets": 3, "reps": 10, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "warrior-flow", "sets": 3, "reps": 0, "seconds": 50, "restSec": 20 },
+      { "exerciseId": "downward-dog", "sets": 2, "reps": 0, "seconds": 45, "restSec": 20 },
+      { "exerciseId": "childs-pose", "sets": 2, "reps": 0, "seconds": 60, "restSec": 15 },
+      { "exerciseId": "cobra-stretch", "sets": 2, "reps": 0, "seconds": 40, "restSec": 15 }
+    ]
+  },
+  {
+    "id": "w037",
+    "name": "Power and Plyo Full Body",
+    "category": "fullBody",
+    "level": "advanced",
+    "goal": "Express force quickly through the entire body",
+    "durationMin": 40,
+    "description": "A power-biased session combining explosive jumps with strict strength work. It suits athletes who need speed as much as endurance.",
+    "focusMuscles": ["fullBody", "legs", "cardio"],
+    "estimatedCalories": 340,
+    "tags": ["home", "no-equipment", "full-body", "power", "advanced"],
+    "demoVideoAsset": "assets/videos/w037.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 4, "reps": 20, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "pushup", "sets": 4, "reps": 15, "seconds": 0, "restSec": 60 },
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 50, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "burpee", "sets": 4, "reps": 15, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "skater-jump", "sets": 4, "reps": 24, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 60, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w038",
+    "name": "Living Room Sweat",
+    "category": "hiit",
+    "level": "beginner",
+    "goal": "Get a real sweat in a small space with simple jumps",
+    "durationMin": 15,
+    "description": "A beginner-friendly circuit that stays within a yoga mat of floor space. Four blocks, no equipment and no impact on the neighbours.",
+    "focusMuscles": ["cardio", "legs"],
+    "estimatedCalories": 130,
+    "tags": ["home", "no-equipment", "hiit", "small-space", "beginner-friendly"],
+    "demoVideoAsset": "assets/videos/w038.mp4",
+    "blocks": [
+      { "exerciseId": "jumpingJack", "sets": 3, "reps": 35, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "squat", "sets": 3, "reps": 15, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "high-knees", "sets": 3, "reps": 35, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "mountain-climber", "sets": 3, "reps": 25, "seconds": 0, "restSec": 25 }
+    ]
+  },
+  {
+    "id": "w039",
+    "name": "Everyday Cardio Base",
+    "category": "cardio",
+    "level": "beginner",
+    "goal": "Keep a healthy heart with low-skill, moderate-intensity movement",
+    "durationMin": 20,
+    "description": "A straightforward cardio option for people building the habit of daily movement. Nothing technical, just consistent work at a steady pace.",
+    "focusMuscles": ["cardio", "legs"],
+    "estimatedCalories": 130,
+    "tags": ["home", "no-equipment", "cardio", "beginner-friendly"],
+    "demoVideoAsset": "assets/videos/w039.mp4",
+    "blocks": [
+      { "exerciseId": "butt-kicks", "sets": 4, "reps": 40, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "high-knees", "sets": 4, "reps": 30, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "skater-jump", "sets": 3, "reps": 16, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "inchworm", "sets": 3, "reps": 8, "seconds": 0, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w040",
+    "name": "Equipment-Free Full Body Base",
+    "category": "fullBody",
+    "level": "beginner",
+    "goal": "Cover every movement pattern with nothing but body weight",
+    "durationMin": 22,
+    "description": "A complete first-month plan that trains squat, push, hinge and brace in one session. Ideal for home users starting from zero.",
+    "focusMuscles": ["fullBody", "legs", "chest"],
+    "estimatedCalories": 150,
+    "tags": ["home", "no-equipment", "full-body", "beginner-friendly"],
+    "demoVideoAsset": "assets/videos/w040.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 3, "reps": 12, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "incline-push-up", "sets": 3, "reps": 12, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "glute-bridge", "sets": 3, "reps": 15, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "superman", "sets": 3, "reps": 12, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "jumpingJack", "sets": 3, "reps": 30, "seconds": 0, "restSec": 25 }
+    ]
+  },
+  {
+    "id": "w041",
+    "name": "Double-Tabata Cardio Blast",
+    "category": "hiit",
+    "level": "intermediate",
+    "goal": "Repeat two tabata waves to extend time at peak intensity",
+    "durationMin": 22,
+    "description": "Two back-to-back waves of short, sharp intervals for intermediate trainers. The second wave is where the conditioning really improves.",
+    "focusMuscles": ["cardio", "fullBody"],
+    "estimatedCalories": 190,
+    "tags": ["home", "no-equipment", "hiit", "intervals", "sweat"],
+    "demoVideoAsset": "assets/videos/w041.mp4",
+    "blocks": [
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 45, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "burpee", "sets": 4, "reps": 12, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "squat", "sets": 4, "reps": 20, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "high-knees", "sets": 4, "reps": 45, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "bear-crawl", "sets": 3, "reps": 12, "seconds": 0, "restSec": 40 }
+    ]
+  },
+  {
+    "id": "w042",
+    "name": "Functional Strength Flow",
+    "category": "fullBody",
+    "level": "intermediate",
+    "goal": "Build strength that transfers to lifting, carrying and sport",
+    "durationMin": 32,
+    "description": "A flow-style session where each block moves into the next with minimal setup. It trains the body as one unit rather than in isolation.",
+    "focusMuscles": ["fullBody", "core", "glutes"],
+    "estimatedCalories": 260,
+    "tags": ["home", "no-equipment", "full-body", "functional"],
+    "demoVideoAsset": "assets/videos/w042.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 3, "reps": 15, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "pushup", "sets": 3, "reps": 12, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "hip-thrust", "sets": 3, "reps": 15, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "bird-dog", "sets": 3, "reps": 10, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 45, "restSec": 30 },
+      { "exerciseId": "inchworm", "sets": 3, "reps": 8, "seconds": 0, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w043",
+    "name": "Run Prep Cardio",
+    "category": "cardio",
+    "level": "intermediate",
+    "goal": "Prepare the legs and lungs for a faster running session",
+    "durationMin": 28,
+    "description": "A primer for runners training on days off from the road. It activates the calves and glutes while lifting the heart rate gradually.",
+    "focusMuscles": ["cardio", "legs"],
+    "estimatedCalories": 210,
+    "tags": ["home", "no-equipment", "cardio", "running", "warm-up"],
+    "demoVideoAsset": "assets/videos/w043.mp4",
+    "blocks": [
+      { "exerciseId": "high-knees", "sets": 4, "reps": 45, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "butt-kicks", "sets": 4, "reps": 45, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "jumpingJack", "sets": 3, "reps": 45, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "calf-raise", "sets": 3, "reps": 20, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "superman", "sets": 3, "reps": 12, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 40, "restSec": 25 }
+    ]
+  },
+  {
+    "id": "w044",
+    "name": "Advanced Core Torque",
+    "category": "core",
+    "level": "advanced",
+    "goal": "Generate and control rotation with heavy abdominal loading",
+    "durationMin": 22,
+    "description": "A rotation and long-lever core workout for advanced trainees. Six demanding blocks finish with a full minute of bracing.",
+    "focusMuscles": ["core"],
+    "estimatedCalories": 130,
+    "tags": ["home", "no-equipment", "core", "rotation", "advanced"],
+    "demoVideoAsset": "assets/videos/w044.mp4",
+    "blocks": [
+      { "exerciseId": "v-up", "sets": 4, "reps": 15, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "leg-raise", "sets": 4, "reps": 18, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "russian-twist", "sets": 4, "reps": 30, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "bicycle-crunch", "sets": 3, "reps": 30, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "side-plank", "sets": 3, "reps": 0, "seconds": 45, "restSec": 20 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 60, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w045",
+    "name": "Supple Spine Mobility",
+    "category": "mobility",
+    "level": "advanced",
+    "goal": "Restore segmented spinal movement for heavier training days",
+    "durationMin": 20,
+    "description": "A spine-focused mobility routine for advanced lifters whose backs have grown stiff from hinge volume. It moves each region without forcing range.",
+    "focusMuscles": ["mobility", "back"],
+    "estimatedCalories": 95,
+    "tags": ["home", "no-equipment", "mobility", "spine", "recovery"],
+    "demoVideoAsset": "assets/videos/w045.mp4",
+    "blocks": [
+      { "exerciseId": "cat-cow", "sets": 3, "reps": 10, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "thoracic-rotation", "sets": 3, "reps": 12, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "cobra-stretch", "sets": 2, "reps": 0, "seconds": 40, "restSec": 15 },
+      { "exerciseId": "downward-dog", "sets": 2, "reps": 0, "seconds": 45, "restSec": 20 },
+      { "exerciseId": "warrior-flow", "sets": 2, "reps": 0, "seconds": 50, "restSec": 20 },
+      { "exerciseId": "childs-pose", "sets": 1, "reps": 0, "seconds": 60, "restSec": 15 }
+    ]
+  },
+  {
+    "id": "w046",
+    "name": "Sprint Tabata Machine",
+    "category": "hiit",
+    "level": "advanced",
+    "goal": "Hold sprint-quality output through repeated hard intervals",
+    "durationMin": 20,
+    "description": "Five blocks of near-maximal work with disciplined rest. It is built for advanced trainees chasing a serious conditioning edge.",
+    "focusMuscles": ["cardio", "fullBody"],
+    "estimatedCalories": 170,
+    "tags": ["home", "no-equipment", "hiit", "intervals", "advanced"],
+    "demoVideoAsset": "assets/videos/w046.mp4",
+    "blocks": [
+      { "exerciseId": "burpee", "sets": 4, "reps": 15, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "mountain-climber", "sets": 4, "reps": 45, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 50, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "squat", "sets": 4, "reps": 25, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "skater-jump", "sets": 4, "reps": 24, "seconds": 0, "restSec": 25 }
+    ]
+  },
+  {
+    "id": "w047",
+    "name": "Bodyweight Beast Circuit",
+    "category": "fullBody",
+    "level": "advanced",
+    "goal": "Accumulate serious total-body volume without a single weight",
+    "durationMin": 38,
+    "description": "A long, grinding circuit for advanced trainees who travel or have no gym access. Six blocks cover every major pattern at high volume.",
+    "focusMuscles": ["fullBody", "chest", "legs"],
+    "estimatedCalories": 330,
+    "tags": ["home", "no-equipment", "full-body", "volume", "advanced"],
+    "demoVideoAsset": "assets/videos/w047.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 4, "reps": 20, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "pushup", "sets": 4, "reps": 15, "seconds": 0, "restSec": 60 },
+      { "exerciseId": "lunge", "sets": 4, "reps": 14, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "pike-push-up", "sets": 3, "reps": 12, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "burpee", "sets": 3, "reps": 12, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 60, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w048",
+    "name": "Floor Core Endurance",
+    "category": "core",
+    "level": "intermediate",
+    "goal": "Hold tension for longer to build a fatigue-resistant midline",
+    "durationMin": 18,
+    "description": "A floor-only routine that extends plank time while keeping the abs under constant load. It fits neatly at the end of any session.",
+    "focusMuscles": ["core", "back"],
+    "estimatedCalories": 105,
+    "tags": ["home", "no-equipment", "core", "endurance", "floor"],
+    "demoVideoAsset": "assets/videos/w048.mp4",
+    "blocks": [
+      { "exerciseId": "plank", "sets": 4, "reps": 0, "seconds": 45, "restSec": 25 },
+      { "exerciseId": "dead-bug", "sets": 3, "reps": 14, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "flutter-kick", "sets": 3, "reps": 40, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "bicycle-crunch", "sets": 3, "reps": 24, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "superman", "sets": 3, "reps": 12, "seconds": 0, "restSec": 20 }
+    ]
+  },
+  {
+    "id": "w049",
+    "name": "Joint Care Mobility",
+    "category": "mobility",
+    "level": "intermediate",
+    "goal": "Keep shoulders, spine and hips moving well under training load",
+    "durationMin": 16,
+    "description": "A joint-focused routine for people training hard most days of the week. It maintains the ranges that heavy pressing and hinging tend to steal.",
+    "focusMuscles": ["mobility", "shoulders"],
+    "estimatedCalories": 75,
+    "tags": ["home", "no-equipment", "mobility", "recovery", "joints"],
+    "demoVideoAsset": "assets/videos/w049.mp4",
+    "blocks": [
+      { "exerciseId": "shoulder-dislocates", "sets": 3, "reps": 12, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "thoracic-rotation", "sets": 2, "reps": 10, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "cat-cow", "sets": 2, "reps": 10, "seconds": 0, "restSec": 15 },
+      { "exerciseId": "warrior-flow", "sets": 2, "reps": 0, "seconds": 40, "restSec": 20 },
+      { "exerciseId": "cobra-stretch", "sets": 2, "reps": 0, "seconds": 30, "restSec": 15 },
+      { "exerciseId": "childs-pose", "sets": 1, "reps": 0, "seconds": 45, "restSec": 15 }
+    ]
+  },
+  {
+    "id": "w050",
+    "name": "Weekend Grind Full Body",
+    "category": "fullBody",
+    "level": "advanced",
+    "goal": "Bank maximum weekly volume in one long session",
+    "durationMin": 45,
+    "description": "The longest session in the library, built for advanced trainees who train fewer days per week. It delivers a week's worth of stimulus in forty-five minutes.",
+    "focusMuscles": ["fullBody", "legs", "chest"],
+    "estimatedCalories": 380,
+    "tags": ["home", "no-equipment", "full-body", "volume", "weekend"],
+    "demoVideoAsset": "assets/videos/w050.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 5, "reps": 20, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "pushup", "sets": 5, "reps": 15, "seconds": 0, "restSec": 60 },
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 50, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "hip-thrust", "sets": 4, "reps": 15, "seconds": 0, "restSec": 40 },
+      { "exerciseId": "burpee", "sets": 3, "reps": 12, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "plank", "sets": 3, "reps": 0, "seconds": 60, "restSec": 30 }
+    ]
+  },
+  {
+    "id": "w051",
+    "name": "Iron Interval HIIT",
+    "category": "hiit",
+    "level": "advanced",
+    "goal": "Blend strength and conditioning into a single hard session",
+    "durationMin": 26,
+    "description": "A strength-flavoured interval workout that keeps rep counts high while rest stays short. It is a favourite for fat-loss phases.",
+    "focusMuscles": ["fullBody", "cardio"],
+    "estimatedCalories": 230,
+    "tags": ["home", "no-equipment", "hiit", "strength", "fat-loss"],
+    "demoVideoAsset": "assets/videos/w051.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 4, "reps": 25, "seconds": 0, "restSec": 30 },
+      { "exerciseId": "pushup", "sets": 4, "reps": 15, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "high-knees", "sets": 4, "reps": 50, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "burpee", "sets": 4, "reps": 12, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "mountain-climber", "sets": 4, "reps": 45, "seconds": 0, "restSec": 20 }
+    ]
+  },
+  {
+    "id": "w052",
+    "name": "Weekend Warrior Circuit",
+    "category": "fullBody",
+    "level": "advanced",
+    "goal": "Reward a hard training week with a complete full-body test",
+    "durationMin": 42,
+    "description": "A Saturday-style circuit mixing squat, press, lateral and core work across six blocks. It rewards fitness built over months of consistent training.",
+    "focusMuscles": ["fullBody", "legs", "core"],
+    "estimatedCalories": 360,
+    "tags": ["home", "no-equipment", "full-body", "weekend", "advanced"],
+    "demoVideoAsset": "assets/videos/w052.mp4",
+    "blocks": [
+      { "exerciseId": "squat", "sets": 4, "reps": 20, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "incline-push-up", "sets": 4, "reps": 15, "seconds": 0, "restSec": 45 },
+      { "exerciseId": "cossack-squat", "sets": 3, "reps": 12, "seconds": 0, "restSec": 50 },
+      { "exerciseId": "jumpingJack", "sets": 4, "reps": 50, "seconds": 0, "restSec": 25 },
+      { "exerciseId": "dead-bug", "sets": 3, "reps": 14, "seconds": 0, "restSec": 20 },
+      { "exerciseId": "side-plank", "sets": 3, "reps": 0, "seconds": 40, "restSec": 25 }
+    ]
+  }
+]
