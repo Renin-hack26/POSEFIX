@@ -32,8 +32,9 @@ Thumbs.db
 # Reports generated at runtime
 *.pdf.reports/
 
-# Named APK deliverables (too large for git)
+# Named APK deliverables (too large for git) — delivered under releases/
 /FixPose-*.apk
+/releases/**/*.apk
 
 # User reference material (3rd-party sample repo + raw source videos — inputs, not app code)
 /Model samples/

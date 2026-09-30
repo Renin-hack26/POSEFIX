@@ -27,7 +27,7 @@
 - **VEDA**: GROQ when online + data-grounded offline fallback (never a dead-end chat)
 - **Model samples received (user)** → `Model samples/fitness-trainer-pose-estimation`: 18-exercise YAML FSM reference (angles/states/counter/feedback/audio cues) = porting source for P2 rules; **camera/detection requirements folded into PLANNING**: person-lock multi-person handling (§4.1), per-exercise framing zones incl. wide push-up view + spoken camera-adjustment cues (§5.3), low-latency sound feedback < 0.5 s (§4.3)
 - Encoding incident (internal): PowerShell ANSI writes had corrupted non-ASCII in ~20 files → repaired; repo-wide strict-UTF-8 + mojibake scans now **clean**; rule adopted: file writes via write/edit tools only
-- Gate: `flutter analyze` = **0 issues** ✅ · `flutter test` = **all passed** ✅ · §10.1 re-synced (Model samples added, stale flagged) · §10.2 unchanged (no reserved pages) → named debug APK
+- Gate: `flutter analyze` = **0 issues** ✅ · `flutter test` = **all passed** ✅ · §10.1 re-synced (Model samples added, stale flagged) · §10.2 unchanged (no reserved pages) → `releases\v1.0.1\FixPose-v1.0.1-debug.apk` (278.5 MB, vCode 2)
 
 ### 2026-09-30 — P1: OTP backend LIVE + full auth wiring + animation kit 🎯
 - **Supabase Edge Function `send-otp` deployed** (Deno + nodemailer → Gmail SMTP App Password — the user's Gmail flow, NOT Supabase email; secrets server-side only): actions `send`/`verify`/`check-user`/`create-user`/`reset-password`; SHA-256 `email:code` rows in `otp_codes` (RLS on, no policies), 60s resend cooldown · 10-min expiry · max 5 attempts — matches `AppConstants`

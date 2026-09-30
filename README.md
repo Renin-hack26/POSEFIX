@@ -38,6 +38,7 @@ $env:JAVA_HOME = (Get-ChildItem 'C:\dev' -Directory -Filter 'jdk-17*').FullName
 $env:Path += ";C:\dev\flutter\bin;$env:JAVA_HOME\bin"
 flutter build apk --release
 # → build\app\outputs\flutter-apk\app-release.apk
+# Deliverable (named + organized): releases\v<version>\FixPose-v<version>-<buildtype>.apk
 ```
 
 ---

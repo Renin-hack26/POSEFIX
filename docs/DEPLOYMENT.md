@@ -33,6 +33,7 @@ First launch checks for an offline-capable system voice; prompts one-time (free)
 flutter build apk --release
 ```
 Artifact: `build/app/outputs/flutter-apk/app-release.apk`
+Deliverable: copy → `releases/v<version>/FixPose-v<version>-<buildtype>.apk` (naming + size budget in `releases/README.md`)
 CI: tag push (`v*`) → GitHub Actions builds APK automatically.
 
 ## Secrets checklist (NEVER in repo)
