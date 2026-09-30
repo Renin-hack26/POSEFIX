@@ -21,6 +21,14 @@
 
 ## Log
 
+### 2026-10-01 — "Can't generate your plan" traced to the exact line + fixed 🔍
+- **Exact issue (reproduced locally, not guessed)**: `ContentLoader.planTemplates()` (`lib/data/datasources/content/content_loader.dart`) did `(await _read(...)).first['templates'].map(...).toList() as List<PlanTemplate>` — `.first['templates']` is `dynamic`, so `.map()` dispatched dynamically and produced `List<dynamic>` at runtime; the `as List<PlanTemplate>` cast threw a `TypeError` on **EVERY** call, for every level×goal, in every build. The onboarding `_generate()` catch turned it into "Could not generate your plan. Please try again." — the workout library was unaffected (those loaders map on statically-typed `List<dynamic>`), which is why only plan generation failed
+- **Fix**: cast to `List<dynamic>` first so `.map()` is statically typed (`Iterable<PlanTemplate>` → `List<PlanTemplate>`), wrapped to fail loud as `StorageException`; sibling `as List<…>` usages audited — all safe
+- **Regression test kept**: `test/trace/plan_generation_trace_test.dart` runs the device's exact chain (real assets + in-memory Drift + keyless GROQ → fallback) across all 9 level×goal combos — failed before the fix, passes after
+- **Key actually baked in this time**: v1.1.0 was built WITHOUT `--dart-define-from-file`, so the phone never had a GROQ key (verified gap). v1.1.1 is built with `--dart-define-from-file=secrets/dart_defines.json` (git-ignored, key never committed); binary-verified inside the APK's `kernel_blob.bin`: `gpt-oss-120b` present ✅, `gsk_` key present ✅, retired `llama-3.3-70b-versatile` absent ✅
+- **Version series** (patch = bugfix): 1.1.0+3 → **1.1.1+4**; Settings row synced
+- Gate: `flutter analyze` = **0 issues** ✅ · `flutter test test/unit/ test/trace/` = **45 passed** ✅ → `releases\v1.1.1\FixPose-v1.1.1-debug.apk` (233.8 MB, vCode 4)
+
 ### 2026-10-01 — Plan generation fixed: GROQ-first with a live LLM + fast boot 🚀
 - **Root cause found (user-reported "Can't generate your plan")**: the GROQ model `llama-3.3-70b-versatile` is **retired** — a live API call returned `404 model_not_found`, which broke plan generation AND VEDA chat on device (the key itself is valid)
 - **Model migrated** to the current GROQ flagship `openai/gpt-oss-120b` in `lib/core/groq/groq_plan_service.dart` (new) + `veda_repository_impl.dart`; `reasoning_effort: low` + `max_tokens` 2000 (plan) / 1024 (chat) — verified with real calls: plan → HTTP 200, complete 7-day JSON (4 workout days for beginner/fat-loss, rest days interleaved); gpt-oss reasoning tokens counted toward completion, so 700 truncated mid-JSON (caught by the strict parser) — budget raised

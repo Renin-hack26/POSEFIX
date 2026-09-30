@@ -57,10 +57,26 @@ class ContentLoader {
       .map((e) => (e as Map<String, dynamic>)['text'] as String)
       .toList(growable: false);
 
-  Future<List<PlanTemplate>> planTemplates() async =>
-      _templates ??= (await _read('assets/data/plan_templates.json'))
-          .first['templates']
-          .map((t) =>
-              planTemplateFromJson(t as Map<String, dynamic>, 'plan_templates.json'))
-          .toList(growable: false) as List<PlanTemplate>;
+  Future<List<PlanTemplate>> planTemplates() async {
+    final cached = _templates;
+    if (cached != null) return cached;
+    // NOTE: `.first['templates']` is `dynamic`, so `.map()` on it dispatches
+    // dynamically and `.toList()` yields `List<dynamic>` — the old
+    // `as List<PlanTemplate>` cast threw a TypeError on EVERY call, which is
+    // exactly what broke onboarding plan generation on device. Cast to
+    // `List<dynamic>` first so `.map()` is statically typed.
+    try {
+      final root = await _read('assets/data/plan_templates.json');
+      final raw =
+          (root.first as Map<String, dynamic>)['templates'] as List<dynamic>;
+      final parsed = raw
+          .map((t) => planTemplateFromJson(
+              t as Map<String, dynamic>, 'plan_templates.json'))
+          .toList(growable: false);
+      return _templates = parsed;
+    } catch (_) {
+      throw StorageException(
+          'Bundled content failed to load (plan_templates.json)');
+    }
+  }
 }
