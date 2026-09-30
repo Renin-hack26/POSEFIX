@@ -92,12 +92,16 @@ class _PasswordFieldState extends State<PasswordField> {
               color: _valid ? p.accentDeep : p.ink3,
             ),
             const SizedBox(width: 6),
-            Text(
-              '8+ characters, letter and number',
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: _valid ? p.accentDeep : p.ink3,
+            Expanded(
+              child: Text(
+                '8+ characters, letter and number',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: _valid ? p.accentDeep : p.ink3,
+                ),
               ),
             ),
           ],

@@ -31,3 +31,6 @@ Thumbs.db
 
 # Reports generated at runtime
 *.pdf.reports/
+
+# Named APK deliverables (too large for git)
+/FixPose-*.apk

@@ -27,6 +27,9 @@ abstract class UserRepository {
   /// Creates a pending account and dispatches an OTP to [data.email].
   Future<OtpDispatch> signUp({required SignUpData data, required String password});
 
+  /// Re-dispatches the signup OTP for the pending [signUp] (resend button).
+  Future<OtpDispatch> resendSignUpOtp();
+
   /// Verifies the latest OTP for [email] (signup or password-reset purpose).
   Future<void> verifyOtp({required String email, required String code});
 

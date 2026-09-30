@@ -1,7 +1,7 @@
 name: fixpose
-description: "FixPose — On-Device AI Pose Detection Fitness Coach & Rep Counter."
+description: "FixPose â€” On-Device AI Pose Detection Fitness Coach & Rep Counter."
 publish_to: "none"
-version: 0.1.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ">=3.13.0 <4.0.0"

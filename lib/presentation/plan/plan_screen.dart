@@ -2,11 +2,13 @@
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../shared/anim/skeleton.dart';
 import '../shared/glass_card.dart';
 import '../shared/grid_background.dart';
 import '../shared/primary_button.dart';
 import '../shared/section_header.dart';
 import '../shared/status_pill.dart';
+import '../shared/under_construction_banner.dart';
 
 // UI-first demo data — phase P5 wires the real source.
 const _weekLabel = 'Sep 29 – Oct 5';
@@ -69,8 +71,25 @@ enum _MediaTone { steel, chartreuse, slate }
 ///
 /// UI-first: only the session Start button is wired (`/vision`); the section
 /// links are static copy until their screens land in the router.
-class PlanScreen extends StatelessWidget {
+class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key});
+
+  @override
+  State<PlanScreen> createState() => _PlanScreenState();
+}
+
+class _PlanScreenState extends State<PlanScreen> {
+  /// True while the screen shows its loading skeleton.
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Mock initial-load delay — P1 swaps this for the real data source.
+    Future<void>.delayed(const Duration(milliseconds: 700), () {
+      if (!mounted) setState(() => _loading = false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,19 +101,25 @@ class PlanScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _WeekHeader(),
-                const SizedBox(height: 14),
-                const _PlanChips(),
-                const SizedBox(height: 16),
-                const _WeekStrip(),
-                const SizedBox(height: 20),
-                _NextSessionCard(onStart: () => context.push('/vision')),
-                const SizedBox(height: 20),
-                const _LibrarySection(),
-                const SizedBox(height: 20),
-                const _MealsSection(),
-                const SizedBox(height: 20),
-                const _HistorySection(),
+                if (_loading)
+                  const _PlanSkeleton()
+                else ...[
+                  const _WeekHeader(),
+                  const SizedBox(height: 14),
+                  const UnderConstructionBanner(),
+                  const SizedBox(height: 14),
+                  const _PlanChips(),
+                  const SizedBox(height: 16),
+                  const _WeekStrip(),
+                  const SizedBox(height: 20),
+                  _NextSessionCard(onStart: () => context.push('/vision')),
+                  const SizedBox(height: 20),
+                  const _LibrarySection(),
+                  const SizedBox(height: 20),
+                  const _MealsSection(),
+                  const SizedBox(height: 20),
+                  const _HistorySection(),
+                ],
               ],
             ),
           ),
@@ -731,6 +756,67 @@ class _LinkLabel extends StatelessWidget {
           fontWeight: FontWeight.w800,
           color: p.accentDeep,
         ),
+      ),
+    );
+  }
+}
+
+/// Loading stand-in: week-header/chip/strip stubs plus three card rows,
+/// using the real paddings so the swap to loaded data doesn't jump.
+class _PlanSkeleton extends StatelessWidget {
+  const _PlanSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Shimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SkeletonText(width: 96),
+          SizedBox(height: 6),
+          SkeletonBox(width: 168, height: 24, radius: 8),
+          SizedBox(height: 14),
+          Row(
+            children: [
+              SkeletonBox(width: 108, height: 36, radius: 999),
+              SizedBox(width: 7),
+              SkeletonBox(width: 98, height: 36, radius: 999),
+              SizedBox(width: 7),
+              SkeletonBox(width: 94, height: 36, radius: 999),
+            ],
+          ),
+          SizedBox(height: 16),
+          SkeletonBox(height: 54, radius: 15),
+          SizedBox(height: 20),
+          _SkeletonPlanRow(),
+          SizedBox(height: 20),
+          _SkeletonPlanRow(),
+          SizedBox(height: 20),
+          _SkeletonPlanRow(),
+        ],
+      ),
+    );
+  }
+}
+
+/// One card-shaped loading row: pill + title line + meta line.
+class _SkeletonPlanRow extends StatelessWidget {
+  const _SkeletonPlanRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const GlassCard(
+      weak: true,
+      padding: EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBox(width: 76, height: 24, radius: 12),
+          SizedBox(height: 10),
+          SkeletonBox(width: 192, height: 18, radius: 8),
+          SizedBox(height: 6),
+          SkeletonText(width: 244),
+        ],
       ),
     );
   }

@@ -35,6 +35,10 @@ class OtpAlreadyVerifiedException extends AppException {
   const OtpAlreadyVerifiedException() : super('Code already used. Request a new one');
 }
 
+class OtpCooldownException extends AppException {
+  const OtpCooldownException() : super('Please wait a moment before resending');
+}
+
 class UnknownAuthException extends AppException {
   const UnknownAuthException() : super('Something went wrong. Please try again');
 }

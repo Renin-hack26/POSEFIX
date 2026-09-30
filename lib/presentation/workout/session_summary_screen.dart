@@ -7,6 +7,7 @@ import '../shared/grid_background.dart';
 import '../shared/primary_button.dart';
 import '../shared/section_header.dart';
 import '../shared/status_pill.dart';
+import '../shared/under_construction_banner.dart';
 
 /// 11 — Session summary (sample `index.html`): completion headline, result
 /// stats, per-exercise breakdown, streak banner and the exit actions.
@@ -50,6 +51,8 @@ class SessionSummaryScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: p.ink2),
               ),
+              const SizedBox(height: 14),
+              const UnderConstructionBanner(),
               const SizedBox(height: 20),
               for (var i = 0; i < _stats.length; i += 2) ...[
                 Row(

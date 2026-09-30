@@ -18,6 +18,19 @@
 
 ## Log
 
+### 2026-09-30 — P1: OTP backend LIVE + full auth wiring + animation kit 🎯
+- **Supabase Edge Function `send-otp` deployed** (Deno + nodemailer → Gmail SMTP App Password — the user's Gmail flow, NOT Supabase email; secrets server-side only): actions `send`/`verify`/`check-user`/`create-user`/`reset-password`; SHA-256 `email:code` rows in `otp_codes` (RLS on, no policies), 60s resend cooldown · 10-min expiry · max 5 attempts — matches `AppConstants`
+- **Required OTP test done**: `send` → `{"ok":true}` (test email accepted for **shubham93328@gmail.com**); `verify` with wrong code → `400 {"error":"invalid"}` (server-side rejection verified)
+- Infra: `otp_codes` table via Management API · `GMAIL_ADDRESS`/`GMAIL_APP_PASSWORD` via `supabase secrets set` · function deploy exit 0
+- Client stack (P1 placeholders → real): `SupabaseConfig` (URL + publishable key only) · `EmailService` (send action + `FunctionException`→`AppException` mapping incl. new `OtpCooldownException`) · `AuthRemoteDataSource` · `UserRepositoryImpl` (pending signup held in memory → verify → create-user → auto sign-in; forgot = check-user → exact "User doesn't exist"; reset = apply + auto-login) · 7 use cases · Riverpod DI (`app_dependencies.dart`) · `Supabase.initialize` in `main.dart` (local-only at boot → app still starts offline)
+- All 5 auth screens wired to use cases: sign-up dispatches the real OTP · OTP verifies server-side (clears boxes on failure, working resend via `ResendOtp`) · forgot/reset use the reset purpose · **Settings → Sign out now ends the session** (`signOutProvider`)
+- **Under-construction banners** added everywhere functionality is pending (new shared `UnderConstructionBanner`, amber pill tokens): plan · vision · instruction video · session summary · VEDA
+- **Animation kit (parallel agent)**: `FadeSlideIn` entrance + `Shimmer` skeletons + `AppTransitions.fadeRise`; 5 reserved routes converted to `pageBuilder`, splash entrance motion, shimmer loading states on home/plan/workout
+- Traced with pixel-measured golden renders (temp tests, deleted after use): **password-field hint Row overflowed at font-scale ≥1.3 → fixed with `Expanded` + ellipsis**; **date-picker "left white space" not reproducible in portrait/landscape/1.3× (always exactly 16px/16px centered)** — original report traces to the GridBackground fill bug fixed earlier in this pass
+- Version → **1.0.1+2** (versionName 1.0.1 / versionCode 2 = upgrade-safe)
+- Gate: `flutter analyze` = **0 issues** ✅ · `flutter test` = **all passed** ✅ → `FixPose-v1.0.1-debug.apk` building. Tracked non-blocking: a 40px Row overflow exists only at Android font scale 1.3 (dialog region; not seen at default scale)
+- Next: on-device E2E of the auth loop + named APK delivery → then release build (R8 crash bisect: debug ✅ / release ❌)
+
 ### 2026-09-30 — UI Build: screens 06–14 + routes + app icon (UI-first order) 🧱
 - Screens 06–14 converted from `sample/` (3 parallel work streams): **06 Home** (greeting, today's-session gradient banner, suggestions/tips carousels, weekly time-spent graph, analytics tiles), **07 Workout** (resume card, category chips, library), **08 Workout details**, **09 Instruction video**, **10 Vision/live-reps** (framing-guide painter, HUD chips, posture avatar, controls), **11 Session summary**, **12 Plan** (week strip, next-session card, exercise library, meals, history), **13 VEDA chat** (canned exchange, suggestion chips, composer), **14 Settings** (appearance Auto/Light/Dark wired to `themeModeProvider`, notifications, data, sign-out)
 - Router: 5 reserved full-screen routes added (PLANNING §10.2): `/workout-details` · `/instruction-video` · `/vision` · `/summary` · `/veda` — every in-app navigation path is now live

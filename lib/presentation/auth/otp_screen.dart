@@ -2,9 +2,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/di/app_dependencies.dart';
+import '../../core/errors/app_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../shared/app_back_button.dart';
@@ -27,23 +30,25 @@ class OtpArgs {
 /// Spec: the code is NEVER shown on screen — email only, with the exact copy
 /// "The code was sent to your email. Check spam if it's missing."
 ///
-/// UI-first: any 6-digit code verifies. P1 checks the real Gmail-sent code
-/// (expiry: [AppConstants.otpCodeExpiry], resend: [AppConstants.otpResendCooldown]).
-class OtpScreen extends StatefulWidget {
+/// P1: verifies the real Gmail-sent code server-side ([VerifyOtp]); wrong
+/// codes clear the boxes for retry, expiry/resend follow
+/// [AppConstants.otpCodeExpiry] / [AppConstants.otpResendCooldown].
+class OtpScreen extends ConsumerStatefulWidget {
   const OtpScreen({super.key, this.args});
 
   final OtpArgs? args;
 
   @override
-  State<OtpScreen> createState() => _OtpScreenState();
+  ConsumerState<OtpScreen> createState() => _OtpScreenState();
 }
 
-class _OtpScreenState extends State<OtpScreen> {
+class _OtpScreenState extends ConsumerState<OtpScreen> {
   final List<TextEditingController> _digits =
       List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _nodes = List.generate(6, (_) => FocusNode());
   Timer? _timer;
   int _secondsLeft = AppConstants.otpResendCooldown.inSeconds;
+  bool _busy = false;
 
   @override
   void initState() {
@@ -78,12 +83,29 @@ class _OtpScreenState extends State<OtpScreen> {
     });
   }
 
-  void _resend() {
-    if (_secondsLeft > 0) return;
-    _startCountdown();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('A new code is on its way.')),
-    );
+  void _snack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _resend() async {
+    if (_secondsLeft > 0 || _busy) return;
+    final purpose = widget.args?.purpose ?? OtpPurpose.signup;
+    setState(() => _busy = true);
+    try {
+      if (purpose == OtpPurpose.reset) {
+        await ref.read(forgotPasswordProvider)(email: widget.args?.email ?? '');
+      } else {
+        await ref.read(resendOtpProvider)();
+      }
+      if (!mounted) return;
+      _startCountdown();
+      _snack('A new code is on its way.');
+    } on AppException catch (e) {
+      if (!mounted) return;
+      _snack(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   void _onChanged(int index, String value) {
@@ -94,24 +116,45 @@ class _OtpScreenState extends State<OtpScreen> {
     }
   }
 
-  void _verify() {
+  void _clearDigits() {
+    for (final c in _digits) {
+      c.clear();
+    }
+    _nodes.first.requestFocus();
+  }
+
+  Future<void> _verify() async {
     final code = _digits.map((d) => d.text).join();
     if (code.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter the 6-digit code.')),
-      );
+      _snack('Enter the 6-digit code.');
       return;
     }
-    // UI-first: accepts any 6 digits (P1 validates the emailed code).
+    if (_busy) return;
+    setState(() => _busy = true);
     final args = widget.args;
     final purpose = args?.purpose ?? OtpPurpose.signup;
-    if (purpose == OtpPurpose.reset) {
-      context.push(
-        '/reset-password',
-        extra: args ?? const OtpArgs(email: ''),
+    try {
+      await ref.read(verifyOtpProvider)(
+        email: args?.email ?? '',
+        code: code,
       );
-    } else {
-      context.go('/home');
+      if (!mounted) return;
+      if (purpose == OtpPurpose.reset) {
+        await context.push(
+          '/reset-password',
+          extra: args ?? const OtpArgs(email: ''),
+        );
+      } else {
+        // Signup verified: account created + session established inside the
+        // use case → straight to HOME.
+        context.go('/home');
+      }
+    } on AppException catch (e) {
+      if (!mounted) return;
+      _clearDigits();
+      _snack(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -261,6 +304,7 @@ class _OtpScreenState extends State<OtpScreen> {
                 PrimaryButton(
                   label: 'Verify',
                   icon: Icons.verified_user_outlined,
+                  loading: _busy,
                   onPressed: _verify,
                 ),
                 const SizedBox(height: 16),

@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/di/app_dependencies.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../shared/glass_card.dart';
@@ -37,6 +38,14 @@ class SettingsScreen extends ConsumerWidget {
             themeMode: themeMode,
             onThemeModeChanged: (mode) =>
                 ref.read(themeModeProvider.notifier).set(mode),
+            onSignOut: () async {
+              try {
+                await ref.read(signOutProvider)();
+              } catch (_) {
+                // Best effort — session may already be cleared locally.
+              }
+              if (context.mounted) context.go('/signin');
+            },
           ),
         ),
       ),
@@ -50,10 +59,12 @@ class _SettingsBody extends StatefulWidget {
   const _SettingsBody({
     required this.themeMode,
     required this.onThemeModeChanged,
+    required this.onSignOut,
   });
 
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeModeChanged;
+  final VoidCallback onSignOut;
 
   @override
   State<_SettingsBody> createState() => _SettingsBodyState();
@@ -178,7 +189,7 @@ class _SettingsBodyState extends State<_SettingsBody> {
             title: 'Sign out',
             danger: true,
             chevron: true,
-            onTap: () => context.go('/signin'),
+            onTap: widget.onSignOut,
           ),
           const SizedBox(height: 12),
         ],

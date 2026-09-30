@@ -1,6 +1,9 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/di/app_dependencies.dart';
+import '../../core/errors/app_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/validators.dart';
 import '../shared/app_back_button.dart';
@@ -11,16 +14,21 @@ import 'otp_screen.dart';
 
 /// Forgot password — email entry that sends the user into the OTP flow
 /// (sample has no dedicated screen; styled after OTP/Reset, PLANNING §5.1).
-class ForgotPasswordScreen extends StatefulWidget {
+///
+/// P1: checks the account exists first — no account shows the exact spec
+/// copy "User doesn't exist" ([UserNotFoundException.message]).
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -28,12 +36,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  void _sendCode() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    context.push(
-      '/otp',
-      extra: OtpArgs(email: _email.text.trim(), purpose: OtpPurpose.reset),
-    );
+  Future<void> _sendCode() async {
+    if (!(_formKey.currentState?.validate() ?? false) || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(forgotPasswordProvider)(email: _email.text.trim());
+      if (!mounted) return;
+      await context.push(
+        '/otp',
+        extra: OtpArgs(email: _email.text.trim(), purpose: OtpPurpose.reset),
+      );
+    } on AppException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -99,12 +118,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   PrimaryButton(
                     label: 'Send code',
                     icon: Icons.arrow_forward,
+                    loading: _busy,
                     onPressed: _sendCode,
                   ),
                   const SizedBox(height: 14),
                   Center(
                     child: Text(
                       'The code expires after 10 minutes',
+                      textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 11.5, color: p.ink3),
                     ),
                   ),

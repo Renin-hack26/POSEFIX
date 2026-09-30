@@ -3,6 +3,7 @@
 import '../../core/theme/app_theme.dart';
 import '../shared/app_back_button.dart';
 import '../shared/grid_background.dart';
+import '../shared/under_construction_banner.dart';
 
 // UI-first canned conversation — phase P6 wires local rules + GROQ (PLANNING §5.6).
 const _seedMessages = [
@@ -141,6 +142,12 @@ class _VedaChatScreenState extends State<VedaChatScreen> {
                     ),
                     const _IconBox(Icons.more_horiz),
                   ],
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(18, 2, 18, 10),
+                child: UnderConstructionBanner(
+                  message: 'Under construction — replies are canned in this build',
                 ),
               ),
               Expanded(

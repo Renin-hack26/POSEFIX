@@ -1,6 +1,9 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/di/app_dependencies.dart';
+import '../../core/errors/app_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/validators.dart';
 import '../shared/app_logo.dart';
@@ -10,20 +13,20 @@ import '../shared/primary_button.dart';
 
 /// 02 — Sign In (sample/index.html).
 ///
-/// UI-first: form + validation are real; submit accepts any valid input and
-/// enters the app. P1 swaps `_submit` to the Supabase-backed UserRepository
-/// ("user doesn't exist" error etc. — PLANNING §5.1).
-class SignInScreen extends StatefulWidget {
+/// P1: submit signs in through the Supabase-backed [SignIn] use case
+/// (PLANNING §5.1); [AppException.message] renders in a SnackBar.
+class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
   @override
-  State<SignInScreen> createState() => _SignInScreenState();
+  ConsumerState<SignInScreen> createState() => _SignInScreenState();
 }
 
-class _SignInScreenState extends State<SignInScreen> {
+class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -32,9 +35,23 @@ class _SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    context.go('/home');
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false) || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(signInProvider)(
+        email: _email.text.trim(),
+        password: _password.text,
+      );
+      if (!mounted) return;
+      context.go('/home');
+    } on AppException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -102,6 +119,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   PrimaryButton(
                     label: 'Sign In',
                     icon: Icons.arrow_forward,
+                    loading: _busy,
                     onPressed: _submit,
                   ),
                   const _OrDivider(),

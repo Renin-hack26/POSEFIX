@@ -1,6 +1,9 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/di/app_dependencies.dart';
+import '../../core/errors/app_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/validators.dart';
@@ -14,21 +17,24 @@ import 'otp_screen.dart';
 
 /// 05 — Reset password (sample/index.html).
 ///
-/// After saving, the user is signed in automatically (spec copy) — UI-first
-/// lands on /home; P1 performs the Supabase password update first.
-class ResetPasswordScreen extends StatefulWidget {
+/// P1: applies the new password through [ResetPassword] — the use case also
+/// signs the user in (spec copy: "You will be signed in automatically"), then
+/// the router lands on HOME.
+class ResetPasswordScreen extends ConsumerStatefulWidget {
   const ResetPasswordScreen({super.key, this.args});
 
   final OtpArgs? args;
 
   @override
-  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+  ConsumerState<ResetPasswordScreen> createState() =>
+      _ResetPasswordScreenState();
 }
 
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -37,9 +43,23 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     super.dispose();
   }
 
-  void _save() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    context.go('/home');
+  Future<void> _save() async {
+    if (!(_formKey.currentState?.validate() ?? false) || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(resetPasswordProvider)(
+        email: widget.args?.email ?? '',
+        newPassword: _password.text,
+      );
+      if (!mounted) return;
+      context.go('/home');
+    } on AppException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   bool get _ruleLength => _password.text.length >= 8;
@@ -150,12 +170,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   PrimaryButton(
                     label: 'Save password & continue',
                     icon: Icons.arrow_forward,
+                    loading: _busy,
                     onPressed: _save,
                   ),
                   const SizedBox(height: 12),
                   Center(
                     child: Text(
                       'You will be signed in automatically',
+                      textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 11.5, color: p.ink3),
                     ),
                   ),

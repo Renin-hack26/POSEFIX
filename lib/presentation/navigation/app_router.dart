@@ -10,6 +10,7 @@ import '../auth/sign_up_screen.dart';
 import '../home/home_screen.dart';
 import '../plan/plan_screen.dart';
 import '../settings/settings_screen.dart';
+import '../shared/anim/app_transitions.dart';
 import '../splash/splash_screen.dart';
 import '../veda/veda_chat_screen.dart';
 import '../workout/instruction_video_screen.dart';
@@ -51,18 +52,39 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // --- Reserved full-screen pages (PLANNING §10.2) ---
       GoRoute(
         path: '/workout-details',
-        builder: (context, state) => const WorkoutDetailsScreen(),
+        pageBuilder: (context, state) => AppTransitions.fadeRise(
+          state: state,
+          child: const WorkoutDetailsScreen(),
+        ),
       ),
       GoRoute(
         path: '/instruction-video',
-        builder: (context, state) => const InstructionVideoScreen(),
+        pageBuilder: (context, state) => AppTransitions.fadeRise(
+          state: state,
+          child: const InstructionVideoScreen(),
+        ),
       ),
-      GoRoute(path: '/vision', builder: (context, state) => const VisionScreen()),
+      GoRoute(
+        path: '/vision',
+        pageBuilder: (context, state) => AppTransitions.fadeRise(
+          state: state,
+          child: const VisionScreen(),
+        ),
+      ),
       GoRoute(
         path: '/summary',
-        builder: (context, state) => const SessionSummaryScreen(),
+        pageBuilder: (context, state) => AppTransitions.fadeRise(
+          state: state,
+          child: const SessionSummaryScreen(),
+        ),
       ),
-      GoRoute(path: '/veda', builder: (context, state) => const VedaChatScreen()),
+      GoRoute(
+        path: '/veda',
+        pageBuilder: (context, state) => AppTransitions.fadeRise(
+          state: state,
+          child: const VedaChatScreen(),
+        ),
+      ),
 
       // --- 4-tab shell ---
       StatefulShellRoute.indexedStack(

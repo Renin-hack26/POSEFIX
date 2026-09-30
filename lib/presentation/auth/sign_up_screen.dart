@@ -1,9 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/di/app_dependencies.dart';
+import '../../core/errors/app_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/validators.dart';
+import '../../domain/entities/user_profile.dart';
 import '../shared/app_back_button.dart';
 import '../shared/app_text_field.dart';
 import '../shared/grid_background.dart';
@@ -13,16 +17,17 @@ import 'otp_screen.dart';
 
 /// 03 — Sign Up (sample/index.html). "Step 1 of 1 — your details".
 ///
-/// UI-first: validation is fully real (PLANNING P-11…P-16); submit hands the
-/// email to the OTP screen. P1 routes the same payload to Supabase Auth.
-class SignUpScreen extends StatefulWidget {
+/// P1: submit dispatches the signup OTP through the Supabase-backed
+/// [SignUp] use case — the account activates only after the OTP screen
+/// verifies the emailed code (PLANNING §5.1).
+class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  ConsumerState<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
   final _firstName = TextEditingController();
   final _middleName = TextEditingController();
@@ -37,6 +42,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   DateTime? _dob;
   String? _gender;
   bool _genderError = false;
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -63,14 +69,37 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final formOk = _formKey.currentState?.validate() ?? false;
     setState(() => _genderError = _gender == null);
-    if (!formOk || _gender == null) return;
-    context.push(
-      '/otp',
-      extra: OtpArgs(email: _email.text.trim(), purpose: OtpPurpose.signup),
-    );
+    if (!formOk || _gender == null || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(signUpProvider)(
+        data: SignUpData(
+          firstName: _firstName.text.trim(),
+          middleName: _middleName.text.trim(),
+          lastName: _lastName.text.trim(),
+          dateOfBirth: _dob!,
+          gender: Gender.values.firstWhere((g) => g.label == _gender),
+          email: _email.text.trim(),
+          weightKg: double.tryParse(_weight.text.trim()),
+          heightCm: double.tryParse(_height.text.trim()),
+        ),
+        password: _password.text,
+      );
+      if (!mounted) return;
+      await context.push(
+        '/otp',
+        extra: OtpArgs(email: _email.text.trim(), purpose: OtpPurpose.signup),
+      );
+    } on AppException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -170,43 +199,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   const SizedBox(height: 14),
                   const FieldLabel('Gender *'),
                   const SizedBox(height: 7),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: 'Male', label: Text('Male')),
-                      ButtonSegment(value: 'Female', label: Text('Female')),
-                      ButtonSegment(
-                        value: 'Prefer not to say',
-                        label: Text('Prefer not to say'),
-                      ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final option in const [
+                        'Male',
+                        'Female',
+                        'Prefer not to say',
+                      ])
+                        _GenderPill(
+                          label: option,
+                          selected: _gender == option,
+                          onTap: () => setState(() {
+                            _gender = option;
+                            _genderError = false;
+                          }),
+                        ),
                     ],
-                    selected: {?_gender},
-                    onSelectionChanged: (s) => setState(() {
-                      _gender = s.isEmpty ? null : s.first;
-                      _genderError = false;
-                    }),
-                    emptySelectionAllowed: true,
-                    showSelectedIcon: false,
-                    expandedInsets: EdgeInsets.zero,
-                    style: ButtonStyle(
-                      visualDensity: VisualDensity.compact,
-                      side: const WidgetStatePropertyAll(BorderSide.none),
-                      backgroundColor: WidgetStateProperty.resolveWith(
-                        (states) => states.contains(WidgetState.selected)
-                            ? p.selBg
-                            : p.track,
-                      ),
-                      foregroundColor: WidgetStateProperty.resolveWith(
-                        (states) => states.contains(WidgetState.selected)
-                            ? p.selFg
-                            : p.ink2,
-                      ),
-                      textStyle: const WidgetStatePropertyAll(
-                        TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                      ),
-                      shape: const WidgetStatePropertyAll(
-                        StadiumBorder(),
-                      ),
-                    ),
                   ),
                   if (_genderError) ...[
                     const SizedBox(height: 6),
@@ -285,6 +295,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   PrimaryButton(
                     label: 'Create account',
                     icon: Icons.arrow_forward,
+                    loading: _busy,
                     onPressed: _submit,
                   ),
                   const SizedBox(height: 12),
@@ -307,6 +318,44 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   const SizedBox(height: 28),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pill toggle for the gender row — each option sizes to its own label and
+/// wraps onto the next run instead of squeezing text (segmented button did).
+class _GenderPill extends StatelessWidget {
+  const _GenderPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Material(
+      color: selected ? p.selBg : p.track,
+      borderRadius: BorderRadius.circular(999),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: selected ? p.selFg : p.ink2,
             ),
           ),
         ),

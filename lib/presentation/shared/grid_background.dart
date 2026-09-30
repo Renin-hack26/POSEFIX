@@ -15,7 +15,11 @@ class GridBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
+    // StackFit.expand: the stack (and its painter) always fills the screen.
+    // Without it the Stack shrink-wraps to the child's content height, so
+    // short forms (sign-in, forgot-password) left the lower part blank.
     return Stack(
+      fit: StackFit.expand,
       children: [
         Positioned.fill(
           child: RepaintBoundary(

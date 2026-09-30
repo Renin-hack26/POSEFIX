@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../shared/anim/skeleton.dart';
 import '../shared/glass_card.dart';
 import '../shared/grid_background.dart';
 import '../shared/primary_button.dart';
@@ -28,6 +29,18 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   /// Index of the active chip — the sample opens with "All" selected.
   int _category = 0;
+
+  /// True while the screen shows its loading skeleton.
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Mock initial-load delay — P1 swaps this for the real data source.
+    Future<void>.delayed(const Duration(milliseconds: 700), () {
+      if (!mounted) setState(() => _loading = false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,43 +83,47 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              const _ResumeCard(),
-              const SizedBox(height: 16),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (var i = 0; i < _categories.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 8),
-                      _CategoryChip(
-                        label: _categories[i],
-                        selected: i == _category,
-                        onTap: () => setState(() => _category = i),
-                      ),
+              if (_loading)
+                const _WorkoutSkeleton()
+              else ...[
+                const _ResumeCard(),
+                const SizedBox(height: 16),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < _categories.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        _CategoryChip(
+                          label: _categories[i],
+                          selected: i == _category,
+                          onTap: () => setState(() => _category = i),
+                        ),
+                      ],
                     ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: SectionHeader(title: 'Workout library'),
+                    ),
+                    Text(
+                      '14 workouts',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: p.accentDeep,
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  const Expanded(
-                    child: SectionHeader(title: 'Workout library'),
-                  ),
-                  Text(
-                    '14 workouts',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: p.accentDeep,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              for (final workout in _workouts) ...[
-                _WorkoutRow(workout),
                 const SizedBox(height: 10),
+                for (final workout in _workouts) ...[
+                  _WorkoutRow(workout),
+                  const SizedBox(height: 10),
+                ],
               ],
             ],
           ),
@@ -455,3 +472,90 @@ const List<_Workout> _workouts = [
     PillTone.green,
   ),
 ];
+
+/// Loading stand-in: resume card, category chips, library header and four
+/// workout rows — same paddings as the real content so the swap doesn't jump.
+class _WorkoutSkeleton extends StatelessWidget {
+  const _WorkoutSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Shimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          GlassCard(
+            weak: true,
+            padding: EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonBox(width: 96, height: 24, radius: 12),
+                SizedBox(height: 10),
+                SkeletonBox(width: 190, height: 18, radius: 8),
+                SizedBox(height: 6),
+                SkeletonText(width: 244),
+                SizedBox(height: 10),
+                SkeletonBox(height: 9, radius: 999),
+                SizedBox(height: 8),
+                SkeletonText(width: 200),
+              ],
+            ),
+          ),
+          SizedBox(height: 16),
+          Row(
+            children: [
+              SkeletonBox(width: 64, height: 36, radius: 999),
+              SizedBox(width: 8),
+              SkeletonBox(width: 84, height: 36, radius: 999),
+              SizedBox(width: 8),
+              SkeletonBox(width: 70, height: 36, radius: 999),
+              SizedBox(width: 8),
+              SkeletonBox(width: 82, height: 36, radius: 999),
+            ],
+          ),
+          SizedBox(height: 18),
+          SkeletonBox(width: 150, height: 20, radius: 6),
+          SizedBox(height: 10),
+          _SkeletonWorkoutRow(),
+          SizedBox(height: 10),
+          _SkeletonWorkoutRow(),
+          SizedBox(height: 10),
+          _SkeletonWorkoutRow(),
+          SizedBox(height: 10),
+          _SkeletonWorkoutRow(),
+        ],
+      ),
+    );
+  }
+}
+
+/// One library-row placeholder: media thumb + title/meta lines.
+class _SkeletonWorkoutRow extends StatelessWidget {
+  const _SkeletonWorkoutRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const GlassCard(
+      weak: true,
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      radius: 18,
+      child: Row(
+        children: [
+          SkeletonBox(width: 56, height: 56, radius: 15),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SkeletonText(width: 140, height: 14),
+                SizedBox(height: 6),
+                SkeletonText(width: 184),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../shared/grid_background.dart';
+import '../shared/under_construction_banner.dart';
 import 'widgets/framing_guide.dart';
 import 'widgets/posture_avatar.dart';
 import 'widgets/vision_hud.dart';
@@ -66,6 +67,12 @@ class _VisionScreenState extends State<VisionScreen> {
                         top: 16,
                         right: 14,
                         child: PostureAvatar(),
+                      ),
+                      const Positioned(
+                        top: 78,
+                        left: 14,
+                        right: 14,
+                        child: UnderConstructionBanner(),
                       ),
                       const Positioned(
                         left: 14,

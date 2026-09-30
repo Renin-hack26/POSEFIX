@@ -6,6 +6,7 @@ import '../shared/glass_card.dart';
 import '../shared/grid_background.dart';
 import '../shared/primary_button.dart';
 import '../shared/status_pill.dart';
+import '../shared/under_construction_banner.dart';
 
 /// 09 — Instruction video (sample `index.html`): form-demo player, coaching
 /// steps and the hand-off into the live camera session.
@@ -59,6 +60,8 @@ class InstructionVideoScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 14),
+                    const UnderConstructionBanner(),
+                    const SizedBox(height: 12),
                     Stack(
                       children: [
                         Container(
