@@ -37,15 +37,20 @@ class PrimaryButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 19, color: AppColors.accentInk),
-                const SizedBox(width: 8),
+                Icon(icon, size: 18, color: AppColors.accentInk),
+                const SizedBox(width: 6),
               ],
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.accentInk,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.accentInk,
+                  ),
                 ),
               ),
             ],
@@ -80,7 +85,8 @@ class PrimaryButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             child: Container(
               alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 17),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: content,
             ),
           ),
@@ -119,7 +125,7 @@ class SecondaryButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         child: Container(
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: p.line, width: 1.5),
@@ -129,15 +135,20 @@ class SecondaryButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 19, color: p.ink),
-                const SizedBox(width: 8),
+                Icon(icon, size: 18, color: p.ink),
+                const SizedBox(width: 6),
               ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: p.ink,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: p.ink,
+                  ),
                 ),
               ),
             ],

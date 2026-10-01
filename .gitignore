@@ -39,3 +39,9 @@ Thumbs.db
 # User reference material (3rd-party sample repo + raw source videos — inputs, not app code)
 /Model samples/
 /Source Animated Video/
+
+# PC pose test bench (tools/pose_test): Python venv + downloaded MediaPipe models
+.venv-pose/
+tools/pose_test/models/
+tools/pose_test/*.log
+__pycache__/

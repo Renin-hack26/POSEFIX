@@ -9,7 +9,7 @@
         { "dayOffset": 1, "kind": "rest" },
         { "dayOffset": 2, "kind": "workout", "categories": ["strength"], "startMin": 420 },
         { "dayOffset": 3, "kind": "rest" },
-        { "dayOffset": 4, "kind": "workout", "categories": ["cardio"], "startMin": 1080 },
+        { "dayOffset": 4, "kind": "workout", "categories": ["hiit"], "startMin": 1080 },
         { "dayOffset": 5, "kind": "rest" },
         { "dayOffset": 6, "kind": "rest" }
       ]
@@ -34,7 +34,7 @@
       "goals": ["fat_loss", "general_fitness"],
       "days": [
         { "dayOffset": 0, "kind": "workout", "categories": ["strength"], "startMin": 420 },
-        { "dayOffset": 1, "kind": "workout", "categories": ["cardio"], "startMin": 1080 },
+        { "dayOffset": 1, "kind": "workout", "categories": ["hiit"], "startMin": 1080 },
         { "dayOffset": 2, "kind": "rest" },
         { "dayOffset": 3, "kind": "workout", "categories": ["hiit"], "startMin": 420 },
         { "dayOffset": 4, "kind": "rest" },
@@ -65,7 +65,7 @@
         { "dayOffset": 1, "kind": "workout", "categories": ["hiit"], "startMin": 420 },
         { "dayOffset": 2, "kind": "rest" },
         { "dayOffset": 3, "kind": "workout", "categories": ["fullBody"], "startMin": 420 },
-        { "dayOffset": 4, "kind": "workout", "categories": ["cardio"], "startMin": 1080 },
+        { "dayOffset": 4, "kind": "workout", "categories": ["hiit"], "startMin": 1080 },
         { "dayOffset": 5, "kind": "workout", "categories": ["strength"], "startMin": 600 },
         { "dayOffset": 6, "kind": "rest" }
       ]
@@ -77,7 +77,7 @@
       "days": [
         { "dayOffset": 0, "kind": "workout", "categories": ["hiit"], "startMin": 420 },
         { "dayOffset": 1, "kind": "workout", "categories": ["strength"], "startMin": 420 },
-        { "dayOffset": 2, "kind": "workout", "categories": ["cardio"], "startMin": 420 },
+        { "dayOffset": 2, "kind": "workout", "categories": ["hiit"], "startMin": 420 },
         { "dayOffset": 3, "kind": "workout", "categories": ["fullBody"], "startMin": 1080 },
         { "dayOffset": 4, "kind": "workout", "categories": ["core"], "startMin": 1080 },
         { "dayOffset": 5, "kind": "workout", "categories": ["strength"], "startMin": 420 },
@@ -93,7 +93,7 @@
         { "dayOffset": 1, "kind": "rest" },
         { "dayOffset": 2, "kind": "workout", "categories": ["strength"], "startMin": 420 },
         { "dayOffset": 3, "kind": "rest" },
-        { "dayOffset": 4, "kind": "workout", "categories": ["cardio"], "startMin": 1080 },
+        { "dayOffset": 4, "kind": "workout", "categories": ["hiit"], "startMin": 1080 },
         { "dayOffset": 5, "kind": "workout", "categories": ["mobility"], "startMin": 600 },
         { "dayOffset": 6, "kind": "rest" }
       ]

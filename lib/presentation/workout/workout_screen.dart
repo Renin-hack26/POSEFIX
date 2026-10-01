@@ -31,13 +31,14 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
   /// Chip → predicate over real [Workout] fields:
   /// All      → every workout;
   /// Strength → `category == strength || fullBody`;
-  /// Cardio   → `category == cardio || hiit`;
+  /// HIIT     → `category == hiit` (pure cardio was removed — cardio can't
+  ///            be reliably monitored by a phone camera);
   /// Mobility → `category == mobility`;
   /// Core     → `category == core`.
   static final _categories = <_CategoryFilter>[
     _CategoryFilter.all(),
     _CategoryFilter.strength(),
-    _CategoryFilter.cardio(),
+    _CategoryFilter.hiit(),
     _CategoryFilter.mobility(),
     _CategoryFilter.core(),
   ];
@@ -309,11 +310,9 @@ class _CategoryFilter {
             w.category == WorkoutCategory.fullBody,
       );
 
-  static _CategoryFilter cardio() => _CategoryFilter(
-        'Cardio',
-        (w) =>
-            w.category == WorkoutCategory.cardio ||
-            w.category == WorkoutCategory.hiit,
+  static _CategoryFilter hiit() => _CategoryFilter(
+        'HIIT',
+        (w) => w.category == WorkoutCategory.hiit,
       );
 
   static _CategoryFilter mobility() => _CategoryFilter(

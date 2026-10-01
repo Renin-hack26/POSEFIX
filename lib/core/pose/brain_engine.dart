@@ -143,11 +143,25 @@ class BilateralStatus {
 
 /// Safe expression evaluator for FSM conditions.
 class ConditionEvaluator {
+  /// Parsed-expression cache — the condition set is the static bundled
+  /// catalog, so each rule is parsed ONCE instead of re-parsed on every
+  /// state/rule × frame (25 fps × dozens of rules was pure waste).
+  static final Map<String, _Expr> _parsed = {};
+
+  /// Sentinel for unparseable conditions — always evaluates to false.
+  static final _Expr _invalid = _Literal(false);
+
   /// Evaluate a condition string against a context. Never throws —
   /// unparseable rules evaluate to false and the rep simply doesn't count.
   static bool evaluate(String condition, Map<String, dynamic> context) {
+    final _Expr expr = _parsed.putIfAbsent(condition, () {
+      try {
+        return _Parser(condition)._parseExpression();
+      } catch (_) {
+        return _invalid;
+      }
+    });
     try {
-      final expr = _Parser(condition)._parseExpression();
       return _truthy(expr.resolve(context));
     } catch (_) {
       return false;
@@ -492,8 +506,13 @@ extension on String {
 
 /// Consecutive-frame state stabilizer — a raw FSM state only commits after
 /// [frames] identical evaluations in a row. Kills single-frame jitter from
-/// noisy low-light detections without adding perceptible latency
-/// (3 frames ≈ 100-250 ms at inference rate).
+/// noisy low-light detections without adding perceptible latency.
+///
+/// Confirmation is **wall-clock aware**: the evidence window targets ~80 ms
+/// of consistency (never below 2 frames, never above [frames]). At 25-33
+/// analyzed frames/s that is a 2-3 frame commit — phases of very fast reps
+/// (up to ~3/s) confirm within the phase instead of the old fixed
+/// 3-frame ≈ 240 ms window that dropped them.
 class StateStabilizer {
   StateStabilizer(this.frames);
 
@@ -502,8 +521,26 @@ class StateStabilizer {
   String _pending = 'unknown';
   int _count = 0;
 
+  /// Target wall-clock window for a commit (seconds) — sized so a
+  /// 3-rep/sec cadence (≈110 ms per FSM phase) can still confirm.
+  static const double confirmSeconds = 0.08;
+
+  /// Frames required for the given inter-frame gap (seconds).
+  int requiredFramesFor(double dtSec) {
+    if (frames <= 1) return 1;
+    if (dtSec <= 0) return frames;
+    final int byTime = (confirmSeconds / dtSec).ceil();
+    if (byTime < 2) return 2;
+    return byTime > frames ? frames : byTime;
+  }
+
   /// Pushes a raw state; returns true when the committed state changed.
-  bool push(String raw) {
+  /// [dtSec] is the time since the previous push (0 when unknown).
+  /// [frameCap] relaxes confirmation for count-critical states (the FSM
+  /// trigger): the trigger commits after at most this many frames so a brief
+  /// top-hold between fast reps can never lose an otherwise complete rep —
+  /// phantom counts stay guarded by visit-memory + minRepDuration.
+  bool push(String raw, [double dtSec = 0, int? frameCap]) {
     if (frames <= 1) {
       if (raw == state) return false;
       state = raw;
@@ -515,7 +552,10 @@ class StateStabilizer {
       _pending = raw;
       _count = 1;
     }
-    if (_count >= frames && _pending != state) {
+    var need = requiredFramesFor(dtSec);
+    if (frameCap != null && need > frameCap) need = frameCap;
+    if (need < 2) need = 2; // a single frame is always noise
+    if (_count >= need && _pending != state) {
       state = _pending;
       return true;
     }
@@ -590,6 +630,10 @@ class BrainEngine {
     required Map<String, LmPoint> landmarkCoords,
     required double timestamp,
   }) {
+    // Wall-clock gap since the previous analyzed frame — drives the
+    // stabilizer's time-aware confirmation window.
+    final double? lastT = _lastT;
+    _frameDt = lastT == null ? 0.0 : timestamp - lastT;
     _updateWindows(angles);
     final vels = _velocities(angles, timestamp);
     final context = _buildContext(angles, landmarkCoords, vels);
@@ -599,6 +643,9 @@ class BrainEngine {
     _currentFormScore = _calculateFormScore(context, result.feedback);
     return result.copyWith(formScore: _currentFormScore);
   }
+
+  /// Inter-frame gap of the frame currently being processed (seconds).
+  double _frameDt = 0;
 
   Map<String, dynamic> _buildContext(
     Map<String, double> angles,
@@ -696,7 +743,15 @@ class BrainEngine {
   ) {
     final raw = _evaluateRaw(context) ?? 'unknown';
     final committedBefore = _stab.state;
-    final changed = _stab.push(raw);
+    // Count-critical states (trigger + required ROM visit) confirm in at
+    // most 2 frames: they gate the rep itself, and a <90 ms bottom touch or
+    // top-hold must never slip past the commit window.
+    final rule0 = definition.counterRule;
+    final int? cap = (raw == rule0.triggerState ||
+            raw == rule0.requiredPriorState)
+        ? 2
+        : null;
+    final changed = _stab.push(raw, _frameDt, cap);
     _previousState = committedBefore;
     final current = _stab.state;
     _visited.add(current);
@@ -730,16 +785,21 @@ class BrainEngine {
     }
 
     context['state'] = current;
-    debugPrint(
-        'DBG uni raw=$raw current=$current min=${context['min_angle']} '
-        'fb=${_evaluateFeedback(context).map((f) => f.name).toList()}');
+    // Evaluate feedback ONCE — the old code built the debug string with a
+    // second full rule evaluation on every frame (pure per-frame waste).
+    final feedback = _evaluateFeedback(context);
+    if (kDebugMode) {
+      debugPrint(
+          'DBG uni raw=$raw current=$current min=${context['min_angle']} '
+          'fb=${feedback.map((f) => f.name).toList()}');
+    }
     return BrainResult(
       exerciseId: definition.id,
       currentState: current,
       previousState: _previousState,
       repCount: _repCount,
       angles: Map<String, double>.from(angles),
-      feedback: _evaluateFeedback(context),
+      feedback: feedback,
       formScore: _currentFormScore,
       repJustCompleted: repCompleted,
       stateJustChanged: changed,
@@ -758,8 +818,15 @@ class BrainEngine {
     final rightCtx = Map<String, dynamic>.from(context)
       ..['angle'] = context['right_angle'] ?? context['angle'] ?? 0.0;
 
-    final changedLeft = _stabLeft.push(_evaluateRaw(leftCtx) ?? 'unknown');
-    final changedRight = _stabRight.push(_evaluateRaw(rightCtx) ?? 'unknown');
+    final String rawLeft = _evaluateRaw(leftCtx) ?? 'unknown';
+    final String rawRight = _evaluateRaw(rightCtx) ?? 'unknown';
+    final rule0 = definition.counterRule;
+    int? capFor(String raw) =>
+        (raw == rule0.triggerState || raw == rule0.requiredPriorState)
+            ? 2
+            : null;
+    final changedLeft = _stabLeft.push(rawLeft, _frameDt, capFor(rawLeft));
+    final changedRight = _stabRight.push(rawRight, _frameDt, capFor(rawRight));
     _visitedLeft.add(_stabLeft.state);
     _visitedRight.add(_stabRight.state);
 

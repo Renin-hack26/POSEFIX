@@ -30,7 +30,9 @@ class _TipsCarouselState extends State<TipsCarousel> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            height: 92,
+            // 4 body lines fit without the "…" cut-off (was 92/3 lines, which
+            // clipped longer coach tips mid-sentence — visual defect).
+            height: 114,
             width: double.infinity,
             child: PageView.builder(
               itemCount: tips.length,
@@ -39,12 +41,11 @@ class _TipsCarouselState extends State<TipsCarousel> {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            spacing: 5,
+            runSpacing: 5,
             children: [
-              for (var i = 0; i < tips.length; i++) ...[
-                if (i > 0) const SizedBox(width: 5),
-                _Dot(active: i == _index),
-              ],
+              for (var i = 0; i < tips.length; i++) _Dot(active: i == _index),
             ],
           ),
         ],
@@ -90,7 +91,7 @@ class _TipSlide extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 tip.body,
-                maxLines: 3,
+                maxLines: 4,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 12.5, height: 1.45, color: p.ink2),
               ),

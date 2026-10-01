@@ -281,8 +281,10 @@ class _HomeBody extends StatelessWidget {
         Row(
           children: [
             // Progress report opens the reports flow — no route yet.
-            Flexible(
-              flex: 1,
+            // Expanded (tight) gives each button a bounded half-width, so the
+            // inner SizedBox(double.infinity) resolves instead of overflowing.
+            // Labels ellipsize inside the button (see primary_button.dart).
+            Expanded(
               child: SecondaryButton(
                 label: 'Progress report',
                 icon: Icons.description,
@@ -290,8 +292,7 @@ class _HomeBody extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            Flexible(
-              flex: 1,
+            Expanded(
               child: PrimaryButton(
                 label: 'Chat with VEDA',
                 icon: Icons.smart_toy,

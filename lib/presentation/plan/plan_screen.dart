@@ -17,7 +17,7 @@ import '../shared/primary_button.dart';
 import '../shared/section_header.dart';
 import '../shared/status_pill.dart';
 
-/// 12 � Plan tab (sample/index.html): week header + navigation, quick chips,
+/// 12 · Plan tab (sample/index.html): week header + navigation, quick chips,
 /// day strip, next session with Start, exercise library, meals and history.
 ///
 /// Data (all real, no demo constants):
@@ -28,8 +28,10 @@ import '../shared/status_pill.dart';
 /// * history ? [SessionRepository] recent sessions (expandable, rows open
 ///   the session summary).
 ///
-/// Tapping a scheduled day (or the calendar icon in the week header) opens
-/// the session editor sheet � time, status and rounds persist via
+/// Tapping any date in the day strip selects it (ongoing week only) · the
+/// slot below then shows that day's full set of workouts, past or upcoming.
+/// Tapping a session card (or the calendar icon in the week header) opens
+/// the session editor sheet · time, status and rounds persist via
 /// [PlanRepository]. The Reminders chip toggles the real daily reminder.
 class PlanScreen extends ConsumerStatefulWidget {
   const PlanScreen({super.key});
@@ -126,7 +128,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         final workout = await workoutRepo.byId(id);
         if (workout != null) workouts[id] = workout;
       } catch (_) {
-        // Leave unresolved � rows fall back to generic titles.
+        // Leave unresolved · rows fall back to generic titles.
       }
     }
 
@@ -198,7 +200,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Check your connection and try again � '
+                          'Check your connection and try again · '
                           'your data stays on this device.',
                           style: TextStyle(fontSize: 12.5, color: p.ink2),
                         ),
@@ -273,7 +275,7 @@ class _NoPlanState extends StatelessWidget {
   }
 }
 
-class _PlanBody extends StatelessWidget {
+class _PlanBody extends StatefulWidget {
   const _PlanBody({required this.data, required this.onEditSession});
 
   final _PlanData data;
@@ -282,8 +284,40 @@ class _PlanBody extends StatelessWidget {
   final ValueChanged<PlanSession> onEditSession;
 
   @override
+  State<_PlanBody> createState() => _PlanBodyState();
+}
+
+class _PlanBodyState extends State<_PlanBody> {
+  /// Highlighted day-strip date (dateKey · ongoing week only). Null until
+  /// the user taps a date → auto-default below.
+  String? _selectedKey;
+
+  /// Auto-selection: today when it has sessions, else the next upcoming day
+  /// with sessions (preserves the original "next slot" default), else today
+  /// (renders the rest card).
+  String _autoSelectedKey(TrainingPlan plan, DateTime now) {
+    if (plan.sessionsFor(now).isNotEmpty) return now.dateKey;
+    final days = [...plan.days]..sort((a, b) => a.date.compareTo(b.date));
+    for (final day in days) {
+      if (day.date.dateKey.compareTo(now.dateKey) > 0 &&
+          day.sessions.isNotEmpty) {
+        return day.date.dateKey;
+      }
+    }
+    return now.dateKey;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final plan = data.plan!;
+    final plan = widget.data.plan!;
+    final now = DateTime.now();
+    final selectedKey = _selectedKey ?? _autoSelectedKey(plan, now);
+    // Resolve the selected strip date (fallback: today — e.g. a stale plan
+    // whose days all sit in a previous week).
+    var selectedDay = now;
+    for (final day in plan.days) {
+      if (day.date.dateKey == selectedKey) selectedDay = day.date;
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -291,25 +325,34 @@ class _PlanBody extends StatelessWidget {
           label: _weekLabelFor(plan),
           onEditSchedule: () {
             // Edit chip opens the editor for today's/next scheduled session.
-            final now = DateTime.now();
             final session = _nextEditableSession(plan, now);
-            if (session != null) onEditSession(session);
+            if (session != null) widget.onEditSession(session);
           },
         ),
         const SizedBox(height: 14),
         _PlanChips(source: plan.source),
         const SizedBox(height: 10),
-        _WeekStrip(days: plan.days, onDayTap: (day) {
-          if (day.sessions.isNotEmpty) onEditSession(day.sessions.first);
-        }),
+        _WeekStrip(
+          days: plan.days,
+          selectedKey: selectedKey,
+          onDayTap: (day) =>
+              setState(() => _selectedKey = day.date.dateKey),
+        ),
         const SizedBox(height: 20),
-        _NextSessionSlot(data: data),
+        _DaySessionsSlot(
+          data: widget.data,
+          day: selectedDay,
+          onEditSession: widget.onEditSession,
+        ),
         const SizedBox(height: 20),
-        _LibrarySection(exercises: data.exercises),
+        _LibrarySection(exercises: widget.data.exercises),
         const SizedBox(height: 20),
-        _MealsSection(meals: data.meals, target: data.target),
+        _MealsSection(
+          meals: widget.data.meals,
+          target: widget.data.target,
+        ),
         const SizedBox(height: 20),
-        _HistorySection(data: data),
+        _HistorySection(data: widget.data),
       ],
     );
   }
@@ -336,7 +379,7 @@ String _weekLabelFor(TrainingPlan plan) {
       ? days.last.date
       : plan.weekStart.add(const Duration(days: 6));
   final fmt = DateFormat('MMM d');
-  return '${fmt.format(start)} � ${fmt.format(end)}';
+  return '${fmt.format(start)} · ${fmt.format(end)}';
 }
 
 /// Local duplicate of home's start-time helper (no home internals import).
@@ -475,7 +518,7 @@ class _PlanChipsState extends ConsumerState<_PlanChips> {
           await ref.read(notificationEngineProvider).areNotificationsEnabled();
       if (mounted) setState(() => _remindersOn = enabled);
     } catch (_) {
-      // Platform channel unavailable (e.g. widget tests) � keep display-only.
+      // Platform channel unavailable (e.g. widget tests) · keep display-only.
     }
   }
 
@@ -489,7 +532,7 @@ class _PlanChipsState extends ConsumerState<_PlanChips> {
         if (plan == null) return;
         final session = _nextEditableSession(plan, DateTime.now());
         if (session == null) {
-          // Nothing scheduled � just make sure nothing is pending.
+          // Nothing scheduled · just make sure nothing is pending.
           await engine.cancelAll();
         } else {
           final workout =
@@ -601,16 +644,23 @@ class _Chip extends StatelessWidget {
 /// with scheduled sessions (empty days show no dot). Tapping a day with a
 /// session opens the session editor.
 class _WeekStrip extends StatelessWidget {
-  const _WeekStrip({required this.days, required this.onDayTap});
+  const _WeekStrip({
+    required this.days,
+    required this.selectedKey,
+    required this.onDayTap,
+  });
 
   final List<PlanDay> days;
 
-  /// Invoked when a day cell is tapped (only days with sessions act).
+  /// dateKey of the highlighted cell (today, or the user's selection).
+  final String selectedKey;
+
+  /// Selects the tapped date — every date of the ongoing week is
+  /// accessible, with or without scheduled sessions.
   final ValueChanged<PlanDay> onDayTap;
 
   @override
   Widget build(BuildContext context) {
-    final todayKey = DateTime.now().dateKey;
     final letterFmt = DateFormat('E');
     return Row(
       children: [
@@ -622,10 +672,8 @@ class _WeekStrip extends StatelessWidget {
               letter: letterFmt.format(days[i].date)[0],
               date: '${days[i].date.day}',
               hasSession: days[i].sessions.isNotEmpty,
-              selected: days[i].date.dateKey == todayKey,
-              onTap: days[i].sessions.isNotEmpty
-                  ? () => onDayTap(days[i])
-                  : null,
+              selected: days[i].date.dateKey == selectedKey,
+              onTap: () => onDayTap(days[i]),
             ),
           ),
         ],
@@ -649,7 +697,7 @@ class _DayCell extends StatelessWidget {
   final bool hasSession;
   final bool selected;
 
-  /// Non-null only for days with scheduled sessions.
+  /// Tap selects the date — any day of the ongoing week is selectable.
   final VoidCallback? onTap;
 
   @override
@@ -712,54 +760,45 @@ class _DayCell extends StatelessWidget {
   }
 }
 
-/// Next-session slot: today's first planned session, else the next future
-/// planned session, else a rest-day card.
-class _NextSessionSlot extends StatelessWidget {
-  const _NextSessionSlot({required this.data});
+/// The selected day's set of workouts — today by default, or whichever date
+/// the user picked in the week strip (ongoing week only). Empty day →
+/// rest card. Each session card taps through to the editor.
+class _DaySessionsSlot extends StatelessWidget {
+  const _DaySessionsSlot({
+    required this.data,
+    required this.day,
+    required this.onEditSession,
+  });
 
   final _PlanData data;
 
+  /// Selected strip date.
+  final DateTime day;
+
+  /// Opens the session editor sheet for a tapped session.
+  final ValueChanged<PlanSession> onEditSession;
+
   @override
   Widget build(BuildContext context) {
-    final plan = data.plan!;
-    final now = DateTime.now();
-    final todayKey = now.dateKey;
+    final sessions = data.plan!.sessionsFor(day);
+    final isToday = day.dateKey == DateTime.now().dateKey;
+    if (sessions.isEmpty) return const _RestDayCard();
+    return Column(
+      children: [
+        for (var i = 0; i < sessions.length; i++) ...[
+          if (i > 0) const SizedBox(height: 10),
+          _sessionCard(context, sessions[i], isToday),
+        ],
+      ],
+    );
+  }
 
-    PlanSession? chosen;
-    DateTime? chosenDate;
-    bool isToday = true;
-
-    final todays = plan.sessionsFor(now);
-    if (todays.isNotEmpty) {
-      final planned = todays.where(
-        (s) => s.status == PlanSessionStatus.planned,
-      );
-      chosen = planned.isNotEmpty ? planned.first : todays.first;
-      chosenDate = now;
-      isToday = true;
-    } else {
-      final days = [...plan.days]
-        ..sort((a, b) => a.date.compareTo(b.date));
-      for (final day in days) {
-        if (day.date.dateKey.compareTo(todayKey) > 0 &&
-            day.sessions.isNotEmpty) {
-          final planned = day.sessions.where(
-            (s) => s.status == PlanSessionStatus.planned,
-          );
-          chosen = planned.isNotEmpty ? planned.first : day.sessions.first;
-          chosenDate = day.date;
-          isToday = false;
-          break;
-        }
-      }
-    }
-
-    if (chosen == null || chosenDate == null) {
-      return const _RestDayCard();
-    }
-    final workout = data.workouts[chosen.workoutId];
-    final time = _formatStartMin(chosen.startTimeMin);
-    final pill = isToday ? time : '${DateFormat('EEE').format(chosenDate)} � $time';
+  Widget _sessionCard(
+      BuildContext context, PlanSession session, bool isToday) {
+    final workout = data.workouts[session.workoutId];
+    final time = _formatStartMin(session.startTimeMin);
+    final pill =
+        isToday ? time : '${DateFormat('EEE').format(day)} · $time';
     final firstExercise = (workout?.blocks.isNotEmpty ?? false)
         ? workout!.blocks.first.exerciseId
         : null;
@@ -767,6 +806,7 @@ class _NextSessionSlot extends StatelessWidget {
       timeLabel: pill,
       title: workout?.name ?? 'Planned session',
       moves: _movesLine(workout, data.exerciseNames),
+      onEdit: () => onEditSession(session),
       onStart: () =>
           context.push('/vision${firstExercise == null ? '' : '?ex=$firstExercise'}'),
     );
@@ -782,9 +822,9 @@ String _movesLine(Workout? workout, Map<String, String> exerciseNames) {
     if (seen.length == 4) break;
   }
   if (seen.isEmpty) {
-    return '${workout.blocks.length} moves � about ${workout.durationMin} min';
+    return '${workout.blocks.length} moves · about ${workout.durationMin} min';
   }
-  return seen.join(' � ');
+  return seen.join(' · ');
 }
 
 /// Rest-day fallback when no planned sessions remain this week.
@@ -819,7 +859,7 @@ class _RestDayCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Enjoy recovery � or browse the library',
+                  'Enjoy recovery · or browse the library',
                   style: TextStyle(fontSize: 11.5, color: p.ink3),
                 ),
               ],
@@ -838,18 +878,23 @@ class _RestDayCard extends StatelessWidget {
   }
 }
 
-/// Today's/next session card with the Start CTA (sample `.btn`).
+/// Selected-day session card with the Start CTA (sample `.btn`).
+/// Tapping the card (outside Start) opens the session editor sheet.
 class _NextSessionCard extends StatelessWidget {
   const _NextSessionCard({
     required this.timeLabel,
     required this.title,
     required this.moves,
+    required this.onEdit,
     required this.onStart,
   });
 
   final String timeLabel;
   final String title;
   final String moves;
+
+  /// Opens the session editor sheet for this session.
+  final VoidCallback onEdit;
   final VoidCallback onStart;
 
   @override
@@ -857,6 +902,7 @@ class _NextSessionCard extends StatelessWidget {
     final p = context.palette;
     return GlassCard(
       padding: const EdgeInsets.all(18),
+      onTap: onEdit,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -917,7 +963,10 @@ class _LibrarySection extends StatelessWidget {
           const _LibraryEmpty()
         else
           SizedBox(
-            height: 138,
+            // 146 = thumb(72) + spacing + text block + 1.2px border + 10px
+            // padding with ~7px slack — at 138 the column overflowed by
+            // ~5px with real device font metrics (stripes on every card).
+            height: 146,
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
@@ -985,7 +1034,7 @@ class _LibraryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            height: 76,
+            height: 72,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(15),
               gradient: LinearGradient(
@@ -1003,22 +1052,33 @@ class _LibraryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            exercise.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: p.ink,
+          // Expanded: the text block can never overflow the card (system
+          // font scaling used to push it past the fixed height → striped
+          // overflow warnings on every card).
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  exercise.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: p.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$muscle · ${exercise.formCues.length} cues',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11.5, color: p.ink3),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '$muscle � ${exercise.formCues.length} cues',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11.5, color: p.ink3),
           ),
         ],
       ),
@@ -1249,7 +1309,7 @@ IconData _mealIcon(MealType type) => switch (type) {
       MealType.snack => Icons.cookie,
     };
 
-/// Recent sessions list (sample `.list .lrow` + `.idx`) � expandable when
+/// Recent sessions list (sample `.list .lrow` + `.idx`) · expandable when
 /// more than five sessions exist; rows open the session summary.
 class _HistorySection extends StatefulWidget {
   const _HistorySection({required this.data});
@@ -1287,7 +1347,7 @@ class _HistorySectionState extends State<_HistorySection> {
         if (data.history.isEmpty)
           GlassCard(
             child: Text(
-              'No sessions yet � your completed workouts will appear here.',
+              'No sessions yet · your completed workouts will appear here.',
               style: TextStyle(fontSize: 12.5, color: p.ink2),
             ),
           )
@@ -1344,8 +1404,8 @@ class _HistorySectionState extends State<_HistorySection> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${_relativeDay(session.startedAt)} � '
-                          '${numbers.format(session.totalReps)} reps � '
+                          '${_relativeDay(session.startedAt)} · '
+                          '${numbers.format(session.totalReps)} reps · '
                           'form ${session.formAccuracyPct.round()}%',
                           style: TextStyle(fontSize: 11.5, color: p.ink3),
                         ),
@@ -1366,7 +1426,7 @@ class _HistorySectionState extends State<_HistorySection> {
   }
 }
 
-/// Accent section action copy (sample `.link`) � tap target for expand/collapse.
+/// Accent section action copy (sample `.link`) · tap target for expand/collapse.
 class _LinkLabel extends StatelessWidget {
   const _LinkLabel(this.label);
 
@@ -1400,7 +1460,7 @@ class _PlanSkeleton extends StatelessWidget {
   }
 }
 
-/// Session editor sheet � time, status and rounds for one scheduled session.
+/// Session editor sheet · time, status and rounds for one scheduled session.
 ///
 /// Returns the edited [PlanSession] via `Navigator.pop` (null when closed
 /// without saving). Persistence happens in the screen via

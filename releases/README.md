@@ -23,6 +23,9 @@ releases/v<version>/FixPose-v<version>-<buildtype>.apk
 
 | File | versionName+Code | Type | Size | Date |
 |---|---|---|---|---|
+| `FixPose-v1.1.9-debug.apk` | 1.1.9+10 | debug | 233.8 MB | 2026-10-01 |
+| `FixPose-v1.1.8-debug.apk` | 1.1.8+9 | debug | 233.8 MB | 2026-10-01 |
+| `FixPose-v1.1.7-debug.apk` | 1.1.7+8 | debug | 233.8 MB | 2026-10-01 |
 | `FixPose-v1.1.6-debug.apk` | 1.1.6+7 | debug | 233.8 MB | 2026-10-01 |
 | `FixPose-v1.1.5-debug.apk` | 1.1.5+6 | debug | 233.8 MB | 2026-10-01 |
 | `FixPose-v1.1.4-debug.apk` | 1.1.4+5 | debug | 272.2 MB | 2026-10-01 |

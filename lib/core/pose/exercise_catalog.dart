@@ -86,7 +86,10 @@ const ExerciseDefinition squatDefinition = ExerciseDefinition(
   counterRule: CounterRule(
     triggerState: 'standing',
     requiredPriorState: 'bottom',
-    minRepDuration: 0.8,
+    // 0.8 dropped fast touch-and-go squats; 0.3 allows a 3-rep/sec cadence
+    // (333 ms) while still exceeding the shortest possible wobble chain
+    // (4 confirmed frames ≈ 160 ms at 25 fps).
+    minRepDuration: 0.3,
   ),
   feedbackRules: [
     FeedbackRule(
@@ -184,7 +187,9 @@ const ExerciseDefinition pushUpDefinition = ExerciseDefinition(
   counterRule: CounterRule(
     triggerState: 'plank_up',
     requiredPriorState: 'bottom',
-    minRepDuration: 0.8,
+    // Fast push-up cadence (up to 3 rep/sec) was gated out at 0.8; 0.3
+    // counts it while visit-memory + stabilizer still reject wobble.
+    minRepDuration: 0.3,
   ),
   feedbackRules: [
     FeedbackRule(
@@ -282,7 +287,8 @@ const ExerciseDefinition jumpingJackDefinition = ExerciseDefinition(
   counterRule: CounterRule(
     triggerState: 'closed',
     requiredPriorState: 'open',
-    minRepDuration: 0.6,
+    // Fast jumping-jack cycles — a 3-rep/sec cadence beats the old 0.6 gate.
+    minRepDuration: 0.3,
   ),
   feedbackRules: [
     FeedbackRule(
@@ -1557,7 +1563,9 @@ const ExerciseDefinition kneePushUpDefinition = ExerciseDefinition(
   counterRule: CounterRule(
     triggerState: 'plank_up',
     requiredPriorState: 'bottom',
-    minRepDuration: 0.8,
+    // Fast push-up cadence (up to 3 rep/sec) was gated out at 0.8; 0.3
+    // counts it while visit-memory + stabilizer still reject wobble.
+    minRepDuration: 0.3,
   ),
   feedbackRules: [
     FeedbackRule(
@@ -1649,7 +1657,9 @@ const ExerciseDefinition inclinePushUpDefinition = ExerciseDefinition(
   counterRule: CounterRule(
     triggerState: 'plank_up',
     requiredPriorState: 'bottom',
-    minRepDuration: 0.8,
+    // Fast push-up cadence (up to 3 rep/sec) was gated out at 0.8; 0.3
+    // counts it while visit-memory + stabilizer still reject wobble.
+    minRepDuration: 0.3,
   ),
   feedbackRules: [
     FeedbackRule(
@@ -1824,7 +1834,10 @@ const ExerciseDefinition sumoSquatDefinition = ExerciseDefinition(
   counterRule: CounterRule(
     triggerState: 'standing',
     requiredPriorState: 'bottom',
-    minRepDuration: 0.8,
+    // 0.8 dropped fast touch-and-go squats; 0.3 allows a 3-rep/sec cadence
+    // (333 ms) while still exceeding the shortest possible wobble chain
+    // (4 confirmed frames ≈ 160 ms at 25 fps).
+    minRepDuration: 0.3,
   ),
   feedbackRules: [
     FeedbackRule(

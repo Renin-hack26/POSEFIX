@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -67,6 +68,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   /// Latest raw pose from ML Kit for skeleton overlay.
   Pose? _latestPose;
 
+  /// Live joint angles (deg) for the HUD — L/R elbow and knee.
+  Map<String, double> _angles = const {};
+
   /// Actual image-stream dimensions (sensor pixels) for overlay transform.
   /// Updated from every frame; falls back to previewSize until first frame.
   double _imageWidth = 0;
@@ -74,6 +78,54 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   int _framesSeen = 0;
   int _lastPosesFound = 0;
   String? _pipelineError;
+
+  // --- frame-rate UI plumbing -------------------------------------------------
+  // Per-frame data (HUD readouts + skeleton overlay) is pushed through
+  // notifiers instead of setState: the camera preview, controls and the
+  // screen structure no longer rebuild on every analyzed frame — only the
+  // small HUD subtrees re-build and the overlay re-paints.
+  final ValueNotifier<_HudSnapshot> _hud = ValueNotifier(_HudSnapshot.initial);
+  final _FrameTick _overlayTick = _FrameTick();
+
+  /// One painter instance for the whole session — frame data is mutated in
+  /// place and the overlay is repainted via [_overlayTick].
+  late final SkeletonOverlayPainter _skeletonPainter = SkeletonOverlayPainter(
+    _latestPose,
+    _imageWidth,
+    _imageHeight,
+    _rotation,
+    _lens == CameraLensDirection.front,
+    repaint: _overlayTick,
+  );
+
+  /// Publishes current per-frame fields to the HUD listeners.
+  void _publishHud() {
+    _hud.value = _HudSnapshot(
+      frames: _framesSeen,
+      poses: _lastPosesFound,
+      error: _pipelineError,
+      lens: _lens,
+      reps: _reps,
+      state: _state,
+      formScore: _formScore,
+      lockReason: _lockReason,
+      framing: _framing,
+      coachCue: _coachCue,
+      paused: _paused,
+      angles: _angles,
+    );
+  }
+
+  /// Refreshes the skeleton overlay paint (pose + mapping) without
+  /// rebuilding any widget.
+  void _publishOverlay() {
+    _skeletonPainter.pose = _latestPose;
+    _skeletonPainter.imageWidth = _imageWidth;
+    _skeletonPainter.imageHeight = _imageHeight;
+    _skeletonPainter.rotation = _rotation;
+    _skeletonPainter.mirrored = _lens == CameraLensDirection.front;
+    _overlayTick.tick();
+  }
 
   @override
   void initState() {
@@ -237,6 +289,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
         _initializing = false;
         _ready = true;
       });
+      _publishHud(); // lens label changed with the camera
     } catch (e) {
       if (_disposed || !mounted) return;
       setState(() {
@@ -285,16 +338,25 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       );
       if (!mounted || _disposed) return;
       // Always refresh telemetry so the HUD proves the pipeline is alive
-      // even when ML Kit returns zero poses.
+      // even when ML Kit returns zero poses — but only notify when the
+      // numbers actually changed (dropped/throttled frames stay silent).
+      final bool telemetryChanged = analyzer.framesSeen != _framesSeen ||
+          analyzer.lastPosesFound != _lastPosesFound ||
+          analyzer.lastError != _pipelineError;
       _framesSeen = analyzer.framesSeen;
       _lastPosesFound = analyzer.lastPosesFound;
       _pipelineError = analyzer.lastError;
       if (result != null) {
         _handleResult(result);
-        // Throttle overlay updates to ~10 fps to avoid excessive UI rebuilds
-        _latestPose = analyzer.latestPose;
+        // Prefer the EMA-smoothed pose for the overlay — stable joints and
+        // lines instead of raw per-frame jitter.
+        _latestPose = analyzer.smoothedPose ?? analyzer.latestPose;
+        _angles = _jointAngles(_latestPose);
+        _publishOverlay();
+        _publishHud();
+      } else if (telemetryChanged) {
+        _publishHud();
       }
-      setState(() {});
     } catch (_) {
       // A bad frame must never break the session.
     } finally {
@@ -346,15 +408,69 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       ));
     }
     _lastLockReason = result.lockReason;
-    setState(() {
-      _lockReason = result.lockReason;
-      _framing = result.framing;
-      if (brain != null) {
-        _reps = brain.repCount;
-        _state = brain.currentState;
-        _coachCue = cue;
+    // Plain field writes — _feed publishes them via _publishHud() right
+    // after this returns (no full-screen setState per frame).
+    _lockReason = result.lockReason;
+    _framing = result.framing;
+    if (brain != null) {
+      _reps = brain.repCount;
+      _state = brain.currentState;
+      _coachCue = cue;
+    }
+  }
+
+  /// Live joint angles (degrees) for the HUD, computed from the overlay
+  /// pose. Returns an empty map when landmarks are missing or occluded.
+  static const Map<String, (PoseLandmarkType, PoseLandmarkType, PoseLandmarkType)>
+      _angleSpecs = {
+    'L elbow': (
+      PoseLandmarkType.leftShoulder,
+      PoseLandmarkType.leftElbow,
+      PoseLandmarkType.leftWrist,
+    ),
+    'R elbow': (
+      PoseLandmarkType.rightShoulder,
+      PoseLandmarkType.rightElbow,
+      PoseLandmarkType.rightWrist,
+    ),
+    'L knee': (
+      PoseLandmarkType.leftHip,
+      PoseLandmarkType.leftKnee,
+      PoseLandmarkType.leftAnkle,
+    ),
+    'R knee': (
+      PoseLandmarkType.rightHip,
+      PoseLandmarkType.rightKnee,
+      PoseLandmarkType.rightAnkle,
+    ),
+  };
+
+  Map<String, double> _jointAngles(Pose? pose) {
+    if (pose == null) return const {};
+    double? ang(PoseLandmarkType a, PoseLandmarkType b, PoseLandmarkType c) {
+      final la = pose.landmarks[a];
+      final lb = pose.landmarks[b];
+      final lc = pose.landmarks[c];
+      if (la == null || lb == null || lc == null) return null;
+      if (la.likelihood < 0.4 || lb.likelihood < 0.4 || lc.likelihood < 0.4) {
+        return null;
       }
-    });
+      final ux = la.x - lb.x;
+      final uy = la.y - lb.y;
+      final vx = lc.x - lb.x;
+      final vy = lc.y - lb.y;
+      final n = math.sqrt(ux * ux + uy * uy) * math.sqrt(vx * vx + vy * vy);
+      if (n == 0) return null;
+      final cos = ((ux * vx + uy * vy) / n).clamp(-1.0, 1.0);
+      return math.acos(cos) * 180.0 / math.pi;
+    }
+
+    final out = <String, double>{};
+    for (final entry in _angleSpecs.entries) {
+      final v = ang(entry.value.$1, entry.value.$2, entry.value.$3);
+      if (v != null) out[entry.key] = v;
+    }
+    return out;
   }
 
   Future<void> _saveSession() async {
@@ -390,6 +506,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     setState(() {
       _paused = !_paused;
     });
+    _publishHud(); // paused banner lives in the HUD snapshot
     await _saveSession();
   }
 
@@ -474,6 +591,8 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     if (analyzer != null) {
       unawaited(analyzer.dispose());
     }
+    _hud.dispose();
+    _overlayTick.dispose();
     super.dispose();
   }
 
@@ -531,64 +650,97 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // CameraPreview already letterboxes correctly — wrap in its own aspect
-    // ratio and center it. Never force StackFit.expand around it; that was
-    // the source of the compressed-frame bug.
+    // Complete-screen layout: the camera preview cover-fits the WHOLE body
+    // area (small symmetric side-crop on portrait phones, full height kept
+    // so head and feet stay visible), and a translucent HUD floats on top —
+    // info at the top, controls at the bottom, the middle stays free for
+    // the user's body. The overlay rides inside CameraPreview's child slot,
+    // so it scales with the cover-fit exactly — never drifts.
     final double aspect = controller.value.aspectRatio > 0
-        ? controller.value.aspectRatio
-        : (_imageWidth > 0 && _imageHeight > 0
-            ? _imageWidth / _imageHeight
-            : 9 / 16);
-    final bool mirrored = _lens == CameraLensDirection.front;
-    return Column(
+        ? 1 / controller.value.aspectRatio // portrait display aspect
+        : 9 / 16;
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        // Pipeline health — proves frames flow even when no pose is found.
-        _PipelineStatus(
-          frames: _framesSeen,
-          poses: _lastPosesFound,
-          error: _pipelineError,
-          lens: _lens,
-        ),
-        // Camera preview occupies the majority of the screen
-        Expanded(
-          child: Center(
-            child: AspectRatio(
-              aspectRatio: aspect,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CameraPreview(controller),
-                  // Skeleton overlay — positioned exactly over the preview region
-                  if (_latestPose != null && _imageWidth > 0 && _imageHeight > 0)
-                    CustomPaint(
-                      painter: SkeletonOverlayPainter(
-                        _latestPose,
-                        _imageWidth,
-                        _imageHeight,
-                        _rotation,
-                        mirrored,
+        // 1. Full-bleed camera preview. This subtree is built once —
+        //    per-frame skeleton data reaches it through the persistent
+        //    painter + _overlayTick, so no widget rebuild happens at
+        //    analysis rate anymore.
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return ClipRect(
+              child: SizedBox.expand(
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: constraints.maxHeight * aspect,
+                    height: constraints.maxHeight,
+                    child: CameraPreview(
+                      controller,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Skeleton overlay — pixel-perfect over the preview.
+                          // Always mounted: the painter itself early-returns
+                          // while there is no pose, and _overlayTick drives
+                          // its repaints.
+                          CustomPaint(
+                            painter: _skeletonPainter,
+                            size: Size.infinite,
+                          ),
+                        ],
                       ),
-                      size: Size.infinite,
-                    ),
-                  // HUD overlay — fixed-height column pinned to bottom
-                  Positioned(
-                    left: 14,
-                    right: 14,
-                    bottom: 14,
-                    child: _HudOverlay(
-                      reps: _reps,
-                      state: _state,
-                      formScore: _formScore,
-                      lockReason: _lockReason,
-                      framing: _framing,
-                      coachCue: _coachCue,
-                      paused: _paused,
-                      onPause: _togglePause,
-                      onEnd: _confirmEndSession,
                     ),
                   ),
-                ],
+                ),
               ),
+            );
+          },
+        ),
+        // 2. Floating translucent HUD (never covers the body's center).
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Pipeline health — proves frames flow even with no pose.
+                // Rebuilds alone when the snapshot ticks.
+                ValueListenableBuilder<_HudSnapshot>(
+                  valueListenable: _hud,
+                  builder: (context, snap, _) => _PipelineStatus(
+                    frames: snap.frames,
+                    poses: snap.poses,
+                    error: snap.error,
+                    lens: snap.lens,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  flex: 3,
+                  child: SingleChildScrollView(
+                    child: ValueListenableBuilder<_HudSnapshot>(
+                      valueListenable: _hud,
+                      builder: (context, snap, _) => _HudOverlay(
+                        reps: snap.reps,
+                        state: snap.state,
+                        formScore: snap.formScore,
+                        lockReason: snap.lockReason,
+                        framing: snap.framing,
+                        coachCue: snap.coachCue,
+                        paused: snap.paused,
+                        angles: snap.angles,
+                      ),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                _SessionControls(
+                  paused: _paused,
+                  onPause: _togglePause,
+                  onEnd: _confirmEndSession,
+                ),
+              ],
             ),
           ),
         ),
@@ -647,8 +799,7 @@ class _HudOverlay extends StatelessWidget {
     required this.framing,
     required this.coachCue,
     required this.paused,
-    required this.onPause,
-    required this.onEnd,
+    required this.angles,
   });
 
   final int reps;
@@ -658,14 +809,18 @@ class _HudOverlay extends StatelessWidget {
   final FramingCue framing;
   final String? coachCue;
   final bool paused;
-  final VoidCallback onPause;
-  final VoidCallback onEnd;
+  final Map<String, double> angles;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Live joint angles (elbows + knees) — measurement readout.
+        if (angles.isNotEmpty) ...[
+          _AngleChips(angles: angles),
+          const SizedBox(height: 10),
+        ],
         // Top row: rep counter + state/form score
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -701,23 +856,75 @@ class _HudOverlay extends StatelessWidget {
           const _PausedBanner(),
           const SizedBox(height: 10),
         ],
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _SessionControlButton(
-              icon: paused ? Icons.play_arrow : Icons.pause,
-              label: paused ? 'Resume' : 'Pause',
-              primary: true,
-              onTap: onPause,
-            ),
-            const SizedBox(width: 16),
-            _SessionControlButton(
-              icon: Icons.stop,
-              label: 'End',
-              onTap: onEnd,
-            ),
-          ],
+      ],
+    );
+  }
+}
+
+/// Bottom floating control bar — pause/resume + end, always reachable.
+class _SessionControls extends StatelessWidget {
+  const _SessionControls({
+    required this.paused,
+    required this.onPause,
+    required this.onEnd,
+  });
+
+  final bool paused;
+  final VoidCallback onPause;
+  final VoidCallback onEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _SessionControlButton(
+          icon: paused ? Icons.play_arrow : Icons.pause,
+          label: paused ? 'Resume' : 'Pause',
+          primary: true,
+          onTap: onPause,
         ),
+        const SizedBox(width: 16),
+        _SessionControlButton(
+          icon: Icons.stop,
+          label: 'End',
+          onTap: onEnd,
+        ),
+      ],
+    );
+  }
+}
+
+/// Compact live-angle readout — one chip per measured joint.
+class _AngleChips extends StatelessWidget {
+  const _AngleChips({required this.angles});
+
+  final Map<String, double> angles;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: [
+        for (final entry in angles.entries)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: p.glass,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: p.border, width: 1.2),
+            ),
+            child: Text(
+              '${entry.key} ${entry.value.round()}°',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: p.ink,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -905,35 +1112,142 @@ class _SessionControlButton extends StatelessWidget {
   }
 }
 
-/// Skeleton overlay painter — draws ML Kit pose landmarks + connections on top
-/// of the camera preview, transformed from camera pixel-space to widget coordinates.
+/// Skeleton overlay painter — draws the ML Kit pose (33 landmarks), the
+/// face jaw line, shoulder/neck bone structure and live joint angles on top
+/// of the camera preview.
 ///
-/// Mathematical model:
-/// - ML Kit landmarks are in IMAGE PIXEL coordinates: (px, py) in
-///   [0, imageW] × [0, imageH] (NOT normalized — the old code treated them
-///   as 0..1, which collapsed every skeleton into the top-left corner).
-/// - preview widget is Wd × Hd with the same aspect ratio as the camera feed
-///   (this screen constrains the AspectRatio so the preview is never stretched)
-/// - normalize: (nx, ny) = (px / imageW, py / imageH), undo ML Kit rotation
-///   to display space, then widget coords: (offset + n * imageDim * scale).
+/// Coordinate model (verified against Android CameraX + ML Kit docs —
+/// "ML Kit results are relative to the rotated buffer"):
+/// - ML Kit landmarks are in the ROTATED (upright) image frame: for 90°/270°
+///   rotation the raw buffer's width/height are swapped. The preview shows
+///   exactly this upright frame, so NO extra rotation transform is applied
+///   (the old switch caused a double rotation and mis-mapped joints).
+/// - [imageWidth]/[imageHeight] are the RAW buffer dims; the painter swaps
+///   them internally and maps landmarks with a center-crop (cover) fit so
+///   slight preview/analysis aspect differences never stretch the skeleton.
+/// - The front-camera preview is mirrored by CameraX (selfie mode) while
+///   the analysis frames are NOT — so x is flipped for front lenses.
+/// ChangeNotifier with a public tick — lets the screen push overlay
+/// repaints without exposing the protected [ChangeNotifier.notifyListeners].
+class _FrameTick extends ChangeNotifier {
+  void tick() => notifyListeners();
+}
+
+/// Everything the per-frame HUD displays. Immutable — each analyzed frame
+/// swaps in a new snapshot, and only the ValueListenableBuilder subtrees
+/// re-build (the camera preview and controls do not).
+@immutable
+class _HudSnapshot {
+  const _HudSnapshot({
+    required this.frames,
+    required this.poses,
+    required this.error,
+    required this.lens,
+    required this.reps,
+    required this.state,
+    required this.formScore,
+    required this.lockReason,
+    required this.framing,
+    required this.coachCue,
+    required this.paused,
+    required this.angles,
+  });
+
+  static const _HudSnapshot initial = _HudSnapshot(
+    frames: 0,
+    poses: 0,
+    error: null,
+    lens: CameraLensDirection.front,
+    reps: 0,
+    state: 'unknown',
+    formScore: 100,
+    lockReason: LockReason.noPerson,
+    framing: FramingCue.ok,
+    coachCue: null,
+    paused: false,
+    angles: {},
+  );
+
+  final int frames;
+  final int poses;
+  final String? error;
+  final CameraLensDirection lens;
+  final int reps;
+  final String state;
+  final int formScore;
+  final LockReason lockReason;
+  final FramingCue framing;
+  final String? coachCue;
+  final bool paused;
+  final Map<String, double> angles;
+}
+
 class SkeletonOverlayPainter extends CustomPainter {
   SkeletonOverlayPainter(
     this.pose,
-    this.previewPixelWidth,
-    this.previewPixelHeight,
+    this.imageWidth,
+    this.imageHeight,
     this.rotation,
-    this.mirrored,
+    this.mirrored, {
+    super.repaint,
+  });
+
+  // Mutable: the session screen updates these in place and ticks `repaint`,
+  // so a camera frame never requires building a new painter widget.
+  Pose? pose;
+
+  /// Raw (unrotated) camera buffer dimensions.
+  double imageWidth;
+  double imageHeight;
+  InputImageRotation rotation;
+  bool mirrored;
+
+  // Hoisted paints — creating ~8 Paint + a TextPainter per frame was
+  // steady GC churn at analysis rate. Statics are created once.
+  static final Paint paintDot = Paint()
+    ..style = PaintingStyle.fill
+    ..color = const Color(0xFF00E676); // chartreuse accent
+  static final Paint paintDotLow = Paint()
+    ..style = PaintingStyle.fill
+    ..color = const Color(0xFFFF6D00); // low confidence
+  static final Paint paintLine = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3
+    ..strokeCap = StrokeCap.round
+    ..color = const Color(0xFF00E676).withValues(alpha: 0.85);
+  static final Paint paintLineLow = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3
+    ..strokeCap = StrokeCap.round
+    ..color = const Color(0xFFFF6D00).withValues(alpha: 0.85);
+  static final Paint paintFace = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5
+    ..strokeCap = StrokeCap.round
+    ..color = Colors.white.withValues(alpha: 0.55);
+  static final Paint paintBone = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.5
+    ..strokeCap = StrokeCap.round
+    ..color = const Color(0xFFFFD740).withValues(alpha: 0.9); // shoulder
+  static final Paint paintAnchor = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2
+    ..color = const Color(0xFF00E676);
+  static final Paint paintArc = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.5
+    ..color = Colors.white.withValues(alpha: 0.9);
+
+  /// Reused across paints — 37 label layouts per frame with fresh
+  /// TextPainters was measurable allocation churn.
+  final TextPainter paintText = TextPainter(
+    textDirection: TextDirection.ltr,
+    textAlign: TextAlign.center,
   );
 
-  final Pose? pose;
-  final double previewPixelWidth;
-  final double previewPixelHeight;
-  final InputImageRotation rotation;
-  final bool mirrored;
-
   /// MediaPipe Pose landmark connections (33-body model, skeleton lines).
-  /// Pairs are (fromIndex, toIndex).
-  static const List<(int, int)> _connections = [
+  static const List<(int, int)> _body = [
     // Face: nose → eyes → ears → mouth
     (0, 1), (1, 2), (2, 3), (3, 7),
     (0, 4), (4, 5), (5, 6), (6, 8),
@@ -951,98 +1265,153 @@ class SkeletonOverlayPainter extends CustomPainter {
     (24, 26), (26, 28), (28, 30), (28, 32), (30, 32),
   ];
 
+  /// Face structure: jaw line (ear → mouth → mouth → ear), eyes, nose.
+  static const List<(int, int)> _face = [
+    (7, 9), (9, 10), (10, 8),
+    (0, 9), (0, 10),
+    (1, 2), (2, 3), (4, 5), (5, 6),
+    (0, 1), (0, 4),
+    (3, 7), (6, 8),
+  ];
+
+  /// Shoulder bone structure: neck lines ear → shoulder.
+  static const List<(int, int)> _shoulderBones = [
+    (7, 11), (8, 12),
+  ];
+
+  /// Landmark indices drawn as emphasized bone anchors (shoulders + hips).
+  static const Set<int> _bigJoints = {11, 12, 23, 24};
+
+  /// Live angle measurement: (a, b, c) — angle drawn AT vertex b.
+  /// Elbows and knees — the two joints that drive squat/push-up reps.
+  static const List<(int, int, int)> _angleSpecs = [
+    (11, 13, 15), // left elbow
+    (12, 14, 16), // right elbow
+    (23, 25, 27), // left knee
+    (24, 26, 28), // right knee
+  ];
+
   @override
   void paint(Canvas canvas, Size size) {
-    if (pose == null || previewPixelWidth <= 0 || previewPixelHeight <= 0) {
+    if (pose == null || imageWidth <= 0 || imageHeight <= 0) {
       return;
     }
 
-    // Colors
-    final paintDot = Paint()
-      ..style = PaintingStyle.fill
-      ..color = const Color(0xFF00E676); // chartreuse accent
-    final paintDotLow = Paint()
-      ..style = PaintingStyle.fill
-      ..color = const Color(0xFFFF6D00); // low confidence
-    final paintLine = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..color = const Color(0xFF00E676).withValues(alpha: 0.8);
-    final paintText = TextPainter(
-      textDirection: TextDirection.ltr,
-      textAlign: TextAlign.center,
-    );
+    // Raw buffer → upright frame: ML Kit already rotated the image for
+    // detection, so landmarks live in the swapped (display) dimensions.
+    final bool swap = rotation == InputImageRotation.rotation90deg ||
+        rotation == InputImageRotation.rotation270deg;
+    final double upW = swap ? imageHeight : imageWidth;
+    final double upH = swap ? imageWidth : imageHeight;
 
-    // Transform camera pixel coordinates → widget coordinates.
-    // For rotation90deg (portrait, back camera), the native frame is
-    // landscape (W=1280, H=720) but we display portrait (Wd × Hd).
-    // The landmark (px, py) is in the ROTATED space that ML Kit sees.
-    // We need to map that back to the un-rotated display space.
-    final double scaleX = size.width / previewPixelWidth;
-    final double scaleY = size.height / previewPixelHeight;
-    final double scale = scaleX < scaleY ? scaleX : scaleY;
-    final double offsetX = (size.width - previewPixelWidth * scale) / 2;
-    final double offsetY = (size.height - previewPixelHeight * scale) / 2;
+    // Center-crop (cover) mapping: the preview fills its widget box; any
+    // small aspect difference between preview and analysis resolutions
+    // crops symmetrically instead of stretching the skeleton.
+    final double scale = math.max(size.width / upW, size.height / upH);
+    final double offX = (size.width - upW * scale) / 2;
+    final double offY = (size.height - upH * scale) / 2;
 
-    // Build world-space landmark coordinates (widget space)
+    // Colors — hoisted static paints (see fields); nothing is allocated
+    // per frame except the tiny per-frame landmark map.
+
+    // Map landmarks: upright pixels → widget coordinates (cover + mirror).
     final landmarks = <int, Offset>{};
     for (int i = 0; i < 33; i++) {
       final lm = pose!.landmarks[PoseLandmarkType.values[i]];
-      if (lm == null || lm.likelihood < 0.3) continue; // skip invisible
-
-      // ML Kit returns IMAGE PIXELS — normalize to 0..1 first.
-      // Guard against zero-size images (should never happen; skip frame).
-      if (previewPixelWidth <= 0 || previewPixelHeight <= 0) continue;
-      final double nx = (lm.x / previewPixelWidth).clamp(0.0, 1.0);
-      final double ny = (lm.y / previewPixelHeight).clamp(0.0, 1.0);
-
-      // Apply rotation inverse to get display-space coordinates.
-      // ML Kit rotates the input image for inference; the landmarks come back
-      // in that rotated frame. We want the portrait-display frame.
-      final double dx;
-      final double dy;
-      switch (rotation) {
-        case InputImageRotation.rotation90deg:
-          // Portrait display: x ← y (rotated), y ← 1-x (rotated)
-          dx = ny;
-          dy = 1 - nx;
-        case InputImageRotation.rotation180deg:
-          dx = 1 - nx;
-          dy = 1 - ny;
-        case InputImageRotation.rotation270deg:
-          dx = 1 - ny;
-          dy = nx;
-        default:
-          dx = nx;
-          dy = ny;
+      if (lm == null || lm.likelihood < 0.3) continue;
+      final double nx = (lm.x / upW).clamp(0.0, 1.0);
+      final double ny = (lm.y / upH).clamp(0.0, 1.0);
+      double wx = offX + nx * upW * scale;
+      final double wy = offY + ny * upH * scale;
+      if (mirrored) {
+        wx = size.width - wx; // front-camera preview is mirrored
       }
-
-      // Mirror happens implicitly via camera orientation on back camera; skip explicit mirror.
-      final double finalDx = mirrored ? 1 - dx : dx;
-
-      // Denormalize to widget coordinates
-      final wx = offsetX + finalDx * previewPixelWidth * scale;
-      final wy = offsetY + dy * previewPixelHeight * scale;
       landmarks[i] = Offset(wx, wy);
     }
+    if (landmarks.isEmpty) return;
 
-    // Draw connections (lines between joints)
-    for (final (a, b) in _connections) {
-      final p1 = landmarks[a];
-      final p2 = landmarks[b];
-      if (p1 != null && p2 != null) {
-        canvas.drawLine(p1, p2, paintLine);
-      }
+    double? likelihoodOf(int i) =>
+        pose!.landmarks[PoseLandmarkType.values[i]]?.likelihood;
+
+    // Body skeleton (lines colored by joint confidence).
+    for (final (a, b) in _body) {
+      final pa = landmarks[a];
+      final pb = landmarks[b];
+      if (pa == null || pb == null) continue;
+      final conf = math.min(likelihoodOf(a) ?? 0, likelihoodOf(b) ?? 0);
+      canvas.drawLine(pa, pb, conf >= 0.5 ? paintLine : paintLineLow);
     }
 
-    // Draw landmark dots + index labels
+    // Face jaw line + eyes (thin white).
+    for (final (a, b) in _face) {
+      final pa = landmarks[a];
+      final pb = landmarks[b];
+      if (pa != null && pb != null) canvas.drawLine(pa, pb, paintFace);
+    }
+
+    // Shoulder bone structure (ear → shoulder neck lines).
+    for (final (a, b) in _shoulderBones) {
+      final pa = landmarks[a];
+      final pb = landmarks[b];
+      if (pa != null && pb != null) canvas.drawLine(pa, pb, paintBone);
+    }
+
+    // Live angle measurement: arc + degrees at elbows and knees.
+    for (final (a, b, c) in _angleSpecs) {
+      final pa = landmarks[a];
+      final pb = landmarks[b];
+      final pc = landmarks[c];
+      if (pa == null || pb == null || pc == null) continue;
+      final u = pa - pb;
+      final v = pc - pb;
+      final n = u.distance * v.distance;
+      if (n < 1e-6) continue;
+      final cos = ((u.dx * v.dx + u.dy * v.dy) / n).clamp(-1.0, 1.0);
+      final degrees = math.acos(cos) * 180.0 / math.pi;
+      final double a1 = math.atan2(u.dy, u.dx);
+      final double a2 = math.atan2(v.dy, v.dx);
+      double delta = a2 - a1;
+      while (delta > math.pi) {
+        delta -= 2 * math.pi;
+      }
+      while (delta < -math.pi) {
+        delta += 2 * math.pi;
+      }
+      const double r = 24;
+      canvas.drawArc(
+        Rect.fromCircle(center: pb, radius: r),
+        a1,
+        delta,
+        false,
+        paintArc,
+      );
+      final mid = a1 + delta / 2;
+      final lp = pb + Offset(math.cos(mid), math.sin(mid)) * (r * 1.5);
+      paintText.text = TextSpan(
+        text: '${degrees.round()}°',
+        style: const TextStyle(
+          fontSize: 11,
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+        ),
+      );
+      paintText.layout();
+      paintText.paint(canvas, lp - Offset(paintText.width / 2, paintText.height / 2));
+    }
+
+    // Landmark dots + index labels (bone anchors emphasized).
+    // Kept intentionally lean for small phone screens — fingertip nodes,
+    // full finger bones and hand tracking live in the PC test bench only.
     for (int i = 0; i < 33; i++) {
       final pt = landmarks[i];
       if (pt == null) continue;
       final lm = pose!.landmarks[PoseLandmarkType.values[i]];
       final dotPaint =
           (lm != null && lm.likelihood >= 0.5) ? paintDot : paintDotLow;
-      canvas.drawCircle(pt, 6, dotPaint);
+      canvas.drawCircle(pt, 5, dotPaint);
+      if (_bigJoints.contains(i)) {
+        canvas.drawCircle(pt, 9, paintAnchor); // shoulder / hip ring
+      }
       paintText.text = TextSpan(
         text: '$i',
         style: const TextStyle(
@@ -1059,8 +1428,8 @@ class SkeletonOverlayPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant SkeletonOverlayPainter oldDelegate) {
     return oldDelegate.pose != pose ||
-        oldDelegate.previewPixelWidth != previewPixelWidth ||
-        oldDelegate.previewPixelHeight != previewPixelHeight ||
+        oldDelegate.imageWidth != imageWidth ||
+        oldDelegate.imageHeight != imageHeight ||
         oldDelegate.rotation != rotation ||
         oldDelegate.mirrored != mirrored;
   }

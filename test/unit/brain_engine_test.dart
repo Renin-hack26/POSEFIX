@@ -116,9 +116,11 @@ void main() {
         landmarkCoords: const {},
         timestamp: 1.6,
       ).repCount, 1);
-      squat(130, 1.8);
-      squat(85, 1.9);
-      final fast = squat(170, 2.0); // only 0.4 s after rep 1
+      squat(130, 1.7);
+      squat(85, 1.8);
+      // minRepDuration is 0.3 s (3-rep/sec cadence support) — a 0.25 s
+      // wobble cycle right after rep 1 must still be suppressed.
+      final fast = squat(170, 1.85);
       expect(fast.repCount, 1);
       expect(fast.repJustCompleted, false);
     });

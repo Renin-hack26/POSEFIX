@@ -1,7 +1,7 @@
 /// FixPose Pose Analyzer — ML Kit pose detection → BrainEngine pipeline.
 ///
 /// Responsibilities (PLANNING §4.1 vision pipeline):
-/// - Throttled streaming inference (default ≥80 ms between starts, frames
+/// - Throttled streaming inference (default ≥30 ms between starts, frames
 ///   dropped while busy — keeps end-to-end latency low on mid-range phones).
 /// - Per-landmark EMA smoothing + confidence gating tuned for bad cameras
 ///   (low light / low resolution): a landmark below
@@ -99,12 +99,15 @@ class PoseFrameResult {
 }
 
 class PoseAnalyzer {
-  PoseAnalyzer(this.definition, {this.minIntervalMs = 80})
+  PoseAnalyzer(this.definition, {this.minIntervalMs = 30})
       : _brain = BrainEngine(definition);
 
   final ExerciseDefinition definition;
 
-  /// Minimum ms between inference starts (frame drops beyond this).
+  /// Minimum ms between inference starts (frame drops beyond this). 30 ms
+  /// allows up to ~33 analyzed frames/s — fast enough that every FSM phase
+  /// of a 3-rep/sec cadence gets its 2-frame confirmation in time.
+  /// Real throughput stays inference-bound (`_busy` never overlaps work).
   final double minIntervalMs;
 
   final BrainEngine _brain;
@@ -121,6 +124,12 @@ class PoseAnalyzer {
   Pose? _latestPose;
   Pose? get latestPose => _latestPose;
 
+  /// EMA-smoothed copy of the latest pose — jitter-free coordinates for the
+  /// skeleton overlay (every landmark with likelihood >= 0.3 is tracked so
+  /// joints and lines stay stable frame-to-frame).
+  Pose? _smoothedPose;
+  Pose? get smoothedPose => _smoothedPose;
+
   /// Debug telemetry — read by the session screen to show pipeline health.
   /// These never affect counting; they only explain "no person" states.
   int framesSeen = 0;
@@ -130,6 +139,11 @@ class PoseAnalyzer {
 
   final Map<int, pm.EmaFilter> _smoothX = {};
   final Map<int, pm.EmaFilter> _smoothY = {};
+
+  /// Per-landmark EMA filters for the overlay copy (separate from the FSM
+  /// smoothing so overlay responsiveness can be tuned independently).
+  final Map<PoseLandmarkType, pm.EmaFilter> _ovX = {};
+  final Map<PoseLandmarkType, pm.EmaFilter> _ovY = {};
   pm.LmPoint? _torsoEma;
   int _stableFrames = 0;
 
@@ -193,10 +207,17 @@ class PoseAnalyzer {
       lastInferenceMs = sw.elapsedMilliseconds;
       lastPosesFound = poses.length;
       lastError = null;
+      // ML Kit returns landmarks in the ROTATED (upright) frame it detected
+      // in — every normalization below must use display dimensions, not the
+      // raw sensor buffer dims (which are swapped for 90°/270° rotation).
+      final bool swapped = rotation == InputImageRotation.rotation90deg ||
+          rotation == InputImageRotation.rotation270deg;
+      final double uprightW = swapped ? imageHeight : imageWidth;
+      final double uprightH = swapped ? imageWidth : imageHeight;
       final result = _handlePoses(
         poses,
-        imageWidth: imageWidth,
-        imageHeight: imageHeight,
+        imageWidth: uprightW,
+        imageHeight: uprightH,
         inferenceMs: sw.elapsedMilliseconds,
         nowMs: nowMs,
       );
@@ -239,6 +260,9 @@ class PoseAnalyzer {
 
     if (poses.isEmpty) {
       _latestPose = null;
+      _smoothedPose = null;
+      _ovX.clear();
+      _ovY.clear();
       _stableFrames = 0;
       _torsoEma = null;
       _videoSuspected = false;
@@ -250,6 +274,11 @@ class PoseAnalyzer {
       _stableFrames = 0;
       _videoSuspected = false;
       _resetRhythm();
+      // Drop the overlay too — the subject changed, don't ghost the old one.
+      _latestPose = null;
+      _smoothedPose = null;
+      _ovX.clear();
+      _ovY.clear();
       return base(
         reason: LockReason.multiPerson,
         locked: false,
@@ -259,6 +288,7 @@ class PoseAnalyzer {
 
     final pose = poses.first;
     _latestPose = pose; // Store for debug overlay
+    _smoothedPose = _smoothOverlay(pose); // Stable coords for the overlay
 
     // Subject continuity: torso centroid jump = someone else stepped in.
     final torso = _torsoCentroid(pose, imageWidth, imageHeight);
@@ -298,15 +328,22 @@ class PoseAnalyzer {
       );
     }
 
-    // Smooth + normalize.
+    // Smooth + normalize. Velocity-aware EMA: fast landmark motion raises
+    // the effective alpha (up to 0.75) so quick reps keep their full
+    // amplitude and still cross the FSM depth thresholds; slow motion keeps
+    // the classic 0.3 smoothing against camera noise.
     final px = <int, pm.LmPoint>{};
     final norm = <String, pm.LmPoint>{};
     for (final entry in visible.entries) {
       final idx = definition.landmarks[entry.key]!;
-      final fx = (_smoothX[idx] ??=
-          pm.EmaFilter(FormRules.emaSmoothingAlpha));
-      final fy = (_smoothY[idx] ??=
-          pm.EmaFilter(FormRules.emaSmoothingAlpha));
+      final fx = (_smoothX[idx] ??= pm.EmaFilter(
+          FormRules.emaSmoothingAlpha,
+          adaptiveGain: 0.012,
+          maxAlpha: 0.75));
+      final fy = (_smoothY[idx] ??= pm.EmaFilter(
+          FormRules.emaSmoothingAlpha,
+          adaptiveGain: 0.012,
+          maxAlpha: 0.75));
       final sx = fx.push(entry.value.x);
       final sy = fy.push(entry.value.y);
       px[idx] = (x: sx, y: sy);
@@ -466,6 +503,31 @@ class PoseAnalyzer {
     return pm.centroid(pts);
   }
 
+  /// Builds the EMA-smoothed overlay pose from [pose]. Tracked in the
+  /// upright (rotated) pixel space ML Kit returns, so the painter can map it
+  /// directly onto the preview. Alpha 0.5 keeps the skeleton responsive
+  /// while removing per-frame jitter from lines and joints; fast motion
+  /// adapts up to 0.85 so the overlay doesn't visibly trail the body.
+  Pose _smoothOverlay(Pose pose) {
+    final map = <PoseLandmarkType, PoseLandmark>{};
+    for (final entry in pose.landmarks.entries) {
+      final lm = entry.value;
+      if (lm.likelihood < 0.3) continue;
+      final fx = (_ovX[entry.key] ??=
+          pm.EmaFilter(0.5, adaptiveGain: 0.006, maxAlpha: 0.85));
+      final fy = (_ovY[entry.key] ??=
+          pm.EmaFilter(0.5, adaptiveGain: 0.006, maxAlpha: 0.85));
+      map[entry.key] = PoseLandmark(
+        type: entry.key,
+        x: fx.push(lm.x),
+        y: fy.push(lm.y),
+        z: lm.z,
+        likelihood: lm.likelihood,
+      );
+    }
+    return Pose(landmarks: map);
+  }
+
   FramingCue _decideFraming(List<pm.LmPoint> pts) {
     if (pts.isEmpty) return FramingCue.ok;
     final bb = pm.boundingBox(pts);
@@ -488,6 +550,10 @@ class PoseAnalyzer {
     _brain.reset();
     _smoothX.clear();
     _smoothY.clear();
+    _ovX.clear();
+    _ovY.clear();
+    _latestPose = null;
+    _smoothedPose = null;
     _torsoEma = null;
     _stableFrames = 0;
     _busy = false;

@@ -28,22 +28,49 @@ double angleBetween(LmPoint a, LmPoint b, LmPoint c) {
 /// Exponential moving average filter — one instance per tracked scalar.
 /// Alpha 0.3 (FormRules.emaSmoothingAlpha): responsive yet stable on noisy
 /// low-light frames.
+///
+/// [adaptiveGain] makes the filter **velocity-aware**: fast raw motion gets a
+/// higher effective alpha (up to [maxAlpha]) so quick reps are tracked nearly
+/// raw instead of being amplitude-clipped by slow smoothing; slow/noisy input
+/// keeps the base alpha. This is what lets fast squats/push-ups still cross
+/// the FSM depth thresholds on time.
 class EmaFilter {
-  EmaFilter(this.alpha);
+  EmaFilter(this.alpha, {this.adaptiveGain = 0.0, this.maxAlpha = 0.9});
 
+  /// Base smoothing factor when the input is (nearly) stationary.
   final double alpha;
+
+  /// Extra alpha granted per unit of raw frame-to-frame delta (0 = off).
+  final double adaptiveGain;
+
+  /// Upper bound for the adaptive alpha.
+  final double maxAlpha;
+
   double? _value;
+  double? _lastRaw;
 
   double? get value => _value;
 
-  /// Pushes [x], returns the filtered value.
-  double push(double x) {
+  /// Pushes [x], returns the filtered value. An [alphaOverride] bypasses the
+  /// base/adaptive blend (used by callers that compute their own factor).
+  double push(double x, [double? alphaOverride]) {
+    final double lastRaw = _lastRaw ?? x;
+    _lastRaw = x;
+    double a = alphaOverride ?? alpha;
+    if (alphaOverride == null && adaptiveGain > 0) {
+      final double delta = (x - lastRaw).abs();
+      a = a + delta * adaptiveGain;
+      if (a > maxAlpha) a = maxAlpha;
+    }
     final prev = _value;
-    _value = prev == null ? x : prev * (1 - alpha) + x * alpha;
+    _value = prev == null ? x : prev * (1 - a) + x * a;
     return _value!;
   }
 
-  void reset() => _value = null;
+  void reset() {
+    _value = null;
+    _lastRaw = null;
+  }
 }
 
 /// Axis-aligned bounding box of [points] in normalized coords.
