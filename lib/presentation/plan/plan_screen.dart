@@ -712,38 +712,43 @@ class _DayCell extends StatelessWidget {
           border:
               Border.all(color: selected ? p.selBg : p.border, width: 1.2),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              letter,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
-                color: selected ? p.selFg : p.ink3,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              date,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w800,
-                color: selected ? p.selFg : p.ink,
-              ),
-            ),
-            if (hasSession) ...[
-              const SizedBox(height: 3),
-              Container(
-                width: 5,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: selected ? p.selDot : p.accentDeep,
-                  shape: BoxShape.circle,
+        child: Center(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  letter,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? p.selFg : p.ink3,
+                  ),
                 ),
-              ),
-            ],
-          ],
+                const SizedBox(height: 3),
+                Text(
+                  date,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: selected ? p.selFg : p.ink,
+                  ),
+                ),
+                if (hasSession) ...[
+                  const SizedBox(height: 3),
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: selected ? p.selDot : p.accentDeep,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -89,7 +89,9 @@ void main() {
     test('full ROM cycle counts exactly one rep', () {
       squat(170, 0.0);
       squat(130, 0.4);
-      squat(85, 0.8);
+      squat(85, 0.8); // ROM visit: 3 raw frames of depth evidence
+      squat(85, 0.9);
+      squat(85, 1.0);
       squat(120, 1.2);
       final done = squat(170, 1.6);
       expect(done.repCount, 1);
@@ -109,7 +111,9 @@ void main() {
 
     test('min_rep_duration suppresses double counts', () {
       squat(170, 0.0);
-      squat(85, 0.4);
+      squat(85, 0.4); // ROM visit (3 raw frames)
+      squat(85, 0.5);
+      squat(85, 0.6);
       squat(170, 1.6); // rep 1
       expect(engine.processFrame(
         angles: const {'primary': 170.0, 'secondary': 100.0},
@@ -117,7 +121,9 @@ void main() {
         timestamp: 1.6,
       ).repCount, 1);
       squat(130, 1.7);
-      squat(85, 1.8);
+      squat(85, 1.8); // full ROM again — suppression must come from
+      squat(85, 1.81); // minRepDuration alone, not the visit guard
+      squat(85, 1.82);
       // minRepDuration is 0.3 s (3-rep/sec cadence support) — a 0.25 s
       // wobble cycle right after rep 1 must still be suppressed.
       final fast = squat(170, 1.85);
@@ -166,7 +172,9 @@ void main() {
     test('open→closed cycle counts one rep', () {
       jack(20, 0.0);
       jack(80, 0.3);
-      jack(150, 0.6);
+      jack(150, 0.6); // open — ROM visit needs 3 raw frames of evidence
+      jack(150, 0.7);
+      jack(150, 0.8);
       jack(80, 0.9);
       final done = jack(20, 1.2);
       expect(done.repCount, 1);

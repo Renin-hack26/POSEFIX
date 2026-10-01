@@ -426,8 +426,14 @@ class _DetailBody extends StatelessWidget {
   ) {
     return GlassCard(
       padding: const EdgeInsets.all(18),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      // Wrap, not Row: 4 stats at natural size exceed the card width on
+      // real devices (RenderFlex "overflowed on the right" stripes in the
+      // duration/level slot). Wrap lays them out side-by-side when they
+      // fit and drops to a second run otherwise — no overflow at any
+      // font scale.
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        runSpacing: 12,
         children: [
           _Stat(
             icon: Icons.schedule,

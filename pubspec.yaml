@@ -1,7 +1,7 @@
 name: fixpose
 description: "FixPose Ã¢â‚¬â€ On-Device AI Pose Detection Fitness Coach & Rep Counter."
 publish_to: "none"
-version: 1.1.9+10
+version: 1.1.10+11
 
 environment:
   sdk: ">=3.13.0 <4.0.0"
@@ -41,6 +41,8 @@ dev_dependencies:
   drift_dev: ^2.35.0
   flutter_lints: ^6.0.0
   mocktail: ^1.0.5
+  # Test-only: swaps the share-sheet delegate in the report export test.
+  share_plus_platform_interface: ^7.2.0
 
 flutter:
   uses-material-design: true

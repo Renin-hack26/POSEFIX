@@ -32,6 +32,7 @@ import '../../domain/repositories/workout_repository.dart';
 import '../../domain/usecases/ask_veda.dart';
 import '../../domain/usecases/end_session.dart';
 import '../../domain/usecases/forgot_password.dart';
+import '../../domain/usecases/generate_progress_report.dart';
 import '../../domain/usecases/generate_weekly_plan.dart';
 import '../../domain/usecases/get_home_dashboard.dart';
 import '../../domain/usecases/get_strike_state.dart';
@@ -273,5 +274,17 @@ final askVedaProvider = Provider(
     ref.watch(planRepositoryProvider),
     ref.watch(progressRepositoryProvider),
     ref.watch(workoutRepositoryProvider),
+  ),
+);
+
+/// Home → Progress report: personal details + training history + AI
+/// suggestions (GROQ-first, rule-based fallback).
+final generateProgressReportProvider = Provider(
+  (ref) => GenerateProgressReport(
+    ref.watch(userRepositoryProvider),
+    ref.watch(sessionRepositoryProvider),
+    ref.watch(progressRepositoryProvider),
+    ref.watch(workoutRepositoryProvider),
+    ref.watch(vedaRepositoryProvider),
   ),
 );

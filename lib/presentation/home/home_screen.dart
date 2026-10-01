@@ -280,7 +280,7 @@ class _HomeBody extends StatelessWidget {
         ],
         Row(
           children: [
-            // Progress report opens the reports flow — no route yet.
+            // Progress report → AI report page with PDF export (/report).
             // Expanded (tight) gives each button a bounded half-width, so the
             // inner SizedBox(double.infinity) resolves instead of overflowing.
             // Labels ellipsize inside the button (see primary_button.dart).
@@ -289,6 +289,7 @@ class _HomeBody extends StatelessWidget {
                 label: 'Progress report',
                 icon: Icons.description,
                 expand: true,
+                onPressed: () => context.push('/report'),
               ),
             ),
             const SizedBox(width: 10),

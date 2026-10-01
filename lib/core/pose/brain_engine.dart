@@ -594,6 +594,22 @@ class BrainEngine {
   final Set<String> _visitedLeft = {};
   final Set<String> _visitedRight = {};
 
+  /// Raw-frame evidence required before [CounterRule.requiredPriorState]
+  /// counts as a visited ROM (user-reported: "many time it takes false
+  /// counts" — reproduced: two-frame landmark-noise dips below the depth
+  /// threshold committed the capped ROM state, and the return to the
+  /// trigger completed a phantom cycle → 20/20 false counts at rest).
+  ///
+  /// Three consecutive raw frames (~100 ms at the 25-33 fps analysis rate)
+  /// restores the pre-cap evidence bar for the *visit* while the trigger
+  /// keeps its 2-frame commit — fast-rep latency (3-rep/sec contract) is
+  /// untouched; only noise dips below the evidence bar lose their credit.
+  static const int priorVisitMinFrames = 3;
+
+  int _priorStreak = 0;
+  int _priorStreakLeft = 0;
+  int _priorStreakRight = 0;
+
   int _leftCount = 0;
   int _rightCount = 0;
   double _lastCountTime = 0;
@@ -746,23 +762,31 @@ class BrainEngine {
     // Count-critical states (trigger + required ROM visit) confirm in at
     // most 2 frames: they gate the rep itself, and a <90 ms bottom touch or
     // top-hold must never slip past the commit window.
-    final rule0 = definition.counterRule;
-    final int? cap = (raw == rule0.triggerState ||
-            raw == rule0.requiredPriorState)
-        ? 2
-        : null;
+    final rule = definition.counterRule;
+    final int? cap =
+        (raw == rule.triggerState || raw == rule.requiredPriorState) ? 2 : null;
     final changed = _stab.push(raw, _frameDt, cap);
     _previousState = committedBefore;
     final current = _stab.state;
-    _visited.add(current);
-    if (current == definition.counterRule.triggerState) {
+    // ROM-visit credit — see priorVisitMinFrames: the commit cap alone
+    // would let a two-frame noise dip fake depth and count a phantom rep
+    // on the return to the trigger.
+    final prior = rule.requiredPriorState;
+    if (prior != null) {
+      if (raw == prior) {
+        _priorStreak++;
+        if (_priorStreak >= priorVisitMinFrames) _visited.add(prior);
+      } else {
+        _priorStreak = 0;
+      }
+    }
+    if (current == rule.triggerState) {
       _wMin.clear();
       _wMax.clear();
     }
 
     var repCompleted = false;
     if (changed) {
-      final rule = definition.counterRule;
       final romOk = rule.requiredPriorState == null ||
           _visited.contains(rule.requiredPriorState);
       if (current == rule.triggerState &&
@@ -827,8 +851,24 @@ class BrainEngine {
             : null;
     final changedLeft = _stabLeft.push(rawLeft, _frameDt, capFor(rawLeft));
     final changedRight = _stabRight.push(rawRight, _frameDt, capFor(rawRight));
-    _visitedLeft.add(_stabLeft.state);
-    _visitedRight.add(_stabRight.state);
+    // Per-side ROM-visit credit (same evidence bar as the unilateral path).
+    final priorB = rule0.requiredPriorState;
+    if (priorB != null) {
+      if (rawLeft == priorB) {
+        _priorStreakLeft++;
+        if (_priorStreakLeft >= priorVisitMinFrames) _visitedLeft.add(priorB);
+      } else {
+        _priorStreakLeft = 0;
+      }
+      if (rawRight == priorB) {
+        _priorStreakRight++;
+        if (_priorStreakRight >= priorVisitMinFrames) {
+          _visitedRight.add(priorB);
+        }
+      } else {
+        _priorStreakRight = 0;
+      }
+    }
 
     var leftRep = false;
     var rightRep = false;
@@ -937,6 +977,9 @@ class BrainEngine {
     _visited.clear();
     _visitedLeft.clear();
     _visitedRight.clear();
+    _priorStreak = 0;
+    _priorStreakLeft = 0;
+    _priorStreakRight = 0;
     _wMin.clear();
     _wMax.clear();
     _lastAngles.clear();

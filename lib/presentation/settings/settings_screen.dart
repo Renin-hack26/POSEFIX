@@ -169,7 +169,7 @@ class _SettingsBodyState extends ConsumerState<_SettingsBody> {
           const SizedBox(height: 20),
           Center(
             child: Text(
-              'FixPose 1.1.9', // keep in sync with pubspec.yaml version
+              'FixPose 1.1.10', // keep in sync with pubspec.yaml version
               style: TextStyle(fontSize: 11.5, color: p.ink3),
             ),
           ),

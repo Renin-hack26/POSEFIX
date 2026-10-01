@@ -11,6 +11,7 @@ import '../home/home_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../permissions/permission_screen.dart';
 import '../plan/plan_screen.dart';
+import '../report/report_screen.dart';
 import '../settings/settings_screen.dart';
 import '../splash/splash_screen.dart';
 import '../veda/veda_chat_screen.dart';
@@ -90,6 +91,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/veda',
         builder: (context, state) => const VedaChatScreen(),
+      ),
+      GoRoute(
+        path: '/report',
+        builder: (context, state) => const ReportScreen(),
       ),
 
       // --- 4-tab shell ---
