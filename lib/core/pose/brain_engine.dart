@@ -141,7 +141,9 @@ class BilateralStatus {
   final bool leftRepJustCompleted;
   final bool rightRepJustCompleted;
 
-  int get totalCount => leftCount + rightCount;
+  /// Reps completed on the stronger side — the same per-arm semantics as
+  /// [BrainResult.repCount] (one curl set counts once, never twice).
+  int get totalCount => math.max(leftCount, rightCount);
 }
 
 // ---------------------------------------------------------------------------
@@ -809,7 +811,13 @@ class BrainEngine {
 
     var repCompleted = false;
     RepRejectedReason? rejection;
-    if (changed && current == rule.triggerState) {
+    // committedBefore != 'unknown': the very first commit of a session
+    // (usually straight into the standing trigger) is not a completed
+    // cycle — gating it keeps a phantom "not counted" off the coach bar
+    // the moment the user steps into frame.
+    if (changed &&
+        committedBefore != 'unknown' &&
+        current == rule.triggerState) {
       final romOk = rule.requiredPriorState == null ||
           _visited.contains(rule.requiredPriorState);
       final timingOk =
@@ -866,6 +874,7 @@ class BrainEngine {
     Map<String, double> angles,
   ) {
     final prevLeft = _stabLeft.state;
+    final prevRight = _stabRight.state;
 
     final leftCtx = Map<String, dynamic>.from(context)
       ..['angle'] = context['left_angle'] ?? context['angle'] ?? 0.0;
@@ -906,7 +915,9 @@ class BrainEngine {
     RepRejectedReason? rightRejection;
     final rule = definition.counterRule;
 
-    if (changedLeft && _stabLeft.state == rule.triggerState) {
+    if (changedLeft &&
+        prevLeft != 'unknown' &&
+        _stabLeft.state == rule.triggerState) {
       final romOk = rule.requiredPriorState == null ||
           _visitedLeft.contains(rule.requiredPriorState);
       final timingOk =
@@ -923,7 +934,9 @@ class BrainEngine {
             : RepRejectedReason.rangeOfMotion;
       }
     }
-    if (changedRight && _stabRight.state == rule.triggerState) {
+    if (changedRight &&
+        prevRight != 'unknown' &&
+        _stabRight.state == rule.triggerState) {
       final romOk = rule.requiredPriorState == null ||
           _visitedRight.contains(rule.requiredPriorState);
       final timingOk =
@@ -940,7 +953,12 @@ class BrainEngine {
             : RepRejectedReason.rangeOfMotion;
       }
     }
-    _repCount = _leftCount + _rightCount;
+    // WS9.2: one count per completed cycle — a simultaneous curl fires
+    // both sides on the same frame, so the left+right sum double-counted
+    // every rep. The set tracks reps per arm (max), matching the
+    // workout's "N reps" target in both simultaneous and alternating
+    // styles.
+    _repCount = math.max(_leftCount, _rightCount);
 
     final shown = <String, double>{};
     for (final entry in angles.entries) {

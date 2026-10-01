@@ -4,7 +4,7 @@ import '../../core/pose/pose_analyzer.dart';
 import '../../core/theme/app_theme.dart';
 
 /// Banner copy per person-lock reason. Empty for [LockReason.ok]
-/// (the cue bar hides while counting is live).
+/// (the banner is hidden while counting is live).
 String lockReasonLine(LockReason reason) => switch (reason) {
       LockReason.ok => '',
       LockReason.noPerson => 'No person detected. Step into frame to begin.',
@@ -19,126 +19,209 @@ String lockReasonLine(LockReason reason) => switch (reason) {
             'reps count.',
     };
 
-/// Sample-accurate HUD chip column pinned to the top-left of the camera
-/// preview (`sample/index.html` §10 + `sample/styles.css` `.hud`).
-///
-/// One block, three chips — never a stacked scrollable column of stats:
-/// * REPS — target-based progress of the CURRENT round (`12 / 13`)
-/// * ROUND — `2 / 3`
-/// * TIME — elapsed session time (`04:35`)
-class SessionHud extends StatelessWidget {
-  const SessionHud({
-    super.key,
-    required this.reps,
-    required this.round,
-    required this.time,
-  });
+/// Human-readable FSM state label (`bottom` → `Bottom`).
+String prettifyExerciseState(String state) {
+  final String normalized = state.trim();
+  if (normalized.isEmpty || normalized == 'unknown') {
+    return 'Getting ready';
+  }
+  final String spaced = normalized.replaceAll('_', ' ');
+  return '${spaced[0].toUpperCase()}${spaced.substring(1)}';
+}
 
-  /// Round progress against the rep target, e.g. `12 / 13`.
-  final String reps;
+/// Big rep count tile shown over the camera preview.
+class RepCounter extends StatelessWidget {
+  const RepCounter({super.key, required this.reps});
 
-  /// Round indicator, e.g. `2 / 3`.
-  final String round;
-
-  /// Elapsed session time, e.g. `04:35`.
-  final String time;
+  final int reps;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _hudChip(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                reps,
-                style: const TextStyle(
-                  fontSize: 26,
-                  height: 1,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-              const SizedBox(height: 4),
-              const _HudLabel('REPS'),
-            ],
+    final p = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: p.glass,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: p.border, width: 1.2),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$reps',
+            style: TextStyle(
+              fontSize: 44,
+              fontWeight: FontWeight.w800,
+              height: 1,
+              color: p.ink,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        _hudChip(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _HudLabel('ROUND'),
-              Text(
-                round,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
-            ],
+          const SizedBox(height: 2),
+          Text(
+            'REPS',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.6,
+              color: p.ink3,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        _hudChip(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _HudLabel('TIME'),
-              Text(
-                time,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-/// Frosted dark chip used by the HUD (sample `.hud .chip-glass`).
-Widget _hudChip({required Widget child, required EdgeInsetsGeometry padding}) {
-  return Container(
-    padding: padding,
-    decoration: BoxDecoration(
-      color: AppColors.darkPage.withAlpha(140),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.white.withAlpha(41)),
-    ),
-    child: child,
-  );
-}
+/// Current FSM state pill (e.g. Bottom, Ascending).
+class ExerciseStateChip extends StatelessWidget {
+  const ExerciseStateChip({super.key, required this.state});
 
-/// Uppercase HUD caption (sample `.hud .lab`).
-class _HudLabel extends StatelessWidget {
-  const _HudLabel(this.text);
-
-  final String text;
+  final String state;
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 9.5,
-        height: 1.2,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 1,
-        color: Colors.white.withAlpha(153),
+    final p = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: BoxDecoration(
+        color: p.glass,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: p.border, width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.fitness_center, size: 15, color: p.accentDeep),
+          const SizedBox(width: 7),
+          Text(
+            prettifyExerciseState(state),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: p.ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Live form-score readout.
+class FormScoreReadout extends StatelessWidget {
+  const FormScoreReadout({super.key, required this.formScore});
+
+  final int formScore;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: BoxDecoration(
+        color: p.glass,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: p.border, width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.grade, size: 15, color: p.accentDeep),
+          const SizedBox(width: 7),
+          Text(
+            'Form $formScore',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: p.ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Person-lock banner — visible only while counting is paused.
+/// Rendered only for non-ok reasons; [LockReason.ok] yields an empty box.
+class PersonLockBanner extends StatelessWidget {
+  const PersonLockBanner({super.key, required this.reason});
+
+  final LockReason reason;
+
+  @override
+  Widget build(BuildContext context) {
+    if (reason == LockReason.ok) return const SizedBox.shrink();
+    final p = context.palette;
+    final IconData icon = switch (reason) {
+      LockReason.noPerson => Icons.person_off,
+      LockReason.multiPerson => Icons.group,
+      LockReason.lostTracking => Icons.person_search,
+      LockReason.occluded => Icons.visibility_off,
+      LockReason.videoPlayback => Icons.smart_display,
+      LockReason.ok => Icons.person,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: p.glass,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: p.border, width: 1.2),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: p.amberPillFg),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              lockReasonLine(reason),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: p.ink,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Camera-adjustment cue card — visible only when framing needs fixing.
+/// [FramingCue.ok] yields an empty box.
+class FramingCueCard extends StatelessWidget {
+  const FramingCueCard({super.key, required this.framing});
+
+  final FramingCue framing;
+
+  @override
+  Widget build(BuildContext context) {
+    if (framing == FramingCue.ok) return const SizedBox.shrink();
+    final p = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: p.glass,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: p.border, width: 1.2),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.videocam, size: 20, color: p.accentDeep),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              framingCueLine(framing),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: p.ink,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

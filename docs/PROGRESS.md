@@ -11,15 +11,24 @@
 | DC | Data core (Drift DB, content, account sync, use cases) | ✅ Complete | 2026-09-30 |
 | P2 | Pose Core (FR-1..FR-6 engines) | ✅ Complete | 2026-10-01 |
 | P3 | Workout Flow (video → camera → report) | 🟡 In progress | |
-| P4 | Home (strike, greeting, graph, slots) | ⬜ Not started | |
-| P5 | Plan (AI schedule, library, meals, history) | ⬜ Not started | |
-| P6 | VEDA + Nutrition + Export | ⬜ Not started | |
-| P7 | Notifications + Settings | ⬜ Not started | |
+| P4 | Home (strike, greeting, graph, slots) | ✅ Complete | 2026-10-01 |
+| P5 | Plan (AI schedule, library, meals, history) | ✅ Complete | 2026-10-01 |
+| P6 | VEDA + Nutrition + Export | ✅ Complete | 2026-10-01 |
+| P7 | Notifications + Settings | ✅ Complete | 2026-10-01 |
 | P8 | Polish (docs, i18n/a11y, FPS validation) | ⬜ Not started | |
 | P9 (J) | Vision model (user-delivered rules/model) | ⏳ Awaiting user | |
 | P10 (I) | Release build (final APK — LAST) | ⬜ After P9 | |
 
 ## Log
+
+### 2026-10-01 — v1.1.11: WS1–WS7 + WS9 count consistency & anti-fake responses 🔧
+- **WS9.1 count consistency (user: push-up/squat counts "not consistent and not proper")**: squat + push-up FSMs got boundary hysteresis — standing enters >156° (the old 160° bar silently dropped every soft-lockout rep) and holds to >146° once committed; `bottom` stays strict at ≤90° for entry but holds to ≤97° across a depth wobble, evaluated **before** `ascending` so rising wobble frames can't reset the 3-frame ROM visit; session-start guard: the first FSM commit of a session never produces a phantom "not counted". Rest-jitter / 2-frame-dip / spike guardrails re-verified untouched (false_count_guard 4/4, fast_rep 8/8).
+- **WS9.2 hammer curl**: count = `max(left, right)` (per-arm reps) instead of `left+right` — simultaneous curls fired both sides on the same frame and +2'd every rep; 3 curls now count 3, and block targets ("12 reps") mean 12 in both simultaneous and alternating styles.
+- **WS9.3 anti-fake responses**: trust gate verified live (analyzer feeds the brain only when locked — noPerson/multiPerson/lostTracking/occluded/videoPlayback all freeze counting) + every lock transition now **speaks** the banner line (3 s cooldown; previously only videoPlayback had a voice); gate-refused reps are explained instead of silently dropped — coach bar + spoken "Too fast — rep not counted" / "Not counted — go through your full range"; first-commit guard kills the startup rangeOfMotion flash. Session auto-pause → v1.1.12 (count freeze covers the fake-rep vector; manual pause exists).
+- **WS9.4 + rejection tests**: new `count_consistency_test.dart` (4) + `rep_rejection_test.dart` rewritten against the real engine API (5) — the old version targeted `BrainConfig`/`feed()`/`domain/` paths that never existed.
+- **WS2 aborted mid-flight, salvage over rewrite**: the vision-HUD agent left 562 analyze errors (screen rewritten against phantom files, tests for unbuilt APIs); restored `vision_session_screen` + `vision_hud` from `f70c5da`, kept its shipped engine pieces (trust pipeline, rejection machinery, banner copy), deleted dead `session_flow` pair (archived in commit `db0e324`); rounds/rest/popups HUD → v1.1.12.
+- **WS1–WS7 (this release, earlier today)**: notification payload routing + shared daily-reminder id + dispatch survives init failure; nutrition kcal target (edit/validate/persist + Today-card row), AskVeda offline kcal reply, estimate truncation, 61 px row overflow; strike/library/plan-slot fixes + content-integrity pins; smart library search (24 tests); docs/README index.
+- **Gates**: `flutter analyze` **0 issues** · `flutter test` **182/182 green in ~28 s** · APK v1.1.11 → `releases/v1.1.11/`.
 
 ### 2026-10-01 — v1.1.10: false-count guardrails + AI progress report (PDF export) + overflow fixes 🔧
 - **False rep counts killed (user report: "many time it takes false counts")** — reproduced first: two-frame landmark-noise dips below the depth threshold (e.g. 165°→87°→back at rest) committed the capped ROM state and the return to the trigger completed a phantom cycle → **20/20 false counts** in the new harness. Fix: ROM-visit credit now requires **`BrainEngine.priorVisitMinFrames = 3` consecutive raw frames** in the required prior state (unilateral + bilateral + `reset()`), restoring the pre-cap evidence bar for the *visit* while the trigger keeps its 2-frame commit — 3-rep/sec fast-rep contract untouched (its bottom dwell is exactly 3 frames). New `test/unit/false_count_guard_test.dart`: rest jitter ±4°/15 s = 0, 20× 2-frame dips = 0, single-frame spikes = 0, 10 real reps with ±3° jitter = exactly 10. Schematic baseline tests updated to hold ROM visits 3 frames (they used 1-frame visits — below the runtime commit floor anyway).

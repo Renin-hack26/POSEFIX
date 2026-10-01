@@ -60,11 +60,19 @@ const ExerciseDefinition squatDefinition = ExerciseDefinition(
       description: 'Hip/torso inclination angle',
     ),
   ],
-  stateOrder: ['standing', 'ascending', 'bottom', 'descending'],
+  // WS9.1: `bottom` is evaluated before `ascending` so the committed
+  // bottom state's hold band (≤97°) wins over the ascending velocity
+  // rule — a depth wobble rising across the 90° line keeps its raw-streak
+  // ROM visit instead of resetting it every upward frame.
+  stateOrder: ['standing', 'bottom', 'ascending', 'descending'],
   states: [
     ExerciseState(
       name: 'standing',
-      condition: 'angle > 160',
+      // WS9.1 count consistency: enter at >156 (the old 160° bar silently
+      // dropped every soft-lockout rep) and stay while >146 once
+      // committed — the hysteresis band stops boundary jitter from
+      // flickering the trigger and losing an otherwise good rep.
+      condition: "angle > 156 or (state == 'standing' and angle > 146)",
       description: 'Fully upright position',
     ),
     ExerciseState(
@@ -74,7 +82,10 @@ const ExerciseDefinition squatDefinition = ExerciseDefinition(
     ),
     ExerciseState(
       name: 'bottom',
-      condition: 'angle <= 90',
+      // WS9.1: entry stays strict (≤90° = real depth) but once committed
+      // the state holds to ≤97° — a depth hold wobbling across the 90°
+      // line keeps its raw-streak ROM visit instead of losing the rep.
+      condition: "angle <= 90 or (state == 'bottom' and angle <= 97)",
       description: 'Parallel or below parallel depth',
     ),
     ExerciseState(
@@ -161,11 +172,17 @@ const ExerciseDefinition pushUpDefinition = ExerciseDefinition(
       description: 'Spine and core alignment',
     ),
   ],
-  stateOrder: ['plank_up', 'ascending', 'bottom', 'descending'],
+  // WS9.1: same evaluation order as the squat FSM — the committed
+  // bottom hold band must win over ascending velocity while the depth
+  // wobble is in progress.
+  stateOrder: ['plank_up', 'bottom', 'ascending', 'descending'],
   states: [
     ExerciseState(
       name: 'plank_up',
-      condition: 'angle > 155',
+      // WS9.1: enter at >153 (soft lockouts below the old 155° bar used
+      // to drop the rep) and hold while >143 once committed — same
+      // boundary-jitter treatment as the squat standing trigger.
+      condition: "angle > 153 or (state == 'plank_up' and angle > 143)",
       description: 'Arms extended in high plank',
     ),
     ExerciseState(
@@ -175,7 +192,10 @@ const ExerciseDefinition pushUpDefinition = ExerciseDefinition(
     ),
     ExerciseState(
       name: 'bottom',
-      condition: 'angle <= 90',
+      // WS9.1: strict ≤90° entry, holds to ≤97° once committed — a depth
+      // wobble across the boundary keeps the ROM visit (same treatment as
+      // the squat bottom state).
+      condition: "angle <= 90 or (state == 'bottom' and angle <= 97)",
       description: 'Chest down with 90-degree arm bend',
     ),
     ExerciseState(
