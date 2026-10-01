@@ -211,7 +211,7 @@ class _SettingsBodyState extends ConsumerState<_SettingsBody> {
       hour: minuteOfDay ~/ 60,
       minute: minuteOfDay % 60,
       workoutName: 'Your workout',
-      workoutId: 'settings-daily-reminder',
+      workoutId: NotificationEngine.settingsReminderWorkoutId,
     );
   }
 

@@ -13,6 +13,13 @@
 /// - Per-exercise framing zones: required landmarks clipped by a frame edge
 ///   (or a tiny subject, or a front view on push-ups which need a wide
 ///   side-on view) produce a spoken camera-adjustment cue.
+/// - Any-angle robustness (WS2 6.3, thresholds-only pass — no model change):
+///   joint angles are computed from landmark *deltas*, so they are invariant
+///   to translation, scale and in-plane rotation of the subject; normalized
+///   landmarks are divided by the frame dimensions; confidences are clamped
+///   to 0..1; and frames whose mean required-landmark confidence falls below
+///   [FormRules.minFrameQuality] are dropped (see the frame-quality gate)
+///   instead of feeding the FSM low-fidelity angles from oblique views.
 ///
 /// Accuracy/speed are internal engineering targets — nothing here renders
 /// latency or confidence numbers into UI copy.
@@ -140,6 +147,10 @@ class PoseAnalyzer {
   final Map<int, pm.EmaFilter> _smoothX = {};
   final Map<int, pm.EmaFilter> _smoothY = {};
 
+  /// Consecutive frames below [FormRules.minFrameQuality] (WS2 6.3) — the
+  /// second one in a row is dropped as occluded instead of reaching the FSM.
+  int _weakQualityFrames = 0;
+
   /// Per-landmark EMA filters for the overlay copy (separate from the FSM
   /// smoothing so overlay responsiveness can be tuned independently).
   final Map<PoseLandmarkType, pm.EmaFilter> _ovX = {};
@@ -264,6 +275,7 @@ class PoseAnalyzer {
       _ovX.clear();
       _ovY.clear();
       _stableFrames = 0;
+      _weakQualityFrames = 0;
       _torsoEma = null;
       _videoSuspected = false;
       _resetRhythm();
@@ -279,6 +291,7 @@ class PoseAnalyzer {
       _smoothedPose = null;
       _ovX.clear();
       _ovY.clear();
+      _weakQualityFrames = 0;
       return base(
         reason: LockReason.multiPerson,
         locked: false,
@@ -326,6 +339,30 @@ class PoseAnalyzer {
         locked: locked,
         visible: visible.length,
       );
+    }
+
+    // WS2 6.3 — frame-quality gate (any-angle robustness, conservative):
+    // enough landmarks can still be *present* while their confidence — and
+    // with it the angular fidelity at odd camera angles / in blur — has
+    // collapsed. Two consecutive weak frames are treated as occluded so the
+    // FSM never integrates foreshortened garbage angles; one marginal frame
+    // after a good run still passes (no flicker).
+    double quality = 0;
+    for (final lm in visible.values) {
+      quality += lm.likelihood.clamp(0.0, 1.0);
+    }
+    quality /= visible.length;
+    if (quality < FormRules.minFrameQuality) {
+      _weakQualityFrames++;
+      if (_weakQualityFrames >= 2) {
+        return base(
+          reason: LockReason.occluded,
+          locked: locked,
+          visible: visible.length,
+        );
+      }
+    } else {
+      _weakQualityFrames = 0;
     }
 
     // Smooth + normalize. Velocity-aware EMA: fast landmark motion raises
@@ -522,7 +559,8 @@ class PoseAnalyzer {
         x: fx.push(lm.x),
         y: fy.push(lm.y),
         z: lm.z,
-        likelihood: lm.likelihood,
+        // Clamped (WS2 6.3): downstream tinting/thresholds assume 0..1.
+        likelihood: lm.likelihood.clamp(0.0, 1.0),
       );
     }
     return Pose(landmarks: map);
@@ -556,6 +594,7 @@ class PoseAnalyzer {
     _smoothedPose = null;
     _torsoEma = null;
     _stableFrames = 0;
+    _weakQualityFrames = 0;
     _busy = false;
     _videoSuspected = false;
     _resetRhythm();

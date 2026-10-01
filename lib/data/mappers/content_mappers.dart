@@ -53,7 +53,11 @@ Workout workoutFromJson(Map<String, dynamic> m, String file) {
           .toList(),
       estimatedCalories: (m['estimatedCalories'] as num).toInt(),
       tags: ((m['tags'] as List?) ?? const []).cast<String>(),
-      demoVideoAsset: m['demoVideoAsset'] as String,
+      // Tolerant: a null/absent path simply means "no hero clip bundled"
+      // (the workouts-level assets/videos/*.mp4 are intentionally not
+      // shipped yet) — normalize to '' so no screen has to null-check and
+      // a partial content pack can never crash the mapper.
+      demoVideoAsset: (m['demoVideoAsset'] as String?) ?? '',
       blocks: (m['blocks'] as List<dynamic>)
           .map((b) => workoutBlockFromJson(b as Map<String, dynamic>, file))
           .toList(),

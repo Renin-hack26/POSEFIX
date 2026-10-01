@@ -41,6 +41,12 @@ class _InstructionVideoScreenState extends ConsumerState<InstructionVideoScreen>
   late final Future<_ExerciseData> _dataFuture;
   VideoPlayerController? _videoController;
 
+  /// Fixed height shared by every media-panel variant (GIF, video, form
+  /// guide, loading). The panel must never change size between states —
+  /// otherwise the layout "jumps" and the caption pill ends up crossing
+  /// the content below it.
+  static const double _mediaPanelHeight = 220;
+
   /// Bundled demo GIF (animated `Image.asset`) when the content pack
   /// declares one — GIFs play natively, no video_player needed.
   String? _gifPath;
@@ -62,11 +68,33 @@ class _InstructionVideoScreenState extends ConsumerState<InstructionVideoScreen>
     if (exercise == null) {
       throw StateError('Unknown exercise: $id');
     }
+    // Resolve the media kind ONCE, outside build(): `.gif` renders via
+    // Image.asset (native animation); anything else goes to video_player.
+    // Doing it here means build() only ever READS the flags, so the header
+    // pill and the panel always agree on the same frame (mutating them
+    // during build was the source of the crossed/uncertain layers).
+    _configureMedia(exercise.demoVideoAsset);
     return _ExerciseData(
       exercise: exercise,
       definition: definition,
       exerciseId: id,
     );
+  }
+
+  /// Classifies the declared demo asset exactly once: a `.gif` path is
+  /// stored for [Image.asset], any other path starts the video load.
+  /// Null/empty (no clip bundled, or one of the 4 exercises without a
+  /// demo) leaves every flag untouched → the static form-guide panel.
+  void _configureMedia(String? clipAsset) {
+    if (clipAsset == null || clipAsset.isEmpty) return;
+    if (clipAsset.toLowerCase().endsWith('.gif')) {
+      _gifPath = clipAsset;
+      return;
+    }
+    if (_videoLoading || _videoInitialized || _videoLoadFailed) return;
+    _videoLoading = true;
+    // Fire-and-forget: _initVideo reports back through setState.
+    _initVideo(clipAsset);
   }
 
   /// Plays the clip declared by the content pack (`Exercise.demoVideoAsset`).
@@ -84,17 +112,23 @@ class _InstructionVideoScreenState extends ConsumerState<InstructionVideoScreen>
       await controller.play();
       setState(() {
         _videoController = controller;
+        _videoLoading = false;
         _videoInitialized = true;
       });
     } catch (_) {
       await controller.dispose();
       if (mounted) {
         setState(() {
+          _videoLoading = false;
           _videoLoadFailed = true;
         });
       }
     }
   }
+
+  /// True while the clip is really on screen (GIF path resolved or video
+  /// initialized) — drives both the header pill and the panel variant.
+  bool get _mediaReady => _videoInitialized || _gifPath != null;
 
   @override
   void dispose() {
@@ -113,7 +147,7 @@ class _InstructionVideoScreenState extends ConsumerState<InstructionVideoScreen>
             future: _dataFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
-                return _buildSkeleton(p);
+                return _buildSkeleton();
               }
               if (snapshot.hasError || !snapshot.hasData) {
                 return _buildNotFound(p);
@@ -123,23 +157,9 @@ class _InstructionVideoScreenState extends ConsumerState<InstructionVideoScreen>
               final steps = _deriveCoachingSteps(data.definition, exercise);
               final meta = _buildMetaLine(exercise, data.definition);
 
-              // Kick the media load once, only when the content pack declares
-              // an asset path for this exercise. `.gif` renders via
-              // Image.asset (native animation); video paths go to
-              // video_player.
-              final clipAsset = exercise.demoVideoAsset;
-              if (clipAsset != null &&
-                  !_videoLoading &&
-                  !_videoInitialized &&
-                  _gifPath == null &&
-                  !_videoLoadFailed) {
-                if (clipAsset.toLowerCase().endsWith('.gif')) {
-                  _gifPath = clipAsset;
-                } else {
-                  _videoLoading = true;
-                  _initVideo(clipAsset);
-                }
-              }
+              // NOTE: the media flags (_gifPath/_videoLoading/…) are only
+              // ever written by _loadExerciseData/_initVideo — build() just
+              // reads them, so the header pill and panel can't disagree.
 
               return ListView(
                 padding: const EdgeInsets.only(bottom: 26),
@@ -170,12 +190,15 @@ class _InstructionVideoScreenState extends ConsumerState<InstructionVideoScreen>
                         child: Center(
                           child: StatusPill(
                             // The pill mirrors the actual media: a demo is
-                            // only "Form demo" once it is really playing.
-                            label: (_videoInitialized || _gifPath != null)
+                            // only "Form demo" once it is really playing,
+                            // and it says so while the video is loading.
+                            label: _mediaReady
                                 ? 'Form demo'
-                                : 'Form guide',
+                                : (_videoLoading && !_videoLoadFailed)
+                                    ? 'Loading demo'
+                                    : 'Form guide',
                             dot: false,
-                            tone: (_videoInitialized || _gifPath != null)
+                            tone: _mediaReady
                                 ? PillTone.green
                                 : PillTone.neutral,
                           ),
@@ -249,7 +272,7 @@ class _InstructionVideoScreenState extends ConsumerState<InstructionVideoScreen>
     );
   }
 
-  Widget _buildSkeleton(AppPalette p) {
+  Widget _buildSkeleton() {
     return const Center(child: CircularProgressIndicator());
   }
 
@@ -293,65 +316,146 @@ class _InstructionVideoScreenState extends ConsumerState<InstructionVideoScreen>
 
   /// The clip when it is really playing (GIF or video), otherwise the static
   /// form-guide panel driven by the FSM step list.
+  ///
+  /// Every variant — loading, GIF, video, fallback — lives in the SAME
+  /// fixed-height frame ([_mediaPanelHeight]), so switching states never
+  /// resizes the layout (previously GIF ≈202dp at 360w, video varied with
+  /// its aspect ratio and the form guide was 220dp: the reported "height
+  /// jump"/layer-crossing bug).
   Widget _buildMediaPanel(
     Exercise exercise,
     List<(String, String)> steps,
     AppPalette p,
   ) {
-    final bool mediaPlaying = _videoInitialized || _gifPath != null;
-    if (mediaPlaying && _gifPath != null) {
-      return Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.asset(
-                _gifPath!,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-                errorBuilder: (_, _, _) => _buildFormGuidePanel(steps, p),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 10,
-            bottom: 10,
-            child: _VideoCaption(title: exercise.name, duration: null),
-          ),
-        ],
-      );
+    // Clip still initializing → a real progress indicator inside the fixed
+    // frame (the flag previously never drove any UI).
+    if (_videoLoading && !_videoInitialized && !_videoLoadFailed) {
+      return _mediaFrame(child: _buildLoadingBackdrop(p));
     }
-    if (mediaPlaying && _videoController != null) {
-      return Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: AspectRatio(
-              aspectRatio: _videoController!.value.aspectRatio,
-              child: VideoPlayer(_videoController!),
-            ),
-          ),
-          Positioned(
-            left: 10,
-            bottom: 10,
-            child: _VideoCaption(
-              title: exercise.name,
-              duration: _videoController!.value.duration.inSeconds,
-            ),
-          ),
-        ],
+
+    // Bundled GIF demo (path classified once while the exercise loaded).
+    if (_gifPath != null) {
+      return _mediaFrame(
+        child: Image.asset(
+          _gifPath!,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          // A missing/mis-bundled GIF drops back to the static guide
+          // INSIDE the same frame — no layout jump.
+          errorBuilder: (_, _, _) => _buildFormGuidePanel(steps, p),
+        ),
+        caption: _VideoCaption(title: exercise.name, duration: null),
       );
     }
 
-    // Static form-guide panel: the coaching steps below carry the detail.
+    // Initialized video, cover-fitted so the frame stays exactly 220dp tall
+    // no matter what aspect ratio the clip ships with.
+    if (_videoInitialized && _videoController != null) {
+      return _mediaFrame(
+        child: _buildVideoSurface(),
+        caption: _VideoCaption(
+          title: exercise.name,
+          duration: _videoController!.value.duration.inSeconds,
+        ),
+      );
+    }
+
+    // No clip declared (4 exercises) or the clip failed to load → static
+    // form-guide panel, already sized to the same height.
     return _buildFormGuidePanel(steps, p);
+  }
+
+  /// One fixed-size rounded frame shared by every media variant: the media
+  /// fills it edge-to-edge and the caption pill sits on a bottom scrim
+  /// INSIDE the clip, so the pill always has contrast and can never spill
+  /// across the panel edge onto the content below.
+  Widget _mediaFrame({required Widget child, Widget? caption}) {
+    return SizedBox(
+      height: _mediaPanelHeight,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            child,
+            if (caption != null) ...[
+              // Scrim: keeps the white pill readable over bright frames.
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomRight,
+                    colors: [Colors.transparent, Colors.black54],
+                    stops: [0.55, 1],
+                  ),
+                ),
+              ),
+              Positioned(left: 10, bottom: 10, child: caption),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Backdrop shown while a video initializes — mirrors the form guide's
+  /// gradient so the swap to the playing clip is seamless.
+  Widget _buildLoadingBackdrop(AppPalette p) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.lightInk2, AppColors.lightInk],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: AppColors.accentBright,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Loading demo…',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.white.withAlpha(200),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Cover-fitted video surface: keeps the clip's own aspect ratio but
+  /// scales it to fill the fixed panel (overflow is clipped by the frame),
+  /// so the panel height never depends on the clip.
+  Widget _buildVideoSurface() {
+    final ratio = _videoController!.value.aspectRatio;
+    final aspect = (ratio.isFinite && ratio > 0) ? ratio : 16 / 9;
+    return FittedBox(
+      fit: BoxFit.cover,
+      child: SizedBox(
+        width: _mediaPanelHeight * aspect,
+        height: _mediaPanelHeight,
+        child: VideoPlayer(_videoController!),
+      ),
+    );
   }
 
   /// Static form-guide panel — the coaching steps below carry the detail.
   Widget _buildFormGuidePanel(List<(String, String)> steps, AppPalette p) {
     return Container(
-      height: 220,
+      height: _mediaPanelHeight,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,

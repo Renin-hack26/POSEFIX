@@ -42,6 +42,16 @@ class FormRules {
   /// Minimum landmark confidence (0..1) before any state transition is accepted.
   static const double minLandmarkConfidence = 0.5;
 
+  /// Minimum MEAN confidence over an exercise's required landmarks before a
+  /// frame's angles are trusted (WS2 6.3 — any-angle robustness).
+  ///
+  /// At odd camera angles, motion blur and low light ML Kit's per-landmark
+  /// confidence decays *before* landmarks disappear. A frame can clear
+  /// [minLandmarkConfidence] on every landmark and still be too noisy to
+  /// measure — frames whose mean confidence falls below this bar are dropped
+  /// (2-frame grace) instead of feeding the FSM foreshortened garbage angles.
+  static const double minFrameQuality = 0.6;
+
   /// Consecutive frames required to confirm a state transition (anti-jitter).
   static const int transitionConfirmFrames = 3;
 

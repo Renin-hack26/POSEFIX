@@ -103,7 +103,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(height: 6),
-                      _HomeHeader(strike: 0),
+                      // Strike unknown while loading → neutral placeholder,
+                      // never a numeric claim.
+                      _HomeHeader(strike: null),
                       SizedBox(height: 20),
                       _HomeSkeleton(),
                     ],
@@ -114,7 +116,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 6),
-                      const _HomeHeader(strike: 0),
+                      // Error branch: the streak was never fetched — show the
+                      // placeholder instead of claiming "0 day streak".
+                      const _HomeHeader(strike: null),
                       const SizedBox(height: 24),
                       GlassCard(
                         child: Column(
@@ -159,7 +163,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _HomeHeader extends StatelessWidget {
   const _HomeHeader({required this.strike});
 
-  final int strike;
+  /// Consecutive-day strike, or null while it is unknown (loading/error
+  /// branch) — [StrikeBadge] then renders a neutral placeholder instead of
+  /// a number.
+  final int? strike;
 
   @override
   Widget build(BuildContext context) {

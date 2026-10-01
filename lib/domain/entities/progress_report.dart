@@ -47,6 +47,10 @@ class ProgressReport {
     required this.avgFormPct,
     required this.currentStrike,
     required this.recentSessions,
+    this.mealsLogged = 0,
+    this.avgKcalPerDay = 0,
+    this.daysWithMeals = 0,
+    this.calorieTarget,
     required this.suggestions,
     required this.aiPowered,
   });
@@ -86,6 +90,19 @@ class ProgressReport {
   /// Newest first, capped by the usecase (10).
   final List<ReportSessionRow> recentSessions;
 
+  // ---- Nutrition (report window, meal page) ----
+  /// Meals logged in the window (0 → the nutrition section stays hidden).
+  final int mealsLogged;
+
+  /// Window-averaged kcal/day across all window days.
+  final int avgKcalPerDay;
+
+  /// Distinct calendar days with at least one logged meal.
+  final int daysWithMeals;
+
+  /// Daily calorie target from the meal page (null → never set).
+  final int? calorieTarget;
+
   // ---- AI analysis ----
   /// Markdown-ish text (## headings, '-' bullets) from GROQ, or the built-in
   /// rule-based version when the model was unreachable.
@@ -116,6 +133,10 @@ class ProgressReport {
         avgFormPct: avgFormPct,
         currentStrike: currentStrike,
         recentSessions: recentSessions,
+        mealsLogged: mealsLogged,
+        avgKcalPerDay: avgKcalPerDay,
+        daysWithMeals: daysWithMeals,
+        calorieTarget: calorieTarget,
         suggestions: suggestions ?? this.suggestions,
         aiPowered: aiPowered ?? this.aiPowered,
       );

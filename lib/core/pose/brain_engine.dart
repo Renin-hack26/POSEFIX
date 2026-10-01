@@ -25,6 +25,21 @@ import 'package:flutter/foundation.dart';
 import 'exercise_definition.dart';
 import 'pose_math.dart' show LmPoint;
 
+/// Why a trigger cycle was NOT counted (WS2 TODO 2.9 — "skip-count fix").
+///
+/// The engine always reports these on the frame where the counter trigger
+/// committed but a gate failed, so the UI can show a "not counted" coach
+/// message + haptic instead of dropping the rep silently.
+enum RepRejectedReason {
+  /// The required ROM state (`requiredPriorState`) wasn't visited since the
+  /// last count — the rep didn't reach full range.
+  rangeOfMotion,
+
+  /// Trigger re-entered sooner than `CounterRule.minRepDuration` — the rep
+  /// was too fast to be a real, controlled cycle.
+  tooFast,
+}
+
 /// Result of one frame analysis.
 @immutable
 class BrainResult {
@@ -38,6 +53,7 @@ class BrainResult {
     required this.formScore,
     this.repJustCompleted = false,
     this.stateJustChanged = false,
+    this.repRejectedReason,
     this.bilateral,
   });
 
@@ -50,6 +66,10 @@ class BrainResult {
   final int formScore; // 0-100
   final bool repJustCompleted;
   final bool stateJustChanged;
+
+  /// Non-null exactly on the frame where the trigger committed but a
+  /// ROM/timing gate refused the count (null = nothing was skipped).
+  final RepRejectedReason? repRejectedReason;
   final BilateralStatus? bilateral;
 
   BrainResult copyWith({
@@ -61,6 +81,7 @@ class BrainResult {
     int? formScore,
     bool? repJustCompleted,
     bool? stateJustChanged,
+    RepRejectedReason? repRejectedReason,
     BilateralStatus? bilateral,
   }) =>
       BrainResult(
@@ -73,6 +94,7 @@ class BrainResult {
         formScore: formScore ?? this.formScore,
         repJustCompleted: repJustCompleted ?? this.repJustCompleted,
         stateJustChanged: stateJustChanged ?? this.stateJustChanged,
+        repRejectedReason: repRejectedReason ?? this.repRejectedReason,
         bilateral: bilateral ?? this.bilateral,
       );
 }
@@ -786,12 +808,13 @@ class BrainEngine {
     }
 
     var repCompleted = false;
-    if (changed) {
+    RepRejectedReason? rejection;
+    if (changed && current == rule.triggerState) {
       final romOk = rule.requiredPriorState == null ||
           _visited.contains(rule.requiredPriorState);
-      if (current == rule.triggerState &&
-          romOk &&
-          (timestamp - _lastCountTime) >= rule.minRepDuration) {
+      final timingOk =
+          (timestamp - _lastCountTime) >= rule.minRepDuration;
+      if (romOk && timingOk) {
         _repCount += rule.repIncrement;
         _lastCountTime = timestamp;
         repCompleted = true;
@@ -805,6 +828,12 @@ class BrainEngine {
         _avgFormScore =
             (_repFormScores.reduce((a, b) => a + b) / _repFormScores.length)
                 .round();
+      } else {
+        // Trigger committed but a gate refused the count — report WHY so the
+        // coach bar can say "not counted" instead of dropping it silently.
+        rejection = romOk
+            ? RepRejectedReason.tooFast
+            : RepRejectedReason.rangeOfMotion;
       }
     }
 
@@ -827,6 +856,7 @@ class BrainEngine {
       formScore: _currentFormScore,
       repJustCompleted: repCompleted,
       stateJustChanged: changed,
+      repRejectedReason: rejection,
     );
   }
 
@@ -872,29 +902,43 @@ class BrainEngine {
 
     var leftRep = false;
     var rightRep = false;
+    RepRejectedReason? leftRejection;
+    RepRejectedReason? rightRejection;
     final rule = definition.counterRule;
 
-    if (changedLeft &&
-        _stabLeft.state == rule.triggerState &&
-        (rule.requiredPriorState == null ||
-            _visitedLeft.contains(rule.requiredPriorState)) &&
-        (timestamp - _lastLeftCountTime) >= rule.minRepDuration) {
-      _leftCount++;
-      _lastLeftCountTime = timestamp;
-      leftRep = true;
-      _visitedLeft.clear();
-      _visitedLeft.add(_stabLeft.state);
+    if (changedLeft && _stabLeft.state == rule.triggerState) {
+      final romOk = rule.requiredPriorState == null ||
+          _visitedLeft.contains(rule.requiredPriorState);
+      final timingOk =
+          (timestamp - _lastLeftCountTime) >= rule.minRepDuration;
+      if (romOk && timingOk) {
+        _leftCount++;
+        _lastLeftCountTime = timestamp;
+        leftRep = true;
+        _visitedLeft.clear();
+        _visitedLeft.add(_stabLeft.state);
+      } else {
+        leftRejection = romOk
+            ? RepRejectedReason.tooFast
+            : RepRejectedReason.rangeOfMotion;
+      }
     }
-    if (changedRight &&
-        _stabRight.state == rule.triggerState &&
-        (rule.requiredPriorState == null ||
-            _visitedRight.contains(rule.requiredPriorState)) &&
-        (timestamp - _lastRightCountTime) >= rule.minRepDuration) {
-      _rightCount++;
-      _lastRightCountTime = timestamp;
-      rightRep = true;
-      _visitedRight.clear();
-      _visitedRight.add(_stabRight.state);
+    if (changedRight && _stabRight.state == rule.triggerState) {
+      final romOk = rule.requiredPriorState == null ||
+          _visitedRight.contains(rule.requiredPriorState);
+      final timingOk =
+          (timestamp - _lastRightCountTime) >= rule.minRepDuration;
+      if (romOk && timingOk) {
+        _rightCount++;
+        _lastRightCountTime = timestamp;
+        rightRep = true;
+        _visitedRight.clear();
+        _visitedRight.add(_stabRight.state);
+      } else {
+        rightRejection = romOk
+            ? RepRejectedReason.tooFast
+            : RepRejectedReason.rangeOfMotion;
+      }
     }
     _repCount = _leftCount + _rightCount;
 
@@ -914,6 +958,8 @@ class BrainEngine {
       formScore: _currentFormScore,
       repJustCompleted: leftRep || rightRep,
       stateJustChanged: changedLeft || changedRight,
+      // One message per frame: a rejected left side wins over the right.
+      repRejectedReason: leftRejection ?? rightRejection,
       bilateral: BilateralStatus(
         leftState: _stabLeft.state,
         rightState: _stabRight.state,

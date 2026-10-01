@@ -292,6 +292,32 @@ class _PlanBodyState extends State<_PlanBody> {
   /// the user taps a date → auto-default below.
   String? _selectedKey;
 
+  /// Floor height reserved for the day-slot region = the rest card's natural
+  /// height. Measured once after the first frame (so it follows the system
+  /// font scale) and then held constant: every day reserves at least this
+  /// much space, so the sections below the slot keep their y-position when
+  /// the selected day swaps between rest and sessions. Null until measured
+  /// (the very first frame lays out naturally).
+  double? _slotFloor;
+
+  /// Offstage reference rest card used to measure [_slotFloor]: laid out at
+  /// the slot's width, but never painted, never hit-testable and taking no
+  /// layout space of its own.
+  final GlobalKey _slotFloorKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureSlotFloor());
+  }
+
+  void _measureSlotFloor() {
+    if (!mounted || _slotFloor != null) return;
+    final renderObject = _slotFloorKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) return;
+    setState(() => _slotFloor = renderObject.size.height);
+  }
+
   /// Auto-selection: today when it has sessions, else the next upcoming day
   /// with sessions (preserves the original "next slot" default), else today
   /// (renders the rest card).
@@ -342,8 +368,14 @@ class _PlanBodyState extends State<_PlanBody> {
         _DaySessionsSlot(
           data: widget.data,
           day: selectedDay,
+          floorHeight: _slotFloor,
           onEditSession: widget.onEditSession,
         ),
+        // Sizing reference for the slot floor (see [_measureSlotFloor]): laid
+        // out at the slot's width so its height can be measured once, but
+        // Offstage keeps it out of the layout (zero size), the paint and the
+        // hit tests — default finders skip it too.
+        Offstage(key: _slotFloorKey, child: const _RestDayCard()),
         const SizedBox(height: 20),
         _LibrarySection(exercises: widget.data.exercises),
         const SizedBox(height: 20),
@@ -768,10 +800,16 @@ class _DayCell extends StatelessWidget {
 /// The selected day's set of workouts — today by default, or whichever date
 /// the user picked in the week strip (ongoing week only). Empty day →
 /// rest card. Each session card taps through to the editor.
+///
+/// Layout stability (the "slots are moving" fix): the stack keeps a stable
+/// floor ([floorHeight] — the rest card's height) on every day, card order
+/// follows the start time and the whole region animates its size on day
+/// switches instead of snapping, so the sections below never jump.
 class _DaySessionsSlot extends StatelessWidget {
   const _DaySessionsSlot({
     required this.data,
     required this.day,
+    required this.floorHeight,
     required this.onEditSession,
   });
 
@@ -780,21 +818,41 @@ class _DaySessionsSlot extends StatelessWidget {
   /// Selected strip date.
   final DateTime day;
 
+  /// Reserved minimum height (measured rest card) — null before the first
+  /// measurement, where the slot lays out at its natural height.
+  final double? floorHeight;
+
   /// Opens the session editor sheet for a tapped session.
   final ValueChanged<PlanSession> onEditSession;
 
   @override
   Widget build(BuildContext context) {
-    final sessions = data.plan!.sessionsFor(day);
+    // Stable order: cards of a day always render by start time, so a day's
+    // slot never reshuffles between visits.
+    final sessions = [...data.plan!.sessionsFor(day)]
+      ..sort((a, b) => a.startTimeMin.compareTo(b.startTimeMin));
     final isToday = day.dateKey == DateTime.now().dateKey;
-    if (sessions.isEmpty) return const _RestDayCard();
-    return Column(
-      children: [
-        for (var i = 0; i < sessions.length; i++) ...[
-          if (i > 0) const SizedBox(height: 10),
-          _sessionCard(context, sessions[i], isToday),
-        ],
-      ],
+    final Widget content = sessions.isEmpty
+        ? const _RestDayCard()
+        : Column(
+            children: [
+              for (var i = 0; i < sessions.length; i++) ...[
+                if (i > 0) const SizedBox(height: 10),
+                _sessionCard(context, sessions[i], isToday),
+              ],
+            ],
+          );
+    return ConstrainedBox(
+      // Floor: same minimum height on every day (rest card's height) —
+      // only days with MORE cards than the floor grow the region, and they
+      // do so smoothly via the AnimatedSize below.
+      constraints: BoxConstraints(minHeight: floorHeight ?? 0),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.fastOutSlowIn,
+        alignment: Alignment.topCenter,
+        child: content,
+      ),
     );
   }
 
@@ -917,8 +975,13 @@ class _NextSessionCard extends StatelessWidget {
               children: [
                 StatusPill(label: timeLabel, tone: PillTone.green),
                 const SizedBox(height: 8),
+                // Single line + ellipsis: every card of a day keeps the same
+                // height (long workout names must not make one card taller
+                // than its neighbours).
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
@@ -928,6 +991,8 @@ class _NextSessionCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   moves,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 11.5, color: p.ink3),
                 ),
               ],
@@ -1003,6 +1068,8 @@ class _LibraryEmpty extends StatelessWidget {
 }
 
 /// One exercise preview card: gradient thumbnail + name + muscle/cues meta.
+/// Tapping the card opens the exercise's instruction video — the section
+/// lists catalog [Exercise]s, so `/instruction-video?ex=<id>` is the route.
 class _LibraryCard extends StatelessWidget {
   const _LibraryCard({required this.exercise, required this.toneIndex});
 
@@ -1020,7 +1087,7 @@ class _LibraryCard extends StatelessWidget {
     final muscle = exercise.primaryMuscles.isNotEmpty
         ? exercise.primaryMuscles.first.label
         : 'General';
-    return Container(
+    final card = Container(
       width: 130,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -1088,6 +1155,17 @@ class _LibraryCard extends StatelessWidget {
         ],
       ),
     );
+    // Material + InkWell make the card tappable; both paint nothing while
+    // the card is at rest, so the rendered pixels stay identical.
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => context.go('/instruction-video?ex=${exercise.id}'),
+        child: card,
+      ),
+    );
   }
 }
 
@@ -1145,10 +1223,17 @@ class _MealsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Expanded(child: SectionHeader(title: 'Meals today')),
-            _LinkLabel('Log meal'),
+            const Expanded(child: SectionHeader(title: 'Meals today')),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => context.push('/meal'),
+                child: const _LinkLabel('Log meal'),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 10),
@@ -1314,37 +1399,33 @@ IconData _mealIcon(MealType type) => switch (type) {
       MealType.snack => Icons.cookie,
     };
 
-/// Recent sessions list (sample `.list .lrow` + `.idx`) · expandable when
-/// more than five sessions exist; rows open the session summary.
-class _HistorySection extends StatefulWidget {
+/// Recent sessions list (sample `.list .lrow` + `.idx`) — latest five
+/// inline; "View all" opens the full activity log (sessions + meals).
+/// Rows open the session summary.
+class _HistorySection extends StatelessWidget {
   const _HistorySection({required this.data});
 
   final _PlanData data;
 
   @override
-  State<_HistorySection> createState() => _HistorySectionState();
-}
-
-class _HistorySectionState extends State<_HistorySection> {
-  /// False shows the latest 5; true shows the full loaded history.
-  bool _expanded = false;
-
-  @override
   Widget build(BuildContext context) {
-    final data = widget.data;
     final p = context.palette;
     final numbers = NumberFormat.decimalPattern();
-    final visible = _expanded ? data.history : data.history.take(5);
+    final visible = data.history.take(5);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             const Expanded(child: SectionHeader(title: 'History')),
-            if (data.history.length > 5)
-              GestureDetector(
-                onTap: () => setState(() => _expanded = !_expanded),
-                child: _LinkLabel(_expanded ? 'Show less' : 'View all'),
+            if (data.history.isNotEmpty)
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => context.push('/log'),
+                  child: const _LinkLabel('View all'),
+                ),
               ),
           ],
         ),
@@ -1431,7 +1512,8 @@ class _HistorySectionState extends State<_HistorySection> {
   }
 }
 
-/// Accent section action copy (sample `.link`) · tap target for expand/collapse.
+/// Accent section action copy (sample `.link`) · tap target for section
+/// actions (Log meal → /meal, View all → /log).
 class _LinkLabel extends StatelessWidget {
   const _LinkLabel(this.label);
 

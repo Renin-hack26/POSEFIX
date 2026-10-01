@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/di/app_dependencies.dart';
+import '../../core/search/library_search.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise.dart';
 import '../../domain/entities/training_plan.dart';
@@ -43,7 +44,7 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
     _CategoryFilter.core(),
   ];
 
-  late Future<List<Workout>> _libraryFuture;
+  late Future<_LibraryData> _libraryFuture;
   late Future<_ResumeData> _resumeFuture;
 
   int _category = 0;
@@ -54,16 +55,37 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
   @override
   void initState() {
     super.initState();
-    _libraryFuture = ref.read(workoutRepositoryProvider).library();
+    _libraryFuture = _loadLibrary();
     _resumeFuture = _loadResumeData();
   }
 
   /// Reloads both futures (error-card retry).
   void _retry() {
     setState(() {
-      _libraryFuture = ref.read(workoutRepositoryProvider).library();
+      _libraryFuture = _loadLibrary();
       _resumeFuture = _loadResumeData();
     });
+  }
+
+  /// Library workouts plus the exercise id→name map for smart block-exercise
+  /// search ([LibrarySearch.filter]). Fetched as one future so the list and
+  /// the search index land in a single frame and stay single-flight across
+  /// both FutureBuilders. Bundled content only — [ContentLoader] caches the
+  /// asset reads, so this adds no network IO.
+  Future<_LibraryData> _loadLibrary() async {
+    // Both providers read synchronously before the first await — safe even
+    // if the widget is disposed while the load is in flight.
+    final workoutRepo = ref.read(workoutRepositoryProvider);
+    final exerciseRepo = ref.read(exerciseRepositoryProvider);
+    final workouts = await workoutRepo.library();
+    var exerciseNames = const <String, String>{};
+    try {
+      final exercises = await exerciseRepo.catalog();
+      exerciseNames = {for (final e in exercises) e.id: e.name};
+    } catch (_) {
+      // Exercise catalog unavailable — search falls back to raw block ids.
+    }
+    return _LibraryData(workouts, exerciseNames);
   }
 
   @override
@@ -216,12 +238,15 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
   }
 
   Widget _buildLibraryHeader(AppPalette p) {
-    return FutureBuilder<List<Workout>>(
+    return FutureBuilder<_LibraryData>(
       future: _libraryFuture,
       builder: (context, snapshot) {
         final loaded = snapshot.connectionState == ConnectionState.done;
-        final allWorkouts = snapshot.data ?? const <Workout>[];
-        final count = _filterWorkouts(allWorkouts).length;
+        final data = snapshot.data;
+        final count = _filterWorkouts(
+          data?.workouts ?? const <Workout>[],
+          data?.exerciseNames ?? const <String, String>{},
+        ).length;
         return Row(
           children: [
             const Expanded(child: SectionHeader(title: 'Workout library')),
@@ -241,7 +266,7 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
   }
 
   Widget _buildWorkoutLibrary() {
-    return FutureBuilder<List<Workout>>(
+    return FutureBuilder<_LibraryData>(
       future: _libraryFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
@@ -253,9 +278,13 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
             onRetry: _retry,
           );
         }
-        final filtered = _filterWorkouts(snapshot.data ?? const <Workout>[]);
+        final data = snapshot.data;
+        final filtered = _filterWorkouts(
+          data?.workouts ?? const <Workout>[],
+          data?.exerciseNames ?? const <String, String>{},
+        );
         if (filtered.isEmpty) {
-          return const _EmptyLibrary();
+          return _EmptyLibrary(query: _searchQuery);
         }
         return Column(
           children: [
@@ -272,17 +301,25 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen> {
     );
   }
 
-  List<Workout> _filterWorkouts(List<Workout> workouts) {
+  List<Workout> _filterWorkouts(
+    List<Workout> workouts,
+    Map<String, String> exerciseNames,
+  ) {
     var result = workouts;
 
     // Category filter — see the mapping comment on [_categories].
     final categoryFilter = _categories[_category];
     result = result.where(categoryFilter.predicate).toList();
 
-    // Search filter — case-insensitive match on the workout name.
+    // Smart search — names, category/level/goal/muscles/description/tags
+    // and block exercise names, with related-word (synonym) expansion and
+    // typo tolerance. Preserves the library's original order.
     if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      result = result.where((w) => w.name.toLowerCase().contains(query)).toList();
+      result = LibrarySearch.filter(
+        result,
+        _searchQuery,
+        exerciseNames: exerciseNames,
+      );
     }
 
     // Sort toggle — real field ([Workout.durationMin]), shortest first.
@@ -332,6 +369,15 @@ class _ResumeData {
 
   final Workout? workout;
   final String sourceLabel;
+}
+
+/// Library rows plus the search index (exercise id → display name) as one
+/// atomic load, so filtering never runs against a half-populated index.
+class _LibraryData {
+  const _LibraryData(this.workouts, this.exerciseNames);
+
+  final List<Workout> workouts;
+  final Map<String, String> exerciseNames;
 }
 
 /// "Today's session" card with stats and a start/resume action.
@@ -696,7 +742,8 @@ class _GlassIcon extends StatelessWidget {
   }
 }
 
-/// Inline search field — filters the library by workout name.
+/// Inline search field — smart-filters the library via
+/// [LibrarySearch] (names, muscles, goals, block exercises, synonyms).
 class _SearchField extends StatefulWidget {
   const _SearchField({
     required this.onChanged,
@@ -810,13 +857,18 @@ class _ErrorCard extends StatelessWidget {
   }
 }
 
-/// Empty library state.
+/// Empty library state — with search-aware copy when a query filtered
+/// everything out (item 7.4).
 class _EmptyLibrary extends StatelessWidget {
-  const _EmptyLibrary();
+  const _EmptyLibrary({required this.query});
+
+  /// Raw search query; blank when the emptiness comes from filters alone.
+  final String query;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final searched = query.trim().isNotEmpty;
     return GlassCard(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -824,7 +876,8 @@ class _EmptyLibrary extends StatelessWidget {
           Icon(Icons.fitness_center, size: 48, color: p.ink3),
           const SizedBox(height: 12),
           Text(
-            'No workouts match your filters',
+            searched ? 'No workouts match "$query".' : 'No workouts match your filters',
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
@@ -833,7 +886,11 @@ class _EmptyLibrary extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Try adjusting your search or category',
+            searched
+                ? 'Try a muscle (legs, chest), a goal (fat burn), '
+                    'or an exercise (squat).'
+                : 'Try adjusting your search or category',
+            textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12.5, color: p.ink3),
           ),
         ],

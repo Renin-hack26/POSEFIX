@@ -10,13 +10,16 @@ import 'package:fixpose/core/di/app_dependencies.dart';
 import 'package:fixpose/core/pdf/progress_report_pdf.dart';
 import 'package:fixpose/core/report/report_sections.dart';
 import 'package:fixpose/core/theme/app_theme.dart';
+import 'package:fixpose/core/utils/extensions.dart';
 import 'package:fixpose/domain/entities/body_metric.dart';
 import 'package:fixpose/domain/entities/chat_message.dart';
 import 'package:fixpose/domain/entities/exercise.dart';
+import 'package:fixpose/domain/entities/meal.dart';
 import 'package:fixpose/domain/entities/strike_state.dart';
 import 'package:fixpose/domain/entities/user_profile.dart';
 import 'package:fixpose/domain/entities/workout.dart';
 import 'package:fixpose/domain/entities/workout_session.dart';
+import 'package:fixpose/domain/repositories/nutrition_repository.dart';
 import 'package:fixpose/domain/repositories/progress_repository.dart';
 import 'package:fixpose/domain/repositories/session_repository.dart';
 import 'package:fixpose/domain/repositories/user_repository.dart';
@@ -183,6 +186,43 @@ class _FakeVedaRepo implements VedaRepository {
   }
 }
 
+class _FakeNutritionRepo implements NutritionRepository {
+  _FakeNutritionRepo({this.entries = const [], this.targetValue});
+
+  final List<MealEntry> entries;
+  final MealTarget? targetValue;
+
+  @override
+  Future<List<FoodItem>> searchFoods(String query) async => [];
+
+  @override
+  Future<List<MealEntry>> entriesFor(String dateKey) async =>
+      entries.where((e) => e.dateKey == dateKey).toList();
+
+  @override
+  Future<List<MealEntry>> entriesBetween(DateTime from, DateTime to) async {
+    final fromKey = from.dateKey;
+    final toKey = to.dateKey;
+    return entries
+        .where((e) =>
+            e.dateKey.compareTo(fromKey) >= 0 &&
+            e.dateKey.compareTo(toKey) <= 0)
+        .toList();
+  }
+
+  @override
+  Future<void> addEntry(MealEntry entry) async {}
+
+  @override
+  Future<void> removeEntry(String id) async {}
+
+  @override
+  Future<MealTarget?> target() async => targetValue;
+
+  @override
+  Future<void> saveTarget(MealTarget target) async {}
+}
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -227,6 +267,8 @@ GenerateProgressReport _usecase({
   StrikeState? strike,
   String? aiReply,
   Object? aiError,
+  List<MealEntry> meals = const [],
+  MealTarget? calorieTarget,
 }) =>
     GenerateProgressReport(
       _FakeUserRepo(profile),
@@ -234,6 +276,7 @@ GenerateProgressReport _usecase({
       _FakeProgressRepo(metricsList: metrics, strikeState: strike),
       _FakeWorkoutRepo([_workout('w1', 'Full Body Blast'), _workout('w2', 'Core Crusher')]),
       _FakeVedaRepo(reply: aiReply, error: aiError),
+      _FakeNutritionRepo(entries: meals, targetValue: calorieTarget),
     );
 
 final UserProfile _profile = UserProfile(
@@ -387,6 +430,64 @@ void main() {
       expect(report.sessionsTotal, 0);
       expect(report.bmi, closeTo(70 / (1.75 * 1.75), 0.01));
     });
+
+    test('wires nutrition data: window meals, target and fallback insight',
+        () async {
+      final report = await _usecase(
+        profile: _profile,
+        sessions: _history(),
+        meals: [
+          MealEntry(
+            id: 'm1',
+            dateKey: '2026-09-30',
+            name: 'Roti & Dal',
+            calories: 450,
+            mealType: MealType.lunch,
+            timeMillis:
+                DateTime(2026, 9, 30, 13, 10).millisecondsSinceEpoch,
+          ),
+          MealEntry(
+            id: 'm2',
+            dateKey: '2026-10-01',
+            name: 'Oats',
+            calories: 320,
+            mealType: MealType.breakfast,
+            timeMillis: DateTime(2026, 10, 1, 8, 5).millisecondsSinceEpoch,
+          ),
+          // Outside the trailing window — must be excluded.
+          MealEntry(
+            id: 'm3',
+            dateKey: '2026-08-15',
+            name: 'Pizza',
+            calories: 900,
+            mealType: MealType.dinner,
+          ),
+        ],
+        calorieTarget: const MealTarget(dailyCalories: 2200),
+        aiError: Exception('offline'),
+      )(now: _now);
+
+      expect(report.mealsLogged, 2);
+      expect(report.daysWithMeals, 2);
+      expect(report.calorieTarget, 2200);
+      // Window = Sep 1 14:30 → Oct 1 = 31 touched calendar days.
+      expect(report.avgKcalPerDay, (450 + 320) ~/ 31);
+
+      // Rule-based fallback carries the nutrition insight.
+      expect(report.aiPowered, isFalse);
+      expect(report.suggestions, contains('Nutrition: 2 meals'));
+    });
+
+    test('no meals logged → nutrition stays at zero (section hidden)',
+        () async {
+      final report =
+          await _usecase(profile: _profile, sessions: _history())(now: _now);
+      expect(report.mealsLogged, 0);
+      expect(report.avgKcalPerDay, 0);
+      expect(report.daysWithMeals, 0);
+      expect(report.calorieTarget, isNull);
+      expect(report.suggestions, isNot(contains('Nutrition:')));
+    });
   });
 
   group('parseReportSections', () {
@@ -471,6 +572,44 @@ void main() {
       expect(text, contains('RENIN'));
       expect(text, contains('© ${report.generatedAt.year} RENIN.'));
       expect(text, contains('Page 1 of'));
+    });
+
+    test('shows the nutrition summary only when meals were logged',
+        () async {
+      final report = await _usecase(
+        profile: _profile,
+        sessions: _history(),
+        meals: [
+          MealEntry(
+            id: 'm1',
+            dateKey: '2026-09-30',
+            name: 'Roti & Dal',
+            calories: 450,
+            mealType: MealType.lunch,
+          ),
+        ],
+        calorieTarget: const MealTarget(dailyCalories: 2200),
+        aiReply: _aiReply,
+      )(now: _now);
+
+      final bytes = await buildProgressReportPdf(report, compress: false);
+      final raw = latin1.decode(bytes);
+      String flatten(String pdf) => RegExp(r'\((?:[^()\\]|\\.)*\)')
+          .allMatches(pdf)
+          .map((m) {
+            final s = m.group(0)!;
+            return s
+                .substring(1, s.length - 1)
+                .replaceAll('\\(', '(')
+                .replaceAll('\\)', ')');
+          })
+          .join(' ');
+      final text = flatten(raw);
+
+      expect(report.mealsLogged, 1);
+      expect(text, contains('Nutrition summary'));
+      expect(text, contains('Meals logged'));
+      expect(text, contains('2200'));
     });
   });
 
@@ -593,6 +732,53 @@ void main() {
         scrollable: find.byType(Scrollable),
       );
       expect(find.textContaining('AI was unreachable'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('shows the nutrition section when meals were logged',
+        (tester) async {
+      tester.view.physicalSize = const Size(360, 780);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final usecase = _usecase(
+        profile: _profile,
+        sessions: _history(),
+        meals: [
+          MealEntry(
+            id: 'm1',
+            dateKey: '2026-09-30',
+            name: 'Roti & Dal',
+            calories: 450,
+            mealType: MealType.lunch,
+          ),
+        ],
+        calorieTarget: const MealTarget(dailyCalories: 2200),
+        aiReply: _aiReply,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            generateProgressReportProvider.overrideWithValue(usecase),
+          ],
+          child: MaterialApp(
+            theme: ThemeData(extensions: [AppPalette.dark]),
+            home: const ReportScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Nutrition summary'),
+        300,
+        scrollable: find.byType(Scrollable),
+      );
+      expect(find.text('Nutrition summary'), findsOneWidget);
+      expect(find.text('Avg kcal/day'), findsOneWidget);
+      expect(find.text('2200'), findsOneWidget); // daily target tile
       expect(tester.takeException(), isNull);
     });
   });

@@ -8,8 +8,10 @@ import '../../shared/glass_card.dart';
 class StrikeBadge extends StatelessWidget {
   const StrikeBadge({super.key, this.days = 5});
 
-  /// Consecutive active days displayed in the badge.
-  final int days;
+  /// Consecutive active days displayed in the badge. Null while the count
+  /// is unknown (dashboard loading/error) → the number is replaced by a
+  /// neutral dash so the badge never claims a streak it hasn't loaded.
+  final int? days;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +29,9 @@ class StrikeBadge extends StatelessWidget {
           ),
           const SizedBox(width: 7),
           Text(
-            '$days',
+            // '—' while the streak is unknown: no numeric claim until the
+            // dashboard has actually loaded (a real 0 still renders '0').
+            days?.toString() ?? '—',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,

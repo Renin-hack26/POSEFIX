@@ -57,6 +57,10 @@ class MealEntries extends Table {
   TextColumn get name => text()();
   IntColumn get calories => integer()();
   TextColumn get mealType => text()(); // MealType.name
+
+  /// Meal clock time as epoch millis (device-local: auto tag + log order).
+  /// NULL on rows logged before schema v2.
+  IntColumn get timeMillis => integer().nullable()();
   DateTimeColumn get syncedAt => dateTime().nullable()();
 
   @override

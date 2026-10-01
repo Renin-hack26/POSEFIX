@@ -31,6 +31,7 @@ import '../../domain/repositories/veda_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
 import '../../domain/usecases/ask_veda.dart';
 import '../../domain/usecases/end_session.dart';
+import '../../domain/usecases/estimate_meal_calories.dart';
 import '../../domain/usecases/forgot_password.dart';
 import '../../domain/usecases/generate_progress_report.dart';
 import '../../domain/usecases/generate_weekly_plan.dart';
@@ -267,6 +268,12 @@ final homeDashboardProvider = Provider(
   ),
 );
 
+/// Meal page — free-text description → GROQ calorie estimate
+/// (null on failure → manual entry fallback in the meal page).
+final estimateMealCaloriesProvider = Provider(
+  (ref) => EstimateMealCalories(ref.watch(vedaRepositoryProvider)),
+);
+
 final askVedaProvider = Provider(
   (ref) => AskVeda(
     ref.watch(vedaRepositoryProvider),
@@ -274,6 +281,7 @@ final askVedaProvider = Provider(
     ref.watch(planRepositoryProvider),
     ref.watch(progressRepositoryProvider),
     ref.watch(workoutRepositoryProvider),
+    ref.watch(nutritionRepositoryProvider),
   ),
 );
 
@@ -286,5 +294,6 @@ final generateProgressReportProvider = Provider(
     ref.watch(progressRepositoryProvider),
     ref.watch(workoutRepositoryProvider),
     ref.watch(vedaRepositoryProvider),
+    ref.watch(nutritionRepositoryProvider),
   ),
 );

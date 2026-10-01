@@ -88,6 +88,9 @@ class _FakeNutritionRepo implements NutritionRepository {
   Future<List<MealEntry>> entriesFor(String dateKey) async => [];
 
   @override
+  Future<List<MealEntry>> entriesBetween(DateTime from, DateTime to) async => [];
+
+  @override
   Future<void> addEntry(MealEntry entry) async {}
 
   @override

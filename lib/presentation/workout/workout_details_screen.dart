@@ -328,8 +328,20 @@ class _DetailBody extends StatelessWidget {
     );
   }
 
+  /// Demo GIF of the first block's exercise, when the content pack ships
+  /// one — used to fill the hero. Workout-level `demoVideoAsset` (mp4) is
+  /// deliberately NOT used: none of the `assets/videos/*.mp4` files are
+  /// bundled yet, while the exercise-level GIFs are.
+  String? get _heroDemoGif {
+    if (data.plan.isEmpty) return null;
+    final asset = data.plan.first.exercise?.demoVideoAsset;
+    if (asset == null || asset.isEmpty) return null;
+    return asset.toLowerCase().endsWith('.gif') ? asset : null;
+  }
+
   Widget _buildHero(AppPalette p, Workout workout) {
     final (gradient, icon) = _heroStyleFor(p, workout.category);
+    final demoGif = _heroDemoGif;
     return Stack(
       children: [
         Container(
@@ -338,8 +350,38 @@ class _DetailBody extends StatelessWidget {
             gradient: gradient,
             borderRadius: BorderRadius.circular(24),
           ),
-          child: Center(
-            child: Icon(icon, size: 56, color: Colors.white.withAlpha(235)),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: demoGif == null
+                // No bundled demo → category gradient + glyph (unchanged).
+                ? Center(child: Icon(icon, size: 56, color: Colors.white.withAlpha(235)))
+                // First block's exercise demo fills the hero under a bottom
+                // scrim, so the category pill keeps its contrast over bright
+                // frames; the GIF itself is the visual (the pill carries the
+                // category). Missing/undecodable asset → plain gradient hero.
+                : Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        demoGif,
+                        fit: BoxFit.cover,
+                        gaplessPlayback: true,
+                        errorBuilder: (_, _, _) => Center(
+                          child: Icon(icon, size: 56, color: Colors.white.withAlpha(235)),
+                        ),
+                      ),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomRight,
+                            colors: [Colors.transparent, Colors.black54],
+                            stops: [0.5, 1],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
         Positioned(

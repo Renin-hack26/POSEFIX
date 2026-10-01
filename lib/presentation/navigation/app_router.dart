@@ -8,6 +8,8 @@ import '../auth/reset_password_screen.dart';
 import '../auth/sign_in_screen.dart';
 import '../auth/sign_up_screen.dart';
 import '../home/home_screen.dart';
+import '../nutrition/log_screen.dart';
+import '../nutrition/meal_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../permissions/permission_screen.dart';
 import '../plan/plan_screen.dart';
@@ -95,6 +97,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/report',
         builder: (context, state) => const ReportScreen(),
+      ),
+      GoRoute(
+        path: '/meal',
+        builder: (context, state) => const MealScreen(),
+      ),
+      GoRoute(
+        path: '/log',
+        builder: (context, state) => const LogScreen(),
       ),
 
       // --- 4-tab shell ---

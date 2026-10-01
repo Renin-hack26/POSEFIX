@@ -1,3 +1,5 @@
+import '../../../core/search/library_search.dart';
+import '../../../core/utils/extensions.dart';
 import '../../../domain/entities/meal.dart';
 import '../../../domain/repositories/nutrition_repository.dart';
 import '../datasources/content/content_loader.dart';
@@ -13,14 +15,21 @@ class NutritionRepositoryImpl implements NutritionRepository {
   @override
   Future<List<FoodItem>> searchFoods(String query) async {
     final all = await _content.foods();
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) return all;
-    return all.where((f) => f.name.toLowerCase().contains(q)).toList();
+    if (LibrarySearch.tokenize(query).isEmpty) return all;
+    // Multi-token AND + word-prefix (shared normalizer with the workout
+    // library search) — "chick br" finds "Chicken Breast".
+    return all
+        .where((f) => LibrarySearch.matchesText(f.name, query))
+        .toList();
   }
 
   @override
   Future<List<MealEntry>> entriesFor(String dateKey) =>
       _dao.entriesFor(dateKey);
+
+  @override
+  Future<List<MealEntry>> entriesBetween(DateTime from, DateTime to) =>
+      _dao.entriesBetween(from.dateKey, to.dateKey);
 
   @override
   Future<void> addEntry(MealEntry entry) => _dao.upsertEntry(entry);

@@ -456,11 +456,23 @@ class ExerciseRegistry {
     final exact = _definitions[id];
     if (exact != null) return exact;
     final key = _normalize(id);
+    // Content-pack aliases (normalized content id → FSM id) for names that
+    // share no normalization with their implementation: `chair-dip` is
+    // counted by the `tricep_dip` FSM. Without this the camera session
+    // dead-ended with "Exercise not found" for the 3 workouts using it.
+    final aliased = _aliases[key];
+    if (aliased != null) {
+      final viaAlias = _definitions[aliased];
+      if (viaAlias != null) return viaAlias;
+    }
     for (final entry in _definitions.entries) {
       if (_normalize(entry.key) == key) return entry.value;
     }
     return null;
   }
+
+  /// Normalized content id → FSM id. Keys must be in normalized form.
+  static const Map<String, String> _aliases = {'chairdip': 'tricep_dip'};
 
   static String _normalize(String id) =>
       id.toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');

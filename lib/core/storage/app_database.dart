@@ -35,7 +35,19 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          // v1.1.11 (schema v2): the meal log gained a device-local
+          // time-of-day (auto meal tag + log page ordering).
+          if (from < 2) {
+            await m.addColumn(mealEntries, mealEntries.timeMillis);
+          }
+        },
+      );
 
   /// Wipes account data on sign-out / account switch (privacy boundary —
   /// bundled content is unaffected because it never lives in Drift).

@@ -17,6 +17,7 @@ class NutritionDao extends DatabaseAccessor<AppDatabase>
         name: row.name,
         calories: row.calories,
         mealType: MealType.values.byName(row.mealType),
+        timeMillis: row.timeMillis,
         syncedAt: row.syncedAt,
       );
 
@@ -25,7 +26,25 @@ class NutritionDao extends DatabaseAccessor<AppDatabase>
   Future<List<MealEntry>> entriesFor(String dateKey) async {
     final rows = await (select(mealEntries)
           ..where((t) => t.dateKey.equals(dateKey))
-          ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+          ..orderBy([(t) => OrderingTerm.desc(t.timeMillis)]))
+        .get();
+    return rows.map(_entryFromRow).toList();
+  }
+
+  /// Meals in [fromDateKey, toDateKey] (inclusive) — log page + report.
+  /// Newest first (day desc, then clock time desc; NULL times sort last).
+  Future<List<MealEntry>> entriesBetween(
+    String fromDateKey,
+    String toDateKey,
+  ) async {
+    final rows = await (select(mealEntries)
+          ..where((t) =>
+              t.dateKey.isBiggerOrEqualValue(fromDateKey) &
+              t.dateKey.isSmallerOrEqualValue(toDateKey))
+          ..orderBy([
+            (t) => OrderingTerm.desc(t.dateKey),
+            (t) => OrderingTerm.desc(t.timeMillis),
+          ]))
         .get();
     return rows.map(_entryFromRow).toList();
   }
@@ -37,6 +56,7 @@ class NutritionDao extends DatabaseAccessor<AppDatabase>
         name: entry.name,
         calories: entry.calories,
         mealType: entry.mealType.name,
+        timeMillis: Value(entry.timeMillis),
         syncedAt: Value(entry.syncedAt),
       ));
 

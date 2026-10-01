@@ -298,6 +298,53 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
         ),
         const SizedBox(height: 18),
 
+        // ---- Nutrition summary (meal page; hidden until meals exist) ----
+        if (r.mealsLogged > 0) ...[
+          _sectionTitle(p, 'Nutrition summary'),
+          const SizedBox(height: 8),
+          GlassCard(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Meals logged between '
+                  '${DateFormat('d MMM yyyy').format(r.periodFrom)} – '
+                  '${DateFormat('d MMM yyyy').format(r.periodTo)}',
+                  style: TextStyle(fontSize: 11, color: p.ink3),
+                ),
+                const SizedBox(height: 10),
+                LayoutBuilder(
+                  builder: (context, c) {
+                    final w = (c.maxWidth - 10) / 2;
+                    final tiles = <(String, String)>[
+                      ('${r.mealsLogged}', 'Meals'),
+                      ('${r.avgKcalPerDay}', 'Avg kcal/day'),
+                      ('${r.daysWithMeals}', 'Logged days'),
+                      (
+                        r.calorieTarget == null ? '—' : '${r.calorieTarget}',
+                        'Daily target',
+                      ),
+                    ];
+                    return Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final t in tiles)
+                          SizedBox(
+                            width: w,
+                            child: _tile(p, t.$1, t.$2),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
+
         // ---- Recent sessions ----
         _sectionTitle(p, 'Recent sessions'),
         const SizedBox(height: 8),

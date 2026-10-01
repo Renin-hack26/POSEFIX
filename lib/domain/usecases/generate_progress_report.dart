@@ -2,10 +2,12 @@ import 'dart:math';
 
 import 'package:intl/intl.dart';
 
+import '../../core/utils/extensions.dart';
 import '../entities/chat_message.dart';
 import '../entities/progress_report.dart';
 import '../entities/user_profile.dart';
 import '../entities/workout_session.dart';
+import '../repositories/nutrition_repository.dart';
 import '../repositories/progress_repository.dart';
 import '../repositories/session_repository.dart';
 import '../repositories/user_repository.dart';
@@ -29,6 +31,7 @@ class GenerateProgressReport {
     this._progress,
     this._workouts,
     this._veda,
+    this._nutrition,
   );
 
   final UserRepository _user;
@@ -36,6 +39,7 @@ class GenerateProgressReport {
   final ProgressRepository _progress;
   final WorkoutRepository _workouts;
   final VedaRepository _veda;
+  final NutritionRepository _nutrition;
 
   /// Trailing report window (days).
   static const int windowDays = 30;
@@ -121,6 +125,16 @@ class GenerateProgressReport {
             ))
         .toList();
 
+    // ---- Nutrition: meals logged in the report window (meal page) ----
+    final meals = await _nutrition.entriesBetween(periodFrom, nowDt);
+    final mealsLogged = meals.length;
+    final totalKcal = meals.fold<int>(0, (sum, m) => sum + m.calories);
+    final mealDays = meals.map((m) => m.dateKey).toSet().length;
+    final windowDayCount =
+        max(1, nowDt.startOfDay.difference(periodFrom.startOfDay).inDays + 1);
+    final avgKcalPerDay = mealsLogged == 0 ? 0 : totalKcal ~/ windowDayCount;
+    final calorieTarget = (await _nutrition.target())?.dailyCalories;
+
     final base = ProgressReport(
       generatedAt: nowDt,
       name: (profile?.fullName ?? '').trim().isEmpty
@@ -144,6 +158,10 @@ class GenerateProgressReport {
       avgFormPct: avgFormPct,
       currentStrike: strike?.currentStrike ?? 0,
       recentSessions: rows,
+      mealsLogged: mealsLogged,
+      avgKcalPerDay: avgKcalPerDay,
+      daysWithMeals: mealDays,
+      calorieTarget: calorieTarget,
       suggestions: '',
       aiPowered: false,
     );
@@ -218,6 +236,11 @@ Supportive expert-coach tone. Maximum 220 words in total.''';
           'strike ${r.currentStrike} days')
       ..writeln('Volume: ${r.totalMinutes} min total, ${r.totalReps} reps, '
           'average form accuracy ${r.avgFormPct.round()}%');
+    if (r.mealsLogged > 0) {
+      buf.writeln('Nutrition: ${r.mealsLogged} meals logged across '
+          '${r.daysWithMeals} day(s), averaging ${r.avgKcalPerDay} kcal/day'
+          '${r.calorieTarget == null ? '' : ' (target ${r.calorieTarget} kcal/day)'}');
+    }
     if (r.recentSessions.isNotEmpty) {
       buf.writeln('Recent sessions (newest first):');
       for (final s in r.recentSessions) {
@@ -246,6 +269,11 @@ Supportive expert-coach tone. Maximum 220 words in total.''';
       ..writeln('## Progress highlights')
       ..writeln('- ${r.activeDays} active day${r.activeDays == 1 ? '' : 's'} '
           'and a current consistency strike of ${r.currentStrike} days.');
+    if (r.mealsLogged > 0) {
+      b.writeln('- Nutrition: ${r.mealsLogged} meals across '
+          '${r.daysWithMeals} logging day(s), averaging '
+          '${r.avgKcalPerDay} kcal/day.');
+    }
     if (r.avgFormPct >= 80) {
       b.writeln('- Strong movement quality — form accuracy is holding at '
           '${r.avgFormPct.round()}%.');

@@ -1,6 +1,7 @@
 import '../../core/utils/extensions.dart';
 import '../../core/utils/id_gen.dart';
 import '../entities/chat_message.dart';
+import '../repositories/nutrition_repository.dart';
 import '../repositories/plan_repository.dart';
 import '../repositories/progress_repository.dart';
 import '../repositories/session_repository.dart';
@@ -17,6 +18,7 @@ class AskVeda {
     this._plan,
     this._progress,
     this._workouts,
+    this._nutrition,
   );
 
   final VedaRepository _veda;
@@ -24,6 +26,7 @@ class AskVeda {
   final PlanRepository _plan;
   final ProgressRepository _progress;
   final WorkoutRepository _workouts;
+  final NutritionRepository _nutrition;
 
   static const int _historyTurns = 12;
 
@@ -79,6 +82,9 @@ class AskVeda {
       final w = await _workouts.byId(ps.workoutId);
       if (w != null) todayNames.add(w.name);
     }
+    // Nutrition feed — today's logged meals (meal page).
+    final meals = await _nutrition.entriesFor(now.dateKey);
+    final target = await _nutrition.target();
     return _VedaContext(
       strike: strike?.currentStrike ?? 0,
       weekSessions: week.length,
@@ -93,6 +99,10 @@ class AskVeda {
               .inDays,
       todayWorkouts: todayNames,
       hasPlan: plan != null,
+      todayKcal: meals.fold<int>(0, (sum, e) => sum + e.calories),
+      calorieTarget: target?.dailyCalories,
+      todayMeals:
+          meals.take(4).map((e) => '${e.name} (${e.calories} kcal)').toList(),
     );
   }
 
@@ -106,7 +116,8 @@ User data:
 - Consistency strike: ${c.strike} day(s)
 - This week: ${c.weekSessions} session(s), ${c.weekMinutes} min, ${c.weekReps} reps
 - Last workout: ${c.lastSessionName ?? 'none yet'}${c.lastSessionGapDays == null ? '' : ' (${c.lastSessionGapDays} day(s) ago)'}
-- Today's plan: ${c.todayWorkouts.isEmpty ? (c.hasPlan ? 'rest day' : 'no plan generated yet') : c.todayWorkouts.join(', ')}''';
+- Today's plan: ${c.todayWorkouts.isEmpty ? (c.hasPlan ? 'rest day' : 'no plan generated yet') : c.todayWorkouts.join(', ')}
+- Nutrition today: ${c.todayKcal} kcal logged${c.calorieTarget == null ? '' : ' of ${c.calorieTarget} kcal target'}${c.todayMeals.isEmpty ? ', no meals logged yet' : ', meals: ${c.todayMeals.join(', ')}'}''';
 
   /// Data-grounded offline answer (local retrieval).
   String _localReply(_VedaContext c) {
@@ -114,11 +125,19 @@ User data:
         "I'm offline right now, so I can't think straight - but here's what I know from your data: ");
     if (c.weekSessions == 0 && c.lastSessionName == null) {
       buffer.write(
-          'you haven\'t completed a session yet. Generate your plan in the Plan tab and start with a short one - I\'ll be back online soon.');
+          'you haven\'t completed a session yet. Generate your plan in the Plan tab and start with a short one - I\'ll be back online soon');
+      if (c.todayKcal > 0) {
+        buffer.write(
+            '. Your ${c.todayKcal} kcal logged today still counts, keep the meals coming');
+      }
+      buffer.write('.');
       return buffer.toString();
     }
     buffer.write(
         'this week you trained ${c.weekSessions} time(s) for ${c.weekMinutes} min and ${c.weekReps} reps, with a ${c.strike}-day strike');
+    if (c.todayKcal > 0) {
+      buffer.write(' and ${c.todayKcal} kcal logged today');
+    }
     if (c.lastSessionName != null) {
       buffer.write(', last workout was ${c.lastSessionName}');
     }
@@ -141,6 +160,9 @@ class _VedaContext {
     required this.lastSessionGapDays,
     required this.todayWorkouts,
     required this.hasPlan,
+    required this.todayKcal,
+    required this.calorieTarget,
+    required this.todayMeals,
   });
 
   final int strike;
@@ -151,4 +173,9 @@ class _VedaContext {
   final int? lastSessionGapDays;
   final List<String> todayWorkouts;
   final bool hasPlan;
+
+  /// Today's logged calories + target (meal page) — AI context feed.
+  final int todayKcal;
+  final int? calorieTarget;
+  final List<String> todayMeals;
 }

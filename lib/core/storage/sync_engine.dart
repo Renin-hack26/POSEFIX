@@ -177,8 +177,15 @@ class SyncEngine {
     }
 
     for (final r in await _select('meal_entries')) {
-      final server = mealEntryFromServer(r);
+      var server = mealEntryFromServer(r);
       final local = await _db.nutritionDao.entryById(server.id);
+      // The meal clock time is device-local (never uploaded) — keep the
+      // local value when the mirror row lands.
+      if (local != null &&
+          local.timeMillis != null &&
+          server.timeMillis == null) {
+        server = server.copyWith(timeMillis: local.timeMillis);
+      }
       if (local == null || local.syncedAt != null) {
         await _db.nutritionDao.upsertEntry(server);
       }

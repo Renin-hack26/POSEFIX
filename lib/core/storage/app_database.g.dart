@@ -1298,6 +1298,17 @@ class $MealEntriesTable extends MealEntries
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _timeMillisMeta = const VerificationMeta(
+    'timeMillis',
+  );
+  @override
+  late final GeneratedColumn<int> timeMillis = GeneratedColumn<int>(
+    'time_millis',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _syncedAtMeta = const VerificationMeta(
     'syncedAt',
   );
@@ -1316,6 +1327,7 @@ class $MealEntriesTable extends MealEntries
     name,
     calories,
     mealType,
+    timeMillis,
     syncedAt,
   ];
   @override
@@ -1367,6 +1379,12 @@ class $MealEntriesTable extends MealEntries
     } else if (isInserting) {
       context.missing(_mealTypeMeta);
     }
+    if (data.containsKey('time_millis')) {
+      context.handle(
+        _timeMillisMeta,
+        timeMillis.isAcceptableOrUnknown(data['time_millis']!, _timeMillisMeta),
+      );
+    }
     if (data.containsKey('synced_at')) {
       context.handle(
         _syncedAtMeta,
@@ -1402,6 +1420,10 @@ class $MealEntriesTable extends MealEntries
         DriftSqlType.string,
         data['${effectivePrefix}meal_type'],
       )!,
+      timeMillis: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}time_millis'],
+      ),
       syncedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}synced_at'],
@@ -1421,6 +1443,10 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
   final String name;
   final int calories;
   final String mealType;
+
+  /// Meal clock time as epoch millis (device-local: auto tag + log order).
+  /// NULL on rows logged before schema v2.
+  final int? timeMillis;
   final DateTime? syncedAt;
   const MealEntryRow({
     required this.id,
@@ -1428,6 +1454,7 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
     required this.name,
     required this.calories,
     required this.mealType,
+    this.timeMillis,
     this.syncedAt,
   });
   @override
@@ -1438,6 +1465,9 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
     map['name'] = Variable<String>(name);
     map['calories'] = Variable<int>(calories);
     map['meal_type'] = Variable<String>(mealType);
+    if (!nullToAbsent || timeMillis != null) {
+      map['time_millis'] = Variable<int>(timeMillis);
+    }
     if (!nullToAbsent || syncedAt != null) {
       map['synced_at'] = Variable<DateTime>(syncedAt);
     }
@@ -1451,6 +1481,9 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
       name: Value(name),
       calories: Value(calories),
       mealType: Value(mealType),
+      timeMillis: timeMillis == null && nullToAbsent
+          ? const Value.absent()
+          : Value(timeMillis),
       syncedAt: syncedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(syncedAt),
@@ -1468,6 +1501,7 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
       name: serializer.fromJson<String>(json['name']),
       calories: serializer.fromJson<int>(json['calories']),
       mealType: serializer.fromJson<String>(json['mealType']),
+      timeMillis: serializer.fromJson<int?>(json['timeMillis']),
       syncedAt: serializer.fromJson<DateTime?>(json['syncedAt']),
     );
   }
@@ -1480,6 +1514,7 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
       'name': serializer.toJson<String>(name),
       'calories': serializer.toJson<int>(calories),
       'mealType': serializer.toJson<String>(mealType),
+      'timeMillis': serializer.toJson<int?>(timeMillis),
       'syncedAt': serializer.toJson<DateTime?>(syncedAt),
     };
   }
@@ -1490,6 +1525,7 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
     String? name,
     int? calories,
     String? mealType,
+    Value<int?> timeMillis = const Value.absent(),
     Value<DateTime?> syncedAt = const Value.absent(),
   }) => MealEntryRow(
     id: id ?? this.id,
@@ -1497,6 +1533,7 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
     name: name ?? this.name,
     calories: calories ?? this.calories,
     mealType: mealType ?? this.mealType,
+    timeMillis: timeMillis.present ? timeMillis.value : this.timeMillis,
     syncedAt: syncedAt.present ? syncedAt.value : this.syncedAt,
   );
   MealEntryRow copyWithCompanion(MealEntriesCompanion data) {
@@ -1506,6 +1543,9 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
       name: data.name.present ? data.name.value : this.name,
       calories: data.calories.present ? data.calories.value : this.calories,
       mealType: data.mealType.present ? data.mealType.value : this.mealType,
+      timeMillis: data.timeMillis.present
+          ? data.timeMillis.value
+          : this.timeMillis,
       syncedAt: data.syncedAt.present ? data.syncedAt.value : this.syncedAt,
     );
   }
@@ -1518,6 +1558,7 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
           ..write('name: $name, ')
           ..write('calories: $calories, ')
           ..write('mealType: $mealType, ')
+          ..write('timeMillis: $timeMillis, ')
           ..write('syncedAt: $syncedAt')
           ..write(')'))
         .toString();
@@ -1525,7 +1566,7 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
 
   @override
   int get hashCode =>
-      Object.hash(id, dateKey, name, calories, mealType, syncedAt);
+      Object.hash(id, dateKey, name, calories, mealType, timeMillis, syncedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1535,6 +1576,7 @@ class MealEntryRow extends DataClass implements Insertable<MealEntryRow> {
           other.name == this.name &&
           other.calories == this.calories &&
           other.mealType == this.mealType &&
+          other.timeMillis == this.timeMillis &&
           other.syncedAt == this.syncedAt);
 }
 
@@ -1544,6 +1586,7 @@ class MealEntriesCompanion extends UpdateCompanion<MealEntryRow> {
   final Value<String> name;
   final Value<int> calories;
   final Value<String> mealType;
+  final Value<int?> timeMillis;
   final Value<DateTime?> syncedAt;
   final Value<int> rowid;
   const MealEntriesCompanion({
@@ -1552,6 +1595,7 @@ class MealEntriesCompanion extends UpdateCompanion<MealEntryRow> {
     this.name = const Value.absent(),
     this.calories = const Value.absent(),
     this.mealType = const Value.absent(),
+    this.timeMillis = const Value.absent(),
     this.syncedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1561,6 +1605,7 @@ class MealEntriesCompanion extends UpdateCompanion<MealEntryRow> {
     required String name,
     required int calories,
     required String mealType,
+    this.timeMillis = const Value.absent(),
     this.syncedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1574,6 +1619,7 @@ class MealEntriesCompanion extends UpdateCompanion<MealEntryRow> {
     Expression<String>? name,
     Expression<int>? calories,
     Expression<String>? mealType,
+    Expression<int>? timeMillis,
     Expression<DateTime>? syncedAt,
     Expression<int>? rowid,
   }) {
@@ -1583,6 +1629,7 @@ class MealEntriesCompanion extends UpdateCompanion<MealEntryRow> {
       if (name != null) 'name': name,
       if (calories != null) 'calories': calories,
       if (mealType != null) 'meal_type': mealType,
+      if (timeMillis != null) 'time_millis': timeMillis,
       if (syncedAt != null) 'synced_at': syncedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1594,6 +1641,7 @@ class MealEntriesCompanion extends UpdateCompanion<MealEntryRow> {
     Value<String>? name,
     Value<int>? calories,
     Value<String>? mealType,
+    Value<int?>? timeMillis,
     Value<DateTime?>? syncedAt,
     Value<int>? rowid,
   }) {
@@ -1603,6 +1651,7 @@ class MealEntriesCompanion extends UpdateCompanion<MealEntryRow> {
       name: name ?? this.name,
       calories: calories ?? this.calories,
       mealType: mealType ?? this.mealType,
+      timeMillis: timeMillis ?? this.timeMillis,
       syncedAt: syncedAt ?? this.syncedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1626,6 +1675,9 @@ class MealEntriesCompanion extends UpdateCompanion<MealEntryRow> {
     if (mealType.present) {
       map['meal_type'] = Variable<String>(mealType.value);
     }
+    if (timeMillis.present) {
+      map['time_millis'] = Variable<int>(timeMillis.value);
+    }
     if (syncedAt.present) {
       map['synced_at'] = Variable<DateTime>(syncedAt.value);
     }
@@ -1643,6 +1695,7 @@ class MealEntriesCompanion extends UpdateCompanion<MealEntryRow> {
           ..write('name: $name, ')
           ..write('calories: $calories, ')
           ..write('mealType: $mealType, ')
+          ..write('timeMillis: $timeMillis, ')
           ..write('syncedAt: $syncedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -4004,6 +4057,7 @@ typedef $$MealEntriesTableCreateCompanionBuilder =
       required String name,
       required int calories,
       required String mealType,
+      Value<int?> timeMillis,
       Value<DateTime?> syncedAt,
       Value<int> rowid,
     });
@@ -4014,6 +4068,7 @@ typedef $$MealEntriesTableUpdateCompanionBuilder =
       Value<String> name,
       Value<int> calories,
       Value<String> mealType,
+      Value<int?> timeMillis,
       Value<DateTime?> syncedAt,
       Value<int> rowid,
     });
@@ -4049,6 +4104,11 @@ class $$MealEntriesTableFilterComposer
 
   ColumnFilters<String> get mealType => $composableBuilder(
     column: $table.mealType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get timeMillis => $composableBuilder(
+    column: $table.timeMillis,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4092,6 +4152,11 @@ class $$MealEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get timeMillis => $composableBuilder(
+    column: $table.timeMillis,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get syncedAt => $composableBuilder(
     column: $table.syncedAt,
     builder: (column) => ColumnOrderings(column),
@@ -4121,6 +4186,11 @@ class $$MealEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get mealType =>
       $composableBuilder(column: $table.mealType, builder: (column) => column);
+
+  GeneratedColumn<int> get timeMillis => $composableBuilder(
+    column: $table.timeMillis,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get syncedAt =>
       $composableBuilder(column: $table.syncedAt, builder: (column) => column);
@@ -4162,6 +4232,7 @@ class $$MealEntriesTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<int> calories = const Value.absent(),
                 Value<String> mealType = const Value.absent(),
+                Value<int?> timeMillis = const Value.absent(),
                 Value<DateTime?> syncedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MealEntriesCompanion(
@@ -4170,6 +4241,7 @@ class $$MealEntriesTableTableManager
                 name: name,
                 calories: calories,
                 mealType: mealType,
+                timeMillis: timeMillis,
                 syncedAt: syncedAt,
                 rowid: rowid,
               ),
@@ -4180,6 +4252,7 @@ class $$MealEntriesTableTableManager
                 required String name,
                 required int calories,
                 required String mealType,
+                Value<int?> timeMillis = const Value.absent(),
                 Value<DateTime?> syncedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MealEntriesCompanion.insert(
@@ -4188,6 +4261,7 @@ class $$MealEntriesTableTableManager
                 name: name,
                 calories: calories,
                 mealType: mealType,
+                timeMillis: timeMillis,
                 syncedAt: syncedAt,
                 rowid: rowid,
               ),

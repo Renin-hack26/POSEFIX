@@ -243,7 +243,7 @@ class _ProbeLibraryCard extends StatelessWidget {
     final muscle = exercise.primaryMuscles.isNotEmpty
         ? exercise.primaryMuscles.first.label
         : 'General';
-    return Container(
+    final card = Container(
       width: 130,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -306,6 +306,17 @@ class _ProbeLibraryCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+    // Material + InkWell make the card tappable; both paint nothing while
+    // the card is at rest, so the rendered pixels stay identical.
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () {},
+        child: card,
       ),
     );
   }

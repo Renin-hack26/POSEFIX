@@ -182,6 +182,22 @@ Future<Uint8List> buildProgressReportPdf(
         ),
         pw.SizedBox(height: 16),
 
+        // ---- Nutrition summary (only when meals were logged) ----
+        if (report.mealsLogged > 0) ...[
+          _sectionTitle('Nutrition summary'),
+          pw.SizedBox(height: 8),
+          _tileRow([
+            ('${report.mealsLogged}', 'Meals logged'),
+            ('${report.avgKcalPerDay}', 'Avg kcal/day'),
+            ('${report.daysWithMeals}', 'Logged days'),
+            if (report.calorieTarget != null)
+              ('${report.calorieTarget}', 'Daily target')
+            else
+              ('-', 'Daily target'),
+          ]),
+          pw.SizedBox(height: 16),
+        ],
+
         // ---- Recent sessions ----
         _sectionTitle('Recent sessions'),
         pw.SizedBox(height: 8),

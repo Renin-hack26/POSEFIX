@@ -1,0 +1,85 @@
+# FixPose — Consolidated TODO (v1.1.11 work batch)
+
+> Source: user requests 2026-10-01 (post-v1.1.10). One row per item.
+> Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/needs user input
+> Process: background subagents per workstream; central gates (analyze + full test) + commit owned by coordinator.
+
+## WS1 — Notifications & reminders (background-safe) ✅ (agent complete)
+| # | Item | Status |
+|---|---|---|
+| 1.1 | AndroidManifest: `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `WAKE_LOCK` + flutter_local_notifications `ScheduledNotificationReceiver` + `ScheduledNotificationBootReceiver` (root cause: notifications never show when app closed / lost on reboot) | ✅ |
+| 1.2 | Timezone bug: engine hardcodes UTC (`notification_engine.dart:29`) → use device tz via `flutter_timezone` | ✅ |
+| 1.3 | Exact-alarm capability check with inexact fallback (Android 12+ doze/OEM) | ✅ |
+| 1.4 | Notification tap deep link: `workout:<id>` payload → route to plan/workout (incl. cold start via `getNotificationAppLaunchDetails`) | ✅ |
+| 1.5 | **Background worker** (`workmanager` periodic task): self-heal reminder scheduling from prefs while app closed; re-arm idempotently | ✅ |
+| 1.6 | Unit tests for daily-occurrence/next-schedule logic + `flutter analyze` clean | ✅ (14 tests) |
+
+## WS2 — Camera vision session: layout, rounds, pops, HUD ✅ grounded (explorer A) — launch after WS4 frees vision_session_screen
+| # | Item | Status |
+|---|---|---|
+| 2.1 | Layout per `sample/index.html` §10: HUD **top-left** (REPS/ROUND/TIME — orphaned `VisionHud` exists), posture avatar **top-right** (orphaned `PostureAvatar` exists), cue bar **fixed bottom** (no stacked scrollable column = the "scattering"), controls **bottom-center** (flip · pause · end); frame guide via orphaned `FramingGuide` | ⬜ |
+| 2.2 | Feedback = single fixed cue slot with warn/ok color states (sample styles.css) — never stacked/scattered | ⬜ |
+| 2.3 | Rep counter: `12/13` target (from block reps), **Round 2/3**, elapsed TIME, rest-period countdown + "ready for next round"; consume `PlanSession.roundsOverride`; write `SessionExercise.roundsCompleted/repsPerRound/roundTimesSec` (model exists, always 0 today) | ⬜ |
+| 2.4 | **Pre-session editor** (in-screen sheet): rounds & reps editable before start | ⬜ |
+| 2.5 | Wrong pose: **0.8 s cross-symbol popup + buzz** (Flutter `HapticFeedback` + existing Sfx — no new dep), severity-colored cue card | ⬜ |
+| 2.6 | Round complete: **tick popup** (+ wired `SessionAudioCues.onSet/onRestStart/onRestEnd` — hooks exist, never called); all rounds: **congrats popup w/ log + Next** (`onMilestone` too) | ⬜ |
+| 2.7 | Bottom bar: **Pause / Cancel / End** — Cancel = confirm + discard (`clearActive`, no credit), End = existing complete→summary, Pause = instant w/ banner | ⬜ |
+| 2.8 | **Loading popup before session** (await SoundEngine ready + FSM resolve + analyzer start + camera, with step labels) | ⬜ |
+| 2.9 | Skip-count fix: emit `repRejectedReason` from BrainEngine when trigger commits but ROM/timing gate fails → coach bar "not counted" + haptic (never silent) | ⬜ |
+| 2.10 | Auto-calibration: run `CalibrationConfig` (enabled on 6 exercises, never read today) as pre-session ROM-learning phase; sync with workout | ⬜ |
+| 2.11 | Voice enrichment: wire milestone cues (every 5 reps), round/rest announcements, PLANNING §5.3 | ⬜ |
+| 2.12 | Auto-pause on app background (`didChangeAppLifecycleState`, PLANNING 223); elapsed timer | ⬜ |
+
+## WS3 — Nutrition: meal page + log page + AI calorie entry ✅ (coordinator; entry links pending WS4)
+| # | Item | Status |
+|---|---|---|
+| 3.1 | **Meal page**: free-text description ("2 rotis and dal") → AI determines calories (`EstimateMealCalories` via VEDA transport, strict JSON contract, null → manual entry fallback) | ✅ |
+| 3.2 | User picks date+time (default now); **meal tag auto-determined by time of day** (breakfast 5–10 / lunch 11–15 / dinner 17–21 / else snack), overridable via chips | ✅ |
+| 3.3 | **Log page**: chronological history of workouts + meals, grouped by day with per-day kcal/session totals (trailing 30 d) | ✅ |
+| 3.4 | Daily calorie totals surfaced on the meal page (eaten / target + progress bar) | ✅ |
+| 3.5 | Tests: AI estimate contract (6), tag windows (5), meal screen flows (5), log screen (2), report nutrition (entity+prompt+fallback+PDF+screen) | ✅ |
+| 3.6 | Data: `MealEntry.timeMillis` device-local column, schema v1→2 drift migration (`onUpgrade` `addColumn`), log-ordered by time; sync download preserves local time (payload untouched) | ✅ |
+| 3.7 | Routes `/meal` + `/log` reserved (1 slot recipe) + DI provider; entry links: Plan "Log meal → /meal", History "View all → /log" (inline expander superseded by the log page) + header cross-links meal ↔ log | ✅ |
+| 3.8 | Wiring beyond the pages (user request): VEDA AI context feed gets today's kcal/target/meals (chat + local fallback); report gains nutrition (entity fields, AI prompt, rule-based bullet, PDF section, on-screen section — shown only when meals exist) | ✅ |
+
+## WS4 — Strike, library cards, plan slots ✅ grounded (explorer B) · 🔄 agent running
+| # | Item | Status |
+|---|---|---|
+| 4.1 | Strike starts from **1**: ROOT CAUSE FOUND — `EndSession` usecase is dead code; `_endSession()` bypasses strike credit → wire it (plus no fake "0 day streak" on Home loading/error) | 🔄 |
+| 4.2 | Exercise-library **slot cards clickable** → `_LibraryCard` is a bare Container (no gesture) → Material+InkWell → detail route | 🔄 |
+| 4.3 | Plan **slots stable**: `_DaySessionsSlot` height changes per day → rest-day floor height + AnimatedSize + uniform card dimensions | 🔄 |
+
+## WS5 — Content: workouts data + demo preview ✅ (agent complete)
+| # | Item | Status |
+|---|---|---|
+| 5.1 | Content integrity test (blocks→exercises→FSM); repair ambiguous refs; report gaps (44 workouts, 40 exercises; 4 exercises lack GIF; assets/videos/ empty — 44 dead mp4 refs, never rendered) | ✅ (6 tests, no repairs needed) |
+| 5.2 | Demo preview fixes: `instruction_video_screen` height jumps (202↔220↔video) + build-time flag mutation + caption layer crossing; mapper null-tolerance; workout-details hero now shows first block's GIF | ✅ |
+
+## WS6 — Engine coverage + vision/skeleton robustness 🔄 partially done
+| # | Item | Status |
+|---|---|---|
+| 6.1 | FSM coverage: **`chair-dip` had no engine → camera dead-end in 3 workouts** → alias to `tricep_dip` + `test/unit/exercise_registry_test.dart` (all 40 exercises + 236 block refs resolve) | ✅ |
+| 6.2 | Skeleton overlay refinement: form-based green/red coloring (FR-5), wire quality display (folded into WS2 scope) | ⬜ WS2 |
+| 6.3 | Any-angle pose robustness: thresholds/normalization pass (folded into WS2 scope; full model training = P9 user-delivered model — ⏸) | ⬜ WS2 |
+
+## WS7 — Smart library search (user request 2026-10-01) ✅ (agent complete: 24 tests, analyze clean; plan-screen search box deferred to integration)
+| # | Item | Status |
+|---|---|---|
+| 7.1 | Unified `LibrarySearch` (domain, pure + unit-tested): score workouts **and exercises** by — workout/exercise **name** (word + prefix), **category / goal / focusMuscles / tags / level**, **exercise names inside `blocks`** ("push" finds every workout containing push-ups), description keywords | ⬜ |
+| 7.2 | **Related-word expansion**: synonym map (legs→quads/hamstrings/glutes/squat, abs/core→plank/crunch, chest→push-up/bench, cardio→fat burn/HIIT/jump, back→row/deadlift, shoulders→press/lateral, arms→curl/tricep, stretch→mobility/flexibility…) expanded at query time; multi-token queries = AND across tokens | ⬜ |
+| 7.3 | Typo tolerance: normalized (case/separator) equality + prefix match + edit-distance ≤1 for tokens ≥5 chars | ⬜ |
+| 7.4 | Wire into `WorkoutScreen._filterWorkouts` (today: **name `contains` only**, workout_screen.dart:282-285), plan `_LibrarySection` (today: no search), empty-state copy suggests related terms | ⬜ |
+| 7.5 | Tests: unit (synonyms, multi-token, name-prefix, block-exercise match, no-match) + widget (search field filters with related word) | ⬜ |
+
+## WS8 — Engine rules + feedback vocabulary + angle readouts ❌ cancelled (user 2026-10-01: "NO NEW IMPLEMENTATION — fix what you had made till now"; re-plan for v1.1.12)
+| # | Item | Status |
+|---|---|---|
+| 8.1 | **Feed ALL exercise rules to the pose engine** (user: "POSE ENGINE"): audit every rule surface per exercise — FSM definition (stateOrder/CounterRule/FeedbackRule), catalog thresholds (ROM/angle gates, pixel→normalized notes), `CalibrationConfig` (enabled on 6, never read → wire), bilateral config, timing/hold rules — and wire whatever `BrainEngine`/`PoseAnalyzer` doesn't consume today. Report the gap list. | ⬜ |
+| 8.2 | **Bilateral rep counting → one count per rep-cycle** (user: "USE THE BEST"): hammer curl is the only `bilateral: true` exercise and counts each arm separately (+2 per curl) → count 1 per completed cycle so block targets ("12 reps") mean what they say and inflated/false counts die. `brain_engine.dart` bilateral branch (~:656/:917). | ⬜ |
+| 8.3 | **Feedback vocabulary: 50+ lines** (user: "MORE ACTION 50+ LINE … SITUATION IN DETAIL INSTRUCTIONS HANDLE ALL CASES"): ONE central vocabulary module — every coaching line tagged by situation + action (display / speak / speak-urgent / haptic), covering: form warnings by severity, rep-rejection reasons (2.9), round complete/last-round, rest countdown + ready, milestones (every 5 reps), encouragement, safety, framing, session start/pause/cancel/end, calorie/round summaries. Consumed by the cue slot (on-screen) AND `SoundEngine.speakCue`/`speakUrgent` + `SessionAudioCues` so display and voice never diverge; replaces scattered strings (exercise `FeedbackRule.message`/`audio_cue` map into it). | ⬜ |
+| 8.4 | **Angle readouts on cam screen, bottom-left + bottom-right, translucent** (user: proper place for angle calculation, translucent style): primary/joint angle one side, L/R (bilateral) or secondary angle the other — fed from `PoseAnalyzer`/`BrainEngine` live values, styled like the sample's translucent HUD (low-opacity glass, small type, non-competing with cue bar). | ⬜ |
+| 8.5 | Tests: engine rule-feeding (each rule surface consumed), one-count-per-cycle (bilateral sequence), vocabulary integrity (≥50 lines, all situations covered, no empty/dupe lines, every engine event maps to a line). | ⬜ |
+
+## Cross-cutting
+- Gates per workstream: `flutter analyze` 0 issues · `flutter test` all green · no commits by subagents (coordinator gates + commits).
+- Releases: staged APKs for on-device testing (v1.1.11+…).
