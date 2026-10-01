@@ -23,9 +23,14 @@ releases/v<version>/FixPose-v<version>-<buildtype>.apk
 
 | File | versionName+Code | Type | Size | Date |
 |---|---|---|---|---|
-| `FixPose-v1.0.1-debug.apk` | 1.0.1+2 | debug | 278.5 MB | 2026-09-30 |
-| `FixPose-v1.1.0-debug.apk` | 1.1.0+3 | debug | 233.8 MB | 2026-10-01 |
+| `FixPose-v1.1.6-debug.apk` | 1.1.6+7 | debug | 233.8 MB | 2026-10-01 |
+| `FixPose-v1.1.5-debug.apk` | 1.1.5+6 | debug | 233.8 MB | 2026-10-01 |
+| `FixPose-v1.1.4-debug.apk` | 1.1.4+5 | debug | 272.2 MB | 2026-10-01 |
+| `FixPose-v1.1.3-debug.apk` | 1.1.3+4 | debug | 272.2 MB | 2026-10-01 |
+| `FixPose-v1.1.2-debug.apk` | 1.1.2+3 | debug | 272.2 MB | 2026-10-01 |
 | `FixPose-v1.1.1-debug.apk` | 1.1.1+4 | debug | 233.8 MB | 2026-10-01 |
+| `FixPose-v1.1.0-debug.apk` | 1.1.0+3 | debug | 233.8 MB | 2026-10-01 |
+| `FixPose-v1.0.1-debug.apk` | 1.0.1+2 | debug | 278.5 MB | 2026-09-30 |
 
 ## Build commands (repo root)
 

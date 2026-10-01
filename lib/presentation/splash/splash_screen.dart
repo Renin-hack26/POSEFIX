@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/di/app_dependencies.dart';
 import '../../core/permissions/permission_flow.dart';
 import '../../core/theme/app_theme.dart';
-import '../shared/anim/fade_slide_in.dart';
 import '../shared/app_logo.dart';
 import '../shared/grid_background.dart';
 
@@ -77,31 +76,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const FadeSlideIn(
-                  child: AppLogo(size: 88, radius: 28, iconSize: 44),
-                ),
+                const AppLogo(size: 88, radius: 28, iconSize: 44),
                 const SizedBox(height: 18),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 120),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'FixPose',
-                        style: TextStyle(
-                          fontSize: 27,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.8,
-                          color: p.ink,
-                        ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'FixPose',
+                      style: TextStyle(
+                        fontSize: 27,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.8,
+                        color: p.ink,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Your on-device form coach',
-                        style: TextStyle(fontSize: 14, color: p.ink2),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Your on-device form coach',
+                      style: TextStyle(fontSize: 14, color: p.ink2),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 18),
                 SizedBox(

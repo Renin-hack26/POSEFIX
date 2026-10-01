@@ -7,7 +7,6 @@ import '../../core/di/app_dependencies.dart';
 import '../../core/pose/exercise_definition.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise.dart';
-import '../shared/anim/skeleton.dart';
 import '../shared/glass_card.dart';
 import '../shared/grid_background.dart';
 import '../shared/primary_button.dart';
@@ -251,47 +250,7 @@ class _InstructionVideoScreenState extends ConsumerState<InstructionVideoScreen>
   }
 
   Widget _buildSkeleton(AppPalette p) {
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 26),
-      children: [
-        const Shimmer(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(width: 20),
-              SkeletonBox(width: 42, height: 42, radius: 14),
-              Expanded(
-                child: Center(child: SkeletonBox(width: 160, height: 24, radius: 999)),
-              ),
-            ],
-          ),
-        ),
-        const Shimmer(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: 14),
-                SkeletonBox(height: 220, radius: 24),
-                SizedBox(height: 20),
-                SkeletonText(width: 140),
-                SizedBox(height: 4),
-                SkeletonText(width: 200),
-                SizedBox(height: 20),
-                SkeletonBox(height: 56, radius: 18),
-                SizedBox(height: 10),
-                SkeletonBox(height: 56, radius: 18),
-                SizedBox(height: 10),
-                SkeletonBox(height: 56, radius: 18),
-                SizedBox(height: 10),
-                SkeletonBox(height: 56, radius: 18),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
+    return const Center(child: CircularProgressIndicator());
   }
 
   Widget _buildNotFound(AppPalette p) {

@@ -6,7 +6,6 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/di/app_dependencies.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/workout_session.dart';
-import '../shared/anim/skeleton.dart';
 import '../shared/glass_card.dart';
 import '../shared/grid_background.dart';
 import '../shared/primary_button.dart';
@@ -150,77 +149,7 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
   }
 
   Widget _buildSkeleton(AppPalette p) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 30, 18, 26),
-      children: [
-        const Shimmer(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SkeletonBox(width: 74, height: 74, radius: 37),
-              SizedBox(height: 14),
-              SkeletonText(width: 180),
-              SizedBox(height: 5),
-              SkeletonText(width: 140),
-              SizedBox(height: 14),
-              SkeletonBox(width: double.infinity, height: 28, radius: 8),
-              SizedBox(height: 20),
-            ],
-          ),
-        ),
-        const Shimmer(
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(child: SkeletonBox(height: 80, radius: 20)),
-                  SizedBox(width: 10),
-                  Expanded(child: SkeletonBox(height: 80, radius: 20)),
-                ],
-              ),
-              SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(child: SkeletonBox(height: 80, radius: 20)),
-                  SizedBox(width: 10),
-                  Expanded(child: SkeletonBox(height: 80, radius: 20)),
-                ],
-              ),
-              SizedBox(height: 10),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Shimmer(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SkeletonText(width: 80),
-              SizedBox(height: 10),
-              SkeletonBox(height: 70, radius: 18),
-              SizedBox(height: 10),
-              SkeletonBox(height: 70, radius: 18),
-              SizedBox(height: 10),
-              SkeletonBox(height: 70, radius: 18),
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Shimmer(
-          child: SkeletonBox(height: 80, radius: 18),
-        ),
-        const SizedBox(height: 20),
-        const Shimmer(
-          child: Row(
-            children: [
-              Expanded(flex: 10, child: SkeletonBox(height: 48, radius: 999)),
-              SizedBox(width: 10),
-              Expanded(flex: 14, child: SkeletonBox(height: 48, radius: 999)),
-            ],
-          ),
-        ),
-      ],
-    );
+    return const Center(child: CircularProgressIndicator());
   }
 
   Widget _buildError(AppPalette p) {

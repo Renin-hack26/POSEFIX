@@ -9,7 +9,6 @@ import '../../domain/entities/home_dashboard.dart';
 import '../../domain/entities/user_profile.dart';
 import '../../domain/entities/workout.dart';
 import '../../domain/entities/workout_session.dart';
-import '../shared/anim/skeleton.dart';
 import '../shared/app_logo.dart';
 import '../shared/glass_card.dart';
 import '../shared/grid_background.dart';
@@ -452,73 +451,6 @@ class _HomeSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Shimmer(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SkeletonText(width: 96),
-          SizedBox(height: 6),
-          SkeletonBox(width: 164, height: 26, radius: 8),
-          SizedBox(height: 8),
-          SkeletonText(width: 236),
-          SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: GlassCard(
-              weak: true,
-              padding: EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SkeletonBox(width: 96, height: 24, radius: 12),
-                  SizedBox(height: 10),
-                  SkeletonBox(width: 184, height: 20, radius: 8),
-                  SizedBox(height: 6),
-                  SkeletonText(width: 212),
-                  SizedBox(height: 13),
-                  SkeletonBox(width: 132, height: 40, radius: 999),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(height: 20),
-          SkeletonBox(width: 150, height: 20, radius: 6),
-          SizedBox(height: 10),
-          Row(
-            children: [
-              _SkeletonSuggestionCard(),
-              SizedBox(width: 10),
-              _SkeletonSuggestionCard(),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One suggestion-card placeholder: media block + two text lines.
-class _SkeletonSuggestionCard extends StatelessWidget {
-  const _SkeletonSuggestionCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 172,
-      child: GlassCard(
-        weak: true,
-        padding: EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SkeletonBox(height: 84, radius: 15),
-            SizedBox(height: 9),
-            SkeletonText(width: 112, height: 14),
-            SizedBox(height: 6),
-            SkeletonText(width: 140),
-          ],
-        ),
-      ),
-    );
+    return const Center(child: CircularProgressIndicator());
   }
 }

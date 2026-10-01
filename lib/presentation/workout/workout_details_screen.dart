@@ -7,7 +7,6 @@ import '../../core/storage/hive_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise.dart';
 import '../../domain/entities/workout.dart';
-import '../shared/anim/skeleton.dart';
 import '../shared/app_back_button.dart';
 import '../shared/glass_card.dart';
 import '../shared/grid_background.dart';
@@ -823,117 +822,6 @@ class _DetailSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Shimmer(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Hero
-          SkeletonBox(height: 190, radius: 24),
-          SizedBox(height: 20),
-          SkeletonText(width: 180, height: 26),
-          SizedBox(height: 8),
-          SkeletonText(width: 280, height: 18),
-          SizedBox(height: 20),
-          // Stats card
-          GlassCard(
-            weak: true,
-            padding: EdgeInsets.all(18),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _SkeletonStat(),
-                _SkeletonStat(),
-                _SkeletonStat(),
-                _SkeletonStat(),
-              ],
-            ),
-          ),
-          SizedBox(height: 20),
-          // Start button
-          SkeletonBox(height: 56, radius: 999),
-          SizedBox(height: 20),
-          // Plan header
-          SkeletonBox(width: 130, height: 20, radius: 6),
-          SizedBox(height: 10),
-          // Plan rows
-          _SkeletonPlanRow(),
-          SizedBox(height: 10),
-          _SkeletonPlanRow(),
-          SizedBox(height: 10),
-          _SkeletonPlanRow(),
-          SizedBox(height: 10),
-          _SkeletonPlanRow(),
-          SizedBox(height: 4),
-          // Muscles card
-          GlassCard(
-            weak: true,
-            padding: EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SkeletonText(width: 110, height: 16),
-                SizedBox(height: 12),
-                Row(
-                  children: [
-                    SkeletonBox(width: 70, height: 28, radius: 999),
-                    SizedBox(width: 8),
-                    SkeletonBox(width: 60, height: 28, radius: 999),
-                    SizedBox(width: 8),
-                    SkeletonBox(width: 65, height: 28, radius: 999),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SkeletonStat extends StatelessWidget {
-  const _SkeletonStat();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SkeletonBox(width: 40, height: 16, radius: 4),
-        SizedBox(height: 4),
-        SkeletonText(width: 48),
-      ],
-    );
-  }
-}
-
-class _SkeletonPlanRow extends StatelessWidget {
-  const _SkeletonPlanRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      weak: true,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      radius: 18,
-      child: const Row(
-        children: [
-          SkeletonBox(width: 26, height: 26, radius: 9),
-          SizedBox(width: 12),
-          SkeletonBox(width: 44, height: 44, radius: 13),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SkeletonText(width: 120, height: 14),
-                SizedBox(height: 6),
-                SkeletonText(width: 160),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return const Center(child: CircularProgressIndicator());
   }
 }

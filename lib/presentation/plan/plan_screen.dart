@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -11,26 +11,25 @@ import '../../domain/entities/meal.dart';
 import '../../domain/entities/training_plan.dart';
 import '../../domain/entities/workout.dart';
 import '../../domain/entities/workout_session.dart';
-import '../shared/anim/skeleton.dart';
 import '../shared/glass_card.dart';
 import '../shared/grid_background.dart';
 import '../shared/primary_button.dart';
 import '../shared/section_header.dart';
 import '../shared/status_pill.dart';
 
-/// 12 — Plan tab (sample/index.html): week header + navigation, quick chips,
+/// 12 � Plan tab (sample/index.html): week header + navigation, quick chips,
 /// day strip, next session with Start, exercise library, meals and history.
 ///
 /// Data (all real, no demo constants):
-/// * week strip + next session ← [PlanRepository] current plan
+/// * week strip + next session ? [PlanRepository] current plan
 ///   (+ [WorkoutRepository] names for the session card),
-/// * library preview ← [ExerciseRepository] catalog (first 3),
-/// * meals ← [NutritionRepository] entriesFor(today) + target,
-/// * history ← [SessionRepository] recent sessions (expandable, rows open
+/// * library preview ? [ExerciseRepository] catalog (first 3),
+/// * meals ? [NutritionRepository] entriesFor(today) + target,
+/// * history ? [SessionRepository] recent sessions (expandable, rows open
 ///   the session summary).
 ///
 /// Tapping a scheduled day (or the calendar icon in the week header) opens
-/// the session editor sheet — time, status and rounds persist via
+/// the session editor sheet � time, status and rounds persist via
 /// [PlanRepository]. The Reminders chip toggles the real daily reminder.
 class PlanScreen extends ConsumerStatefulWidget {
   const PlanScreen({super.key});
@@ -57,10 +56,10 @@ class _PlanData {
   final MealTarget? target;
   final List<WorkoutSession> history;
 
-  /// workoutId → resolved workout (session card + history rows).
+  /// workoutId ? resolved workout (session card + history rows).
   final Map<String, Workout> workouts;
 
-  /// exerciseId → display name (session "moves" line).
+  /// exerciseId ? display name (session "moves" line).
   final Map<String, String> exerciseNames;
 }
 
@@ -127,7 +126,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         final workout = await workoutRepo.byId(id);
         if (workout != null) workouts[id] = workout;
       } catch (_) {
-        // Leave unresolved — rows fall back to generic titles.
+        // Leave unresolved � rows fall back to generic titles.
       }
     }
 
@@ -199,7 +198,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Check your connection and try again — '
+                          'Check your connection and try again � '
                           'your data stays on this device.',
                           style: TextStyle(fontSize: 12.5, color: p.ink2),
                         ),
@@ -337,7 +336,7 @@ String _weekLabelFor(TrainingPlan plan) {
       ? days.last.date
       : plan.weekStart.add(const Duration(days: 6));
   final fmt = DateFormat('MMM d');
-  return '${fmt.format(start)} – ${fmt.format(end)}';
+  return '${fmt.format(start)} � ${fmt.format(end)}';
 }
 
 /// Local duplicate of home's start-time helper (no home internals import).
@@ -476,7 +475,7 @@ class _PlanChipsState extends ConsumerState<_PlanChips> {
           await ref.read(notificationEngineProvider).areNotificationsEnabled();
       if (mounted) setState(() => _remindersOn = enabled);
     } catch (_) {
-      // Platform channel unavailable (e.g. widget tests) — keep display-only.
+      // Platform channel unavailable (e.g. widget tests) � keep display-only.
     }
   }
 
@@ -490,7 +489,7 @@ class _PlanChipsState extends ConsumerState<_PlanChips> {
         if (plan == null) return;
         final session = _nextEditableSession(plan, DateTime.now());
         if (session == null) {
-          // Nothing scheduled — just make sure nothing is pending.
+          // Nothing scheduled � just make sure nothing is pending.
           await engine.cancelAll();
         } else {
           final workout =
@@ -760,7 +759,7 @@ class _NextSessionSlot extends StatelessWidget {
     }
     final workout = data.workouts[chosen.workoutId];
     final time = _formatStartMin(chosen.startTimeMin);
-    final pill = isToday ? time : '${DateFormat('EEE').format(chosenDate)} · $time';
+    final pill = isToday ? time : '${DateFormat('EEE').format(chosenDate)} � $time';
     final firstExercise = (workout?.blocks.isNotEmpty ?? false)
         ? workout!.blocks.first.exerciseId
         : null;
@@ -783,9 +782,9 @@ String _movesLine(Workout? workout, Map<String, String> exerciseNames) {
     if (seen.length == 4) break;
   }
   if (seen.isEmpty) {
-    return '${workout.blocks.length} moves · about ${workout.durationMin} min';
+    return '${workout.blocks.length} moves � about ${workout.durationMin} min';
   }
-  return seen.join(' · ');
+  return seen.join(' � ');
 }
 
 /// Rest-day fallback when no planned sessions remain this week.
@@ -820,7 +819,7 @@ class _RestDayCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Enjoy recovery — or browse the library',
+                  'Enjoy recovery � or browse the library',
                   style: TextStyle(fontSize: 11.5, color: p.ink3),
                 ),
               ],
@@ -1016,7 +1015,7 @@ class _LibraryCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            '$muscle · ${exercise.formCues.length} cues',
+            '$muscle � ${exercise.formCues.length} cues',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 11.5, color: p.ink3),
@@ -1250,7 +1249,7 @@ IconData _mealIcon(MealType type) => switch (type) {
       MealType.snack => Icons.cookie,
     };
 
-/// Recent sessions list (sample `.list .lrow` + `.idx`) — expandable when
+/// Recent sessions list (sample `.list .lrow` + `.idx`) � expandable when
 /// more than five sessions exist; rows open the session summary.
 class _HistorySection extends StatefulWidget {
   const _HistorySection({required this.data});
@@ -1288,7 +1287,7 @@ class _HistorySectionState extends State<_HistorySection> {
         if (data.history.isEmpty)
           GlassCard(
             child: Text(
-              'No sessions yet — your completed workouts will appear here.',
+              'No sessions yet � your completed workouts will appear here.',
               style: TextStyle(fontSize: 12.5, color: p.ink2),
             ),
           )
@@ -1345,8 +1344,8 @@ class _HistorySectionState extends State<_HistorySection> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${_relativeDay(session.startedAt)} · '
-                          '${numbers.format(session.totalReps)} reps · '
+                          '${_relativeDay(session.startedAt)} � '
+                          '${numbers.format(session.totalReps)} reps � '
                           'form ${session.formAccuracyPct.round()}%',
                           style: TextStyle(fontSize: 11.5, color: p.ink3),
                         ),
@@ -1367,7 +1366,7 @@ class _HistorySectionState extends State<_HistorySection> {
   }
 }
 
-/// Accent section action copy (sample `.link`) — tap target for expand/collapse.
+/// Accent section action copy (sample `.link`) � tap target for expand/collapse.
 class _LinkLabel extends StatelessWidget {
   const _LinkLabel(this.label);
 
@@ -1397,61 +1396,11 @@ class _PlanSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Shimmer(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SkeletonText(width: 96),
-          SizedBox(height: 6),
-          SkeletonBox(width: 168, height: 24, radius: 8),
-          SizedBox(height: 14),
-          Row(
-            children: [
-              SkeletonBox(width: 108, height: 36, radius: 999),
-              SizedBox(width: 7),
-              SkeletonBox(width: 98, height: 36, radius: 999),
-              SizedBox(width: 7),
-              SkeletonBox(width: 94, height: 36, radius: 999),
-            ],
-          ),
-          SizedBox(height: 16),
-          SkeletonBox(height: 54, radius: 15),
-          SizedBox(height: 20),
-          _SkeletonPlanRow(),
-          SizedBox(height: 20),
-          _SkeletonPlanRow(),
-          SizedBox(height: 20),
-          _SkeletonPlanRow(),
-        ],
-      ),
-    );
+    return const Center(child: CircularProgressIndicator());
   }
 }
 
-/// One card-shaped loading row: pill + title line + meta line.
-class _SkeletonPlanRow extends StatelessWidget {
-  const _SkeletonPlanRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return const GlassCard(
-      weak: true,
-      padding: EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SkeletonBox(width: 76, height: 24, radius: 12),
-          SizedBox(height: 10),
-          SkeletonBox(width: 192, height: 18, radius: 8),
-          SizedBox(height: 6),
-          SkeletonText(width: 244),
-        ],
-      ),
-    );
-  }
-}
-
-/// Session editor sheet — time, status and rounds for one scheduled session.
+/// Session editor sheet � time, status and rounds for one scheduled session.
 ///
 /// Returns the edited [PlanSession] via `Navigator.pop` (null when closed
 /// without saving). Persistence happens in the screen via

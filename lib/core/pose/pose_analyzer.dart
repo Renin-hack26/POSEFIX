@@ -121,6 +121,13 @@ class PoseAnalyzer {
   Pose? _latestPose;
   Pose? get latestPose => _latestPose;
 
+  /// Debug telemetry — read by the session screen to show pipeline health.
+  /// These never affect counting; they only explain "no person" states.
+  int framesSeen = 0;
+  int lastPosesFound = 0;
+  String? lastError;
+  int lastInferenceMs = 0;
+
   final Map<int, pm.EmaFilter> _smoothX = {};
   final Map<int, pm.EmaFilter> _smoothY = {};
   pm.LmPoint? _torsoEma;
@@ -169,15 +176,23 @@ class PoseAnalyzer {
     }
     _busy = true;
     _lastStartMs = nowMs;
+    framesSeen++;
     try {
       final input = _toInputImage(
         image,
         Size(imageWidth, imageHeight),
         rotation,
       );
+      if (input == null) {
+        lastError = 'unsupported format group=${image.format.group.name}';
+        return null;
+      }
       final sw = Stopwatch()..start();
       final poses = await detector.processImage(input);
       sw.stop();
+      lastInferenceMs = sw.elapsedMilliseconds;
+      lastPosesFound = poses.length;
+      lastError = null;
       final result = _handlePoses(
         poses,
         imageWidth: imageWidth,
@@ -187,7 +202,8 @@ class PoseAnalyzer {
       );
       if (!_controller.isClosed) _controller.add(result);
       return result;
-    } catch (_) {
+    } catch (e) {
+      lastError = '$e';
       return null;
     } finally {
       _busy = false;
@@ -495,34 +511,94 @@ class PoseAnalyzer {
 
   // -- camera → ML Kit -------------------------------------------------------
 
-  InputImage _toInputImage(CameraImage image, Size size, InputImageRotation rotation) {
-    final format =
-        InputImageFormatValue.fromRawValue(image.format.raw) ??
-            InputImageFormat.nv21;
-    final bytes = _concatPlanes(image);
-    return InputImage.fromBytes(
-      bytes: bytes,
-      metadata: InputImageMetadata(
-        size: size,
-        rotation: rotation,
-        format: format,
-        bytesPerRow: image.planes.first.bytesPerRow,
-      ),
-    );
+  /// Builds an [InputImage] from a camera frame. Returns null when the
+  /// format cannot be mapped (caller records [lastError] instead of
+  /// silently feeding garbage bytes that always yield "no person").
+  InputImage? _toInputImage(
+      CameraImage image, Size size, InputImageRotation rotation) {
+    // Preferred path: controller requests NV21 (single plane) or BGRA8888.
+    // Fallback: genuine YUV420_888 (3 planes) converted to NV21.
+    final group = image.format.group;
+    if (group == ImageFormatGroup.bgra8888) {
+      if (image.planes.length != 1) return null;
+      return InputImage.fromBytes(
+        bytes: image.planes.first.bytes,
+        metadata: InputImageMetadata(
+          size: size,
+          rotation: rotation,
+          format: InputImageFormat.bgra8888,
+          bytesPerRow: image.planes.first.bytesPerRow,
+        ),
+      );
+    }
+    if (group == ImageFormatGroup.nv21) {
+      if (image.planes.length != 1) return null;
+      return InputImage.fromBytes(
+        bytes: image.planes.first.bytes,
+        metadata: InputImageMetadata(
+          size: size,
+          rotation: rotation,
+          format: InputImageFormat.nv21,
+          bytesPerRow: image.planes.first.bytesPerRow,
+        ),
+      );
+    }
+    if (group == ImageFormatGroup.yuv420) {
+      if (image.planes.length != 3) return null;
+      final nv21 = _yuv420ToNv21(image);
+      if (nv21 == null) return null;
+      return InputImage.fromBytes(
+        bytes: nv21,
+        metadata: InputImageMetadata(
+          size: size,
+          rotation: rotation,
+          format: InputImageFormat.nv21,
+          bytesPerRow: image.planes.first.bytesPerRow,
+        ),
+      );
+    }
+    // Unknown group (e.g. jpeg on some devices) — do not guess.
+    return null;
   }
 
-  static Uint8List _concatPlanes(CameraImage image) {
-    var size = 0;
-    for (final plane in image.planes) {
-      size += plane.bytes.length;
+  /// YUV420_888 (Y + U + V, arbitrary row/pixel strides) → NV21 (Y + VU).
+  /// The old code simply concatenated the three planes, which garbles the
+  /// chroma whenever pixelStride != 1 and ML Kit then sees noise and
+  /// returns zero poses forever.
+  static Uint8List? _yuv420ToNv21(CameraImage image) {
+    try {
+      final yPlane = image.planes[0];
+      final uPlane = image.planes[1];
+      final vPlane = image.planes[2];
+      final yBytes = yPlane.bytes;
+      final uBytes = uPlane.bytes;
+      final vBytes = vPlane.bytes;
+      final width = image.width;
+      final height = image.height;
+      final yRowStride = yPlane.bytesPerRow;
+      final uvRowStride = uPlane.bytesPerRow;
+      final uvPixelStride = uPlane.bytesPerPixel ?? 1;
+
+      final out = Uint8List(width * height * 3 ~/ 2);
+      // Y: copy row by row (handles rowStride padding).
+      var outPos = 0;
+      for (var row = 0; row < height; row++) {
+        final srcPos = row * yRowStride;
+        out.setRange(outPos, outPos + width, yBytes.sublist(srcPos, srcPos + width));
+        outPos += width;
+      }
+      // VU interleaved, subsampled 2x2.
+      for (var row = 0; row < height ~/ 2; row++) {
+        for (var col = 0; col < width ~/ 2; col++) {
+          final uvIndex = row * uvRowStride + col * uvPixelStride;
+          out[outPos++] = vBytes[uvIndex];
+          out[outPos++] = uBytes[uvIndex];
+        }
+      }
+      return out;
+    } catch (_) {
+      return null;
     }
-    final out = Uint8List(size);
-    var offset = 0;
-    for (final plane in image.planes) {
-      out.setRange(offset, offset + plane.bytes.length, plane.bytes);
-      offset += plane.bytes.length;
-    }
-    return out;
   }
 }
 

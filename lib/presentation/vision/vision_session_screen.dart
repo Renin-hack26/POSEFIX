@@ -35,7 +35,8 @@ class VisionSessionScreen extends ConsumerStatefulWidget {
 class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   CameraController? _camera;
   PoseAnalyzer? _analyzer;
-  InputImageRotation _rotation = InputImageRotation.rotation90deg; // back cam, portrait
+  InputImageRotation _rotation = InputImageRotation.rotation270deg; // front cam, portrait
+  CameraLensDirection _lens = CameraLensDirection.front;
 
   bool _initializing = true;
   bool _permissionDenied = false;
@@ -66,9 +67,13 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   /// Latest raw pose from ML Kit for skeleton overlay.
   Pose? _latestPose;
 
-  /// Camera preview dimensions (pixel space) for overlay transform.
-  double _previewPixelWidth = 0;
-  double _previewPixelHeight = 0;
+  /// Actual image-stream dimensions (sensor pixels) for overlay transform.
+  /// Updated from every frame; falls back to previewSize until first frame.
+  double _imageWidth = 0;
+  double _imageHeight = 0;
+  int _framesSeen = 0;
+  int _lastPosesFound = 0;
+  String? _pipelineError;
 
   @override
   void initState() {
@@ -157,6 +162,17 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
 
   Future<void> _initCamera() async {
     if (_disposed) return;
+    // Dispose previous controller when toggling lenses.
+    final old = _camera;
+    _camera = null;
+    if (old != null) {
+      try {
+        await old.stopImageStream();
+      } catch (_) {}
+      try {
+        await old.dispose();
+      } catch (_) {}
+    }
     setState(() {
       _initializing = true;
       _permissionDenied = false;
@@ -177,17 +193,23 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       if (cameras.isEmpty) {
         throw StateError('No camera found on this device.');
       }
+      // Default to FRONT camera so the user sees themselves while working
+      // out. Back camera previously pointed away from the user, which is
+      // why every frame returned "no person".
       CameraDescription selected = cameras.first;
       for (final CameraDescription cam in cameras) {
-        if (cam.lensDirection == CameraLensDirection.back) {
+        if (cam.lensDirection == _lens) {
           selected = cam;
           break;
         }
       }
+      // Fall back to whatever exists if the preferred lens is missing.
+      _lens = selected.lensDirection;
       final CameraController controller = CameraController(
         selected,
-        ResolutionPreset.high, // higher resolution for better ML Kit accuracy
+        ResolutionPreset.medium, // 720p: reliable ML Kit input, less heat
         enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.nv21,
       );
       await controller.initialize();
       if (_disposed || !mounted) {
@@ -203,10 +225,12 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       await WakelockPlus.enable();
       if (_disposed || !mounted) return;
 
-      // Store pixel-space preview size for overlay transform
-      final size = controller.value.previewSize!;
-      _previewPixelWidth = size.width;
-      _previewPixelHeight = size.height;
+      // Fallback size until the first real frame reports its dimensions.
+      final size = controller.value.previewSize;
+      if (size != null) {
+        _imageWidth = size.width;
+        _imageHeight = size.height;
+      }
 
       setState(() {
         _camera = controller;
@@ -220,6 +244,13 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
         _cameraError = 'Could not start the camera: $e';
       });
     }
+  }
+
+  Future<void> _toggleLens() async {
+    _lens = _lens == CameraLensDirection.front
+        ? CameraLensDirection.back
+        : CameraLensDirection.front;
+    await _initCamera();
   }
 
   InputImageRotation _rotationFromSensor(int sensorOrientation) {
@@ -244,18 +275,26 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
 
   Future<void> _feed(PoseAnalyzer analyzer, CameraImage image) async {
     try {
+      _imageWidth = image.width.toDouble();
+      _imageHeight = image.height.toDouble();
       final PoseFrameResult? result = await analyzer.processCameraImage(
         image,
         imageWidth: image.width.toDouble(),
         imageHeight: image.height.toDouble(),
         rotation: _rotation,
       );
-      if (result != null && mounted && !_disposed) {
+      if (!mounted || _disposed) return;
+      // Always refresh telemetry so the HUD proves the pipeline is alive
+      // even when ML Kit returns zero poses.
+      _framesSeen = analyzer.framesSeen;
+      _lastPosesFound = analyzer.lastPosesFound;
+      _pipelineError = analyzer.lastError;
+      if (result != null) {
         _handleResult(result);
         // Throttle overlay updates to ~10 fps to avoid excessive UI rebuilds
         _latestPose = analyzer.latestPose;
-        setState(() {});
       }
+      setState(() {});
     } catch (_) {
       // A bad frame must never break the session.
     } finally {
@@ -443,7 +482,22 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     final definition = ExerciseRegistry.instance.resolve(widget.exerciseId);
     final String title = definition?.displayName ?? 'Live session';
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          IconButton(
+            tooltip: _lens == CameraLensDirection.front
+                ? 'Switch to back camera'
+                : 'Switch to front camera',
+            icon: Icon(
+              _lens == CameraLensDirection.front
+                  ? Icons.camera_rear
+                  : Icons.camera_front,
+            ),
+            onPressed: _ready ? _toggleLens : null,
+          ),
+        ],
+      ),
       body: _buildBody(),
     );
   }
@@ -477,52 +531,108 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Use full available space — no padding around the preview itself.
-    // The preview widget internally fits the camera feed correctly.
+    // CameraPreview already letterboxes correctly — wrap in its own aspect
+    // ratio and center it. Never force StackFit.expand around it; that was
+    // the source of the compressed-frame bug.
+    final double aspect = controller.value.aspectRatio > 0
+        ? controller.value.aspectRatio
+        : (_imageWidth > 0 && _imageHeight > 0
+            ? _imageWidth / _imageHeight
+            : 9 / 16);
+    final bool mirrored = _lens == CameraLensDirection.front;
     return Column(
       children: [
+        // Pipeline health — proves frames flow even when no pose is found.
+        _PipelineStatus(
+          frames: _framesSeen,
+          poses: _lastPosesFound,
+          error: _pipelineError,
+          lens: _lens,
+        ),
         // Camera preview occupies the majority of the screen
         Expanded(
-          child: AspectRatio(
-            aspectRatio: _previewPixelWidth / _previewPixelHeight,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CameraPreview(controller),
-                // Skeleton overlay — positioned exactly over the preview region
-                if (_latestPose != null)
-                  CustomPaint(
-                    painter: SkeletonOverlayPainter(
-                      _latestPose,
-                      _previewPixelWidth,
-                      _previewPixelHeight,
-                      _rotation,
-                      false, // back camera
+          child: Center(
+            child: AspectRatio(
+              aspectRatio: aspect,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  CameraPreview(controller),
+                  // Skeleton overlay — positioned exactly over the preview region
+                  if (_latestPose != null && _imageWidth > 0 && _imageHeight > 0)
+                    CustomPaint(
+                      painter: SkeletonOverlayPainter(
+                        _latestPose,
+                        _imageWidth,
+                        _imageHeight,
+                        _rotation,
+                        mirrored,
+                      ),
+                      size: Size.infinite,
                     ),
-                    size: Size.infinite,
+                  // HUD overlay — fixed-height column pinned to bottom
+                  Positioned(
+                    left: 14,
+                    right: 14,
+                    bottom: 14,
+                    child: _HudOverlay(
+                      reps: _reps,
+                      state: _state,
+                      formScore: _formScore,
+                      lockReason: _lockReason,
+                      framing: _framing,
+                      coachCue: _coachCue,
+                      paused: _paused,
+                      onPause: _togglePause,
+                      onEnd: _confirmEndSession,
+                    ),
                   ),
-                // HUD overlay — fixed-height column pinned to bottom
-                Positioned(
-                  left: 14,
-                  right: 14,
-                  bottom: 14,
-                  child: _HudOverlay(
-                    reps: _reps,
-                    state: _state,
-                    formScore: _formScore,
-                    lockReason: _lockReason,
-                    framing: _framing,
-                    coachCue: _coachCue,
-                    paused: _paused,
-                    onPause: _togglePause,
-                    onEnd: _confirmEndSession,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// One-line pipeline health readout shown above the preview.
+class _PipelineStatus extends StatelessWidget {
+  const _PipelineStatus({
+    required this.frames,
+    required this.poses,
+    required this.error,
+    required this.lens,
+  });
+
+  final int frames;
+  final int poses;
+  final String? error;
+  final CameraLensDirection lens;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final String lensLabel = lens == CameraLensDirection.front ? 'front' : 'back';
+    final String text;
+    if (error != null) {
+      text = 'camera $lensLabel · frames $frames · error: $error';
+    } else if (frames == 0) {
+      text = 'camera $lensLabel · starting feed…';
+    } else {
+      text = 'camera $lensLabel · frames $frames · poses $poses';
+    }
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      color: p.track.withValues(alpha: 0.35),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 11, color: p.ink2),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 }
@@ -799,12 +909,13 @@ class _SessionControlButton extends StatelessWidget {
 /// of the camera preview, transformed from camera pixel-space to widget coordinates.
 ///
 /// Mathematical model:
-/// - pose landmarks are in camera pixel coordinates: (px, py) in [0, Wc] × [0, Hc]
+/// - ML Kit landmarks are in IMAGE PIXEL coordinates: (px, py) in
+///   [0, imageW] × [0, imageH] (NOT normalized — the old code treated them
+///   as 0..1, which collapsed every skeleton into the top-left corner).
 /// - preview widget is Wd × Hd with the same aspect ratio as the camera feed
 ///   (this screen constrains the AspectRatio so the preview is never stretched)
-/// - widget coordinates for a landmark: (px / Wc * Wd, py / Hc * Hd)
-/// - rotation is applied to the input image for ML Kit; the raw pose landmarks
-///   are in the ROTATED frame, so we map back to the display frame.
+/// - normalize: (nx, ny) = (px / imageW, py / imageH), undo ML Kit rotation
+///   to display space, then widget coords: (offset + n * imageDim * scale).
 class SkeletonOverlayPainter extends CustomPainter {
   SkeletonOverlayPainter(
     this.pose,
@@ -879,9 +990,11 @@ class SkeletonOverlayPainter extends CustomPainter {
       final lm = pose!.landmarks[PoseLandmarkType.values[i]];
       if (lm == null || lm.likelihood < 0.3) continue; // skip invisible
 
-      // Raw camera coordinates (normalized to 0..1 in ML Kit)
-      final double nx = lm.x; // normalized [0,1]
-      final double ny = lm.y;
+      // ML Kit returns IMAGE PIXELS — normalize to 0..1 first.
+      // Guard against zero-size images (should never happen; skip frame).
+      if (previewPixelWidth <= 0 || previewPixelHeight <= 0) continue;
+      final double nx = (lm.x / previewPixelWidth).clamp(0.0, 1.0);
+      final double ny = (lm.y / previewPixelHeight).clamp(0.0, 1.0);
 
       // Apply rotation inverse to get display-space coordinates.
       // ML Kit rotates the input image for inference; the landmarks come back
