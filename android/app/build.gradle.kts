@@ -37,6 +37,12 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Batch 8: R8 shrink + minify for the release APK (smaller
+            // download, faster install). AAR consumer rules (ML Kit,
+            // tasks-vision, TFLite) keep their natives; drift/json use
+            // codegen, not reflection. Verified by release smoke builds.
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
     }
 }

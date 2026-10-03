@@ -508,6 +508,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       if (isDuration) {
         _holdTarget = preset.holdSecs;
         _rounds = null;
+        _targetReps = 0;
       } else {
         _rounds = RoundTracker(
           targetRounds: preset.rounds,
@@ -515,11 +516,13 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
           restSec: preset.rest,
         );
         _targetReps = preset.reps;
+        _holdTarget = 0;
       }
     } else if (isDuration) {
       _holdTarget =
           block.seconds > 0 ? block.seconds : blockDef.targetDuration;
       _rounds = null;
+      _targetReps = 0;
     } else {
       _rounds = RoundTracker(
         targetRounds: block.sets,
@@ -527,6 +530,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
         restSec: block.restSec,
       );
       _targetReps = block.reps;
+      // Stale duration state from a previous block must not leak into
+      // repetition work (ghost hold chip / wrong OF-target).
+      _holdTarget = 0;
     }
     // Re-anchor on the saved record: display totals continue where the
     // record left off (resume never loses history to a fresh engine).
