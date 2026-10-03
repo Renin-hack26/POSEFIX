@@ -2126,19 +2126,43 @@ class SkeletonOverlayPainter extends CustomPainter {
     ..style = PaintingStyle.stroke
     ..strokeWidth = 3
     ..strokeCap = StrokeCap.round
-    ..color = const Color(0xFF00E676).withValues(alpha: 0.55);
+    ..color = const Color(0xFF00E676).withValues(alpha: 0.75);
   static final Paint paintSecondLow = Paint()
     ..style = PaintingStyle.stroke
     ..strokeWidth = 3
     ..strokeCap = StrokeCap.round
-    ..color = const Color(0xFFFF6D00).withValues(alpha: 0.55);
+    ..color = const Color(0xFFFF6D00).withValues(alpha: 0.75);
 
   /// Hollow ring for occluded joints (Batch 5): a joint below the solid
   /// threshold still reads as "there, but hidden" rather than gone.
   static final Paint paintGhost = Paint()
     ..style = PaintingStyle.stroke
-    ..strokeWidth = 2
-    ..color = Colors.white.withValues(alpha: 0.5);
+    ..strokeWidth = 2.5
+    ..color = Colors.white;
+
+  /// Dark halo under every bone (visibility hardening): the skeleton
+  /// reads on any background — bright gym walls included — because the
+  /// color line always sits on its own dark bed.
+  static final Paint paintHaloMajor = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 7
+    ..strokeCap = StrokeCap.round
+    ..color = Colors.black.withValues(alpha: 0.45);
+  static final Paint paintHaloSecond = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 6
+    ..strokeCap = StrokeCap.round
+    ..color = Colors.black.withValues(alpha: 0.45);
+  static final Paint paintHaloDetail = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 4
+    ..strokeCap = StrokeCap.round
+    ..color = Colors.black.withValues(alpha: 0.45);
+
+  /// Dark bed under joint dots (same hardening as the bone halos).
+  static final Paint paintDotBed = Paint()
+    ..style = PaintingStyle.fill
+    ..color = Colors.black.withValues(alpha: 0.45);
   static final Paint paintFace = Paint()
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1.5
@@ -2169,14 +2193,16 @@ class SkeletonOverlayPainter extends CustomPainter {
   /// Tiered per the Batch 5 merge (structural = major, hands/feet =
   /// second, face = detail via [_face]): facial pairs live ONLY in [_face]
   /// so the jaw is drawn once, thin — never a thick double stroke.
+  /// Hand links follow the reference topology (wrist→pinky→index→thumb
+  /// chain + wrist→thumb); every segment is a real anatomical connection.
   static const List<(int, int)> _body = [
     // Torso: shoulders → hips
     (11, 12),
     (11, 23), (12, 24), (23, 24),
     // Left arm: shoulder → elbow → wrist → hand
-    (11, 13), (13, 15), (15, 17), (15, 19), (15, 21), (17, 19),
+    (11, 13), (13, 15), (15, 17), (17, 19), (19, 21), (15, 21),
     // Right arm
-    (12, 14), (14, 16), (16, 18), (16, 20), (16, 22), (18, 20),
+    (12, 14), (14, 16), (16, 18), (18, 20), (20, 22), (16, 22),
     // Left leg: hip → knee → ankle → heel/foot
     (23, 25), (25, 27), (27, 29), (27, 31), (29, 31),
     // Right leg
@@ -2186,18 +2212,19 @@ class SkeletonOverlayPainter extends CustomPainter {
   /// Appendage bones (hands + feet) — medium tier. Everything else in
   /// [_body] is structural (thick tier).
   static const Set<(int, int)> _secondBones = {
-    (15, 17), (15, 19), (15, 21), (17, 19),
-    (16, 18), (16, 20), (16, 22), (18, 20),
+    (15, 17), (17, 19), (19, 21), (15, 21),
+    (16, 18), (18, 20), (20, 22), (16, 22),
     (27, 29), (27, 31), (29, 31),
     (28, 30), (28, 32), (30, 32),
   };
 
   /// Face structure: jaw line (ear → mouth → mouth → ear), eyes, nose.
+  /// Nose spokes land on the eye centres (reference topology).
   static const List<(int, int)> _face = [
     (7, 9), (9, 10), (10, 8),
     (0, 9), (0, 10),
     (1, 2), (2, 3), (4, 5), (5, 6),
-    (0, 1), (0, 4),
+    (0, 2), (0, 5),
     (3, 7), (6, 8),
   ];
 
@@ -2265,7 +2292,8 @@ class SkeletonOverlayPainter extends CustomPainter {
 
     // Body skeleton: tiered widths (structural thick, appendages medium),
     // confidence tiers (shaky segments dim), form signal overrides the
-    // confident tier (WS6.2/FR-5 green/red form coloring).
+    // confident tier (WS6.2/FR-5 green/red form coloring). Every bone rides
+    // on a dark halo so the full skeleton stays visible on any background.
     for (final (a, b) in _body) {
       final pa = landmarks[a];
       final pb = landmarks[b];
@@ -2282,21 +2310,26 @@ class SkeletonOverlayPainter extends CustomPainter {
       } else {
         linePaint = secondTier ? paintSecond : paintLine;
       }
+      canvas.drawLine(pa, pb, secondTier ? paintHaloSecond : paintHaloMajor);
       canvas.drawLine(pa, pb, linePaint);
     }
 
-    // Face jaw line + eyes (thin white).
+    // Face jaw line + eyes (thin white on a dark bed).
     for (final (a, b) in _face) {
       final pa = landmarks[a];
       final pb = landmarks[b];
-      if (pa != null && pb != null) canvas.drawLine(pa, pb, paintFace);
+      if (pa == null || pb == null) continue;
+      canvas.drawLine(pa, pb, paintHaloDetail);
+      canvas.drawLine(pa, pb, paintFace);
     }
 
     // Shoulder bone structure (ear → shoulder neck lines).
     for (final (a, b) in _shoulderBones) {
       final pa = landmarks[a];
       final pb = landmarks[b];
-      if (pa != null && pb != null) canvas.drawLine(pa, pb, paintBone);
+      if (pa == null || pb == null) continue;
+      canvas.drawLine(pa, pb, paintHaloSecond);
+      canvas.drawLine(pa, pb, paintBone);
     }
 
     // Live angle measurement: arc + degrees at elbows and knees.
@@ -2350,6 +2383,8 @@ class SkeletonOverlayPainter extends CustomPainter {
       if (pt == null) continue;
       final lm = pose!.landmarks[PoseLandmarkType.values[i]];
       final solid = lm != null && lm.likelihood >= 0.5;
+      // Dark bed first so every node reads on any background.
+      canvas.drawCircle(pt, 6, paintDotBed);
       if (solid) {
         canvas.drawCircle(pt, 5, paintDot);
       } else {
