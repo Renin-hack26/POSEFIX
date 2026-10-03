@@ -170,15 +170,18 @@ Reference (read-only): `C:\Users\imu\Desktop\New folder\openvission\`
 - P8: analyze 0, suite 273/274 (sole failure = the sqlite env issue);
   docs current. FPS validation needs on-device runs (B8/field testing).
 
-### Open item — multi-exercise sessions (P3 remainder)
+### Open item — multi-exercise sessions (P3 remainder) (DONE — user chose
+"build the chain", 2026-10-03)
 
-The blind audit independently confirmed: `StartSession` (multi-exercise
-session from a workout's blocks) is dead code, and every entry point
-starts only the FIRST block's exercise (`single_<ex>` sessions). A full
-workout (N blocks) cannot flow as one session today. Options: (a) thread
-`workoutId` through `/vision` and run blocks in sequence (new session
-flow, medium), or (b) leave single-exercise sessions (current behavior).
-Needs a user decision — see TODO cross-cutting.
+`workoutId` threads through `/vision`; the screen resolves the workout's
+blocks into a sequenced chain (revived `StartSession`: one record per
+unique block exercise), runs them in order with Next between exercises
+(targets from each block; editor + calibration per block as configured),
+persists per-exercise reps/rounds/form + `PausedState` resume position,
+and credits the summed totals at End. Timed blocks complete once on the
+hold target. Resume replays from the paused/first-incomplete block;
+display totals are offset-based so a fresh engine never loses history
+(also fixes the old single-mode resume drop).
 
 ## Batch 8 — KGP + R8 + P10 release APK
 

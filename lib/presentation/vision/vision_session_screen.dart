@@ -20,6 +20,7 @@ import '../../core/pose/pose_landmarker_source.dart';
 import '../../core/pose/round_tracker.dart';
 import '../../core/pose/trust_gate.dart';
 import '../../core/theme/app_theme.dart';
+import '../../domain/entities/workout.dart';
 import '../../domain/entities/workout_session.dart';
 import '../../domain/repositories/session_repository.dart';
 import '../../engines/session_audio/session_audio_cues.dart';
@@ -37,7 +38,9 @@ import 'vision_hud.dart';
 ///
 /// Optional [targetRounds]/[targetReps]/[restSec] carry the plan block's
 /// targets (rounds override wins); otherwise the pre-session editor offers
-/// the definition defaults and the user confirms.
+/// the definition defaults and the user confirms. Optional [workoutId]
+/// chains the workout's blocks in sequence (Next between exercises);
+/// without it the session is a single exercise.
 class VisionSessionScreen extends ConsumerStatefulWidget {
   const VisionSessionScreen({
     super.key,
@@ -45,12 +48,14 @@ class VisionSessionScreen extends ConsumerStatefulWidget {
     this.targetRounds,
     this.targetReps,
     this.restSec,
+    this.workoutId,
   });
 
   final String exerciseId;
   final int? targetRounds;
   final int? targetReps;
   final int? restSec;
+  final String? workoutId;
 
   @override
   ConsumerState<VisionSessionScreen> createState() =>
@@ -103,6 +108,24 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
 
   /// Exercise definition for this session (readouts + hold target).
   ExerciseDefinition? _definition;
+
+  // --- Workout chain (multi-block sessions) ------------------------------------
+  /// Sequenced blocks (empty = single-exercise session).
+  List<ChainBlock> _chain = const [];
+
+  /// Index of the live block.
+  int _blockIdx = 0;
+
+  /// Saved reps of the live exercise when its block started — the display
+  /// total is offset + engine count, so resume never loses history.
+  int _repsOffset = 0;
+
+  /// Per-exercise form sums (parallel to the session's exercises).
+  final List<int> _exFormSum = [];
+  final List<int> _exFormCount = [];
+
+  /// Timed-block completion fired (hold target reached once per block).
+  bool _holdDone = false;
 
   // --- Batch 5 pose stack ------------------------------------------------------
   /// MediaPipe PoseLandmarker (heavy) source; ML Kit stays the fallback.
@@ -319,56 +342,105 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
 
     _setBootStep(2);
     final sessionRepository = ref.read(sessionRepositoryProvider);
-    final active = await sessionRepository.activeSession();
-    if (active != null) {
-      if (active.exercises.isNotEmpty &&
-          active.exercises.first.exerciseId != widget.exerciseId) {
-        await sessionRepository.clearActive();
-        await _createNewSession(sessionRepository);
-      } else {
-        await _resumeSession(active, sessionRepository);
+    // Workout chain: resolve the sequenced blocks + session via
+    // StartSession (active-or-create, one record per unique exercise).
+    // Single mode keeps the legacy one-exercise flow.
+    var startIdx = 0;
+    final wid = widget.workoutId;
+    if (wid != null && !wid.startsWith('single_')) {
+      Workout? chainWorkout;
+      try {
+        chainWorkout = await ref.read(workoutRepositoryProvider).byId(wid);
+      } catch (_) {
+        chainWorkout = null;
+      }
+      if (chainWorkout != null && chainWorkout.blocks.isNotEmpty) {
+        final blocks = chainWorkout.blocks;
+        _chain = uniqueBlocks(
+          exerciseIds: [for (final b in blocks) b.exerciseId],
+          setsFor: (id) =>
+              blocks.firstWhere((b) => b.exerciseId == id).sets,
+          repsFor: (id) =>
+              blocks.firstWhere((b) => b.exerciseId == id).reps,
+          secondsFor: (id) =>
+              blocks.firstWhere((b) => b.exerciseId == id).seconds,
+          restFor: (id) =>
+              blocks.firstWhere((b) => b.exerciseId == id).restSec,
+        );
+      }
+    }
+    if (_chain.isEmpty) {
+      _chain = [
+        ChainBlock(
+          exerciseId: widget.exerciseId,
+          sets: widget.targetRounds ?? definition.defaultSets,
+          reps: widget.targetReps ?? definition.defaultReps,
+          seconds: 0,
+          restSec: widget.restSec ?? 30,
+        ),
+      ];
+    }
+    if (_chain.length > 1) {
+      try {
+        final current = await sessionRepository.activeSession();
+        if (current != null && current.workoutId != wid) {
+          await sessionRepository.clearActive();
+        }
+        final session =
+            await ref.read(startSessionProvider)(workoutId: wid!);
+        _session = session;
+        _sessionStartTime = session.startedAt;
+        final exCount = session.exercises.length;
+        startIdx = chainResumeIndex(
+          exerciseCount: exCount,
+          pausedIndex: session.pausedState?.exerciseIndex,
+          roundsDone: (i) =>
+              i < exCount ? session.exercises[i].repsPerRound.length : 0,
+          setsTarget: (i) => i < _chain.length ? _chain[i].sets : 1,
+        ).clamp(0, _chain.length - 1);
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _initializing = false;
+          _cameraError = 'This workout is not available right now.';
+        });
+        return;
       }
     } else {
-      await _createNewSession(sessionRepository);
+      final active = await sessionRepository.activeSession();
+      if (active != null) {
+        if (active.exercises.isNotEmpty &&
+            active.exercises.first.exerciseId != widget.exerciseId) {
+          await sessionRepository.clearActive();
+          await _createNewSession(sessionRepository);
+        } else {
+          await _resumeSession(active, sessionRepository);
+        }
+      } else {
+        await _createNewSession(sessionRepository);
+      }
     }
 
     // Pre-session target editor (WS2.4) — plan values win, definition
-    // defaults otherwise; dismissing backs out of the session.
+    // defaults otherwise; dismissing backs out of the session. Chain
+    // resumes past block 0 skip it (block prescriptions apply).
     _setBootStep(3);
     if (!mounted || _disposed) return;
-    final targets = await _editTargets(definition);
-    if (targets == null) {
-      if (!mounted) return;
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      } else {
-        context.go('/plan');
+    _Targets? targets;
+    if (startIdx == 0) {
+      final editorDef =
+          ExerciseRegistry.instance.resolve(_chain[0].exerciseId) ??
+              definition;
+      targets = await _editTargets(editorDef);
+      if (targets == null) {
+        if (!mounted) return;
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else {
+          context.go('/plan');
+        }
+        return;
       }
-      return;
-    }
-    if (definition.type != 'duration') {
-      _rounds = RoundTracker(
-        targetRounds: targets.rounds,
-        targetReps: targets.reps,
-        restSec: targets.rest,
-      );
-      _targetReps = targets.reps;
-    } else {
-      _holdTarget = targets.holdSecs;
-    }
-
-    _setBootStep(4);
-    try {
-      final analyzer = ref.read(poseAnalyzerProvider(widget.exerciseId));
-      _analyzer = analyzer;
-      await analyzer.start();
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _initializing = false;
-        _cameraError = 'This exercise is not available right now.';
-      });
-      return;
     }
 
     // Batch 5 primary backend: PoseLandmarker (heavy). Any failure here —
@@ -386,15 +458,112 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     _setBootStep(6);
     await _initCamera();
     if (!mounted || _disposed) return;
+    _setBootStep(4);
+    await _beginBlock(startIdx, preset: targets);
+    if (!mounted || _disposed || _cameraError != null) return;
     _setBootStep(-1);
     _startTicker();
-    // Pre-session calibration (WS2.10) runs where the definition enables
-    // it; otherwise the session starts immediately with the vocab line.
-    if (_definition?.calibration.enabled ?? false) {
+  }
+
+  /// Begins one chain block: swaps in its analyzer (fresh engine), applies
+  /// targets, re-anchors counters on the saved record (resume-safe), then
+  /// runs calibration where enabled or announces the start.
+  Future<void> _beginBlock(int index, {_Targets? preset}) async {
+    if (!mounted || _disposed) return;
+    if (index < 0 || index >= _chain.length) return;
+    final block = _chain[index];
+    final blockDef = ExerciseRegistry.instance.resolve(block.exerciseId);
+    if (blockDef == null) {
+      if (!mounted) return;
+      setState(() {
+        _initializing = false;
+        _cameraError = 'Exercise not found. Please try another.';
+      });
+      return;
+    }
+    // Fresh analyzer per exercise (engine, smoothing, rhythm all reset).
+    final old = _analyzer;
+    _analyzer = null;
+    if (old != null) {
+      try {
+        await old.dispose();
+      } catch (_) {}
+    }
+    try {
+      final analyzer = ref.read(poseAnalyzerProvider(block.exerciseId));
+      _analyzer = analyzer;
+      await analyzer.start();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _initializing = false;
+        _cameraError = 'This exercise is not available right now.';
+      });
+      return;
+    }
+    _definition = blockDef;
+    _blockIdx = index;
+    final isDuration = blockDef.type == 'duration';
+    if (preset != null) {
+      if (isDuration) {
+        _holdTarget = preset.holdSecs;
+        _rounds = null;
+      } else {
+        _rounds = RoundTracker(
+          targetRounds: preset.rounds,
+          targetReps: preset.reps,
+          restSec: preset.rest,
+        );
+        _targetReps = preset.reps;
+      }
+    } else if (isDuration) {
+      _holdTarget =
+          block.seconds > 0 ? block.seconds : blockDef.targetDuration;
+      _rounds = null;
+    } else {
+      _rounds = RoundTracker(
+        targetRounds: block.sets,
+        targetReps: block.reps,
+        restSec: block.restSec,
+      );
+      _targetReps = block.reps;
+    }
+    // Re-anchor on the saved record: display totals continue where the
+    // record left off (resume never loses history to a fresh engine).
+    final saved = (index >= 0 && index < (_session?.exercises.length ?? 0))
+        ? _session!.exercises[index]
+        : SessionExercise(exerciseId: block.exerciseId);
+    _repsOffset = saved.totalReps;
+    _reps = saved.totalReps;
+    _lastSavedRepCount = _reps;
+    _lastMilestone = _reps ~/ 5;
+    _lastEngineCount = 0;
+    while (_exFormSum.length <= index) {
+      _exFormSum.add(0);
+      _exFormCount.add(0);
+    }
+    _resting = false;
+    _restEndsAt = null;
+    _holdDone = false;
+    _holdSeconds = 0;
+    _showCongrats = false;
+    _tickFlash = false;
+    _rejectFlash = null;
+    if (blockDef.calibration.enabled) {
       _startCalibration();
     } else {
-      final line = CueVocabulary.lines
-          .firstWhere((l) => l.id == 'session-start');
+      var line =
+          CueVocabulary.lines.firstWhere((l) => l.id == 'session-start');
+      if (_chain.length > 1) {
+        final prefix = 'Exercise ${index + 1} of ${_chain.length} — ';
+        line = CueLine(
+          id: line.id,
+          situation: line.situation,
+          actions: line.actions,
+          display: '$prefix${line.display}',
+          speak: line.speak == null ? null : '$prefix${line.speak}',
+        );
+      }
       _coachCue = line.display;
       unawaited(_audioCues?.announce(line.spoken));
       _publishHud();
@@ -525,6 +694,18 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     _showCongrats = true;
     unawaited(_audioCues?.onMilestone());
     _publishHud();
+  }
+
+  /// Wrong-pose flash (WS2.5/2.9): 0.8 s severity card + haptic.
+  /// Timed-block completion: the hold target held → record one timed
+  /// completion and run the congrats flow (Log ends, Next advances).
+  void _completeHold() {
+    _holdDone = true;
+    _reps = _repsOffset + 1;
+    _lastSavedRepCount = _reps;
+    _saveSession();
+    unawaited(_audioCues?.announce(CueVocabulary.byId('hold-target').spoken));
+    _presentCongrats();
   }
 
   /// Wrong-pose flash (WS2.5/2.9): 0.8 s severity card + haptic.
@@ -774,9 +955,16 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
         }
       } else {
         if (brain.repJustCompleted) {
-          _reps = brain.repCount;
+          // Display totals continue from the saved record (offset +
+          // engine count) — a fresh engine after resume/advance never
+          // loses history.
+          _reps = _repsOffset + brain.repCount;
           _totalFormScoreSum += brain.formScore;
           _formScoreCount++;
+          if (_blockIdx < _exFormSum.length) {
+            _exFormSum[_blockIdx] += brain.formScore;
+            _exFormCount[_blockIdx]++;
+          }
           _formScore = (_totalFormScoreSum / _formScoreCount).round();
           _audioCues?.onRep();
           if (_reps > _lastSavedRepCount) {
@@ -848,7 +1036,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     _lockReason = result.lockReason;
     _framing = result.framing;
     if (brain != null) {
-      if (!_calibrating) _reps = brain.repCount;
+      if (!_calibrating) _reps = _repsOffset + brain.repCount;
       _state = brain.currentState;
       _coachCue = cue;
       _cueWarn = cueWarn;
@@ -874,6 +1062,15 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
         _readoutRight = null;
       }
       _holdSeconds = brain.holdSeconds;
+      // Timed blocks complete once: hold target reached → one timed
+      // completion, same congrats flow as a final round.
+      if (_rounds == null &&
+          !_holdDone &&
+          !_calibrating &&
+          _holdTarget > 0 &&
+          _holdSeconds >= _holdTarget) {
+        _completeHold();
+      }
       // Overlay form signal (WS6.2): warnings/errors paint the skeleton
       // red, pure praise paints it green, otherwise neutral.
       var signal = 0;
@@ -898,29 +1095,59 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   Future<void> _saveSession() async {
     if (_session == null) return;
     final repository = ref.read(sessionRepositoryProvider);
-    final existing = _session!.exercises.first;
     final tracker = _rounds;
-    final updatedExercise = _session!.exercises.first.copyWith(
-      totalReps: _reps,
-      formAccuracyPct: _formScoreCount > 0
-          ? _totalFormScoreSum / _formScoreCount
-          : 100,
-      // WS2.3: round progress persists per save (summary + dashboard read it).
-      roundsCompleted: tracker?.repsPerRound.length ?? existing.roundsCompleted,
-      repsPerRound: tracker != null
-          ? List<int>.of(tracker.repsPerRound)
-          : existing.repsPerRound,
-      roundTimesSec: tracker != null
-          ? List<double>.of(tracker.roundTimesSec)
-          : existing.roundTimesSec,
-    );
+    final exercises = [..._session!.exercises];
+    // Chain growth guard: indices always line up with the session record.
+    while (exercises.length <= _blockIdx) {
+      final id = _blockIdx < _chain.length
+          ? _chain[_blockIdx].exerciseId
+          : widget.exerciseId;
+      exercises.add(SessionExercise(
+          exerciseId: id, totalReps: 0, formAccuracyPct: 100));
+    }
+    final avgForm = _formScoreCount > 0
+        ? _totalFormScoreSum / _formScoreCount
+        : 100.0;
+    final updated = <SessionExercise>[];
+    for (var i = 0; i < exercises.length; i++) {
+      final e = exercises[i];
+      if (i != _blockIdx) {
+        updated.add(e);
+        continue;
+      }
+      final exAvg = (i < _exFormCount.length && _exFormCount[i] > 0)
+          ? _exFormSum[i] / _exFormCount[i]
+          : e.formAccuracyPct;
+      updated.add(e.copyWith(
+        totalReps: _reps,
+        formAccuracyPct: exAvg,
+        // WS2.3: round progress persists per save (summary + dashboard).
+        roundsCompleted:
+            tracker?.repsPerRound.length ?? e.roundsCompleted,
+        repsPerRound: tracker != null
+            ? List<int>.of(tracker.repsPerRound)
+            : e.repsPerRound,
+        roundTimesSec: tracker != null
+            ? List<double>.of(tracker.roundTimesSec)
+            : e.roundTimesSec,
+      ));
+    }
+    final now = DateTime.now();
+    final elapsed = _sessionStartTime != null
+        ? now.difference(_sessionStartTime!).inSeconds
+        : 0;
     final updatedSession = _session!.copyWith(
-      exercises: [updatedExercise],
-      totalReps: _reps,
-      formAccuracyPct: _formScoreCount > 0
-          ? _totalFormScoreSum / _formScoreCount
-          : 100,
+      exercises: updated,
+      totalReps: updated.fold<int>(0, (s, e) => s + e.totalReps),
+      formAccuracyPct: avgForm,
       status: SessionStatus.active,
+      // Chain resume position for the next boot (or after a kill).
+      pausedState: PausedState(
+        exerciseIndex: _blockIdx,
+        roundIndex: (tracker?.currentRound ?? 1) - 1,
+        repsInRound: tracker?.repsThisRound(_lastEngineCount) ?? _reps,
+        elapsedSec: elapsed,
+      ),
     );
     _session = updatedSession;
     await repository.saveActive(updatedSession);
@@ -1012,13 +1239,18 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   }
 
   Future<void> _endSession() async {
-    _exitedEarly = _reps == 0;
     final CameraController? controller = _camera;
     if (controller != null && controller.value.isStreamingImages) {
       try {
         await controller.stopImageStream();
       } catch (_) {}
     }
+    // Persist the live block first — the headline totals below sum the
+    // whole record, so multi-block chains credit every exercise.
+    await _saveSession();
+    final exercises = _session?.exercises ?? const <SessionExercise>[];
+    final total = exercises.fold<int>(0, (s, e) => s + e.totalReps);
+    _exitedEarly = total == 0;
     if (_session != null) {
       // Route through the EndSession usecase (WS4 4.1): it finalizes the
       // session AND runs the post-workout chain — strike credit, plan credit,
@@ -1029,7 +1261,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
           : 0.0;
       final report = await ref.read(endSessionProvider)(
         _session!.copyWith(
-          totalReps: _reps,
+          totalReps: total,
           formAccuracyPct: avgForm,
           durationSec: _sessionStartTime != null
               ? DateTime.now().difference(_sessionStartTime!).inSeconds
@@ -1328,9 +1560,15 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
                       unawaited(_endSession());
                     },
                     onNext: () {
-                      // Bonus rounds past the target — still credited.
                       setState(() => _showCongrats = false);
-                      _publishHud();
+                      if (_blockIdx + 1 < _chain.length) {
+                        // Next exercise in the chain (targets from its
+                        // block; no editor mid-flow).
+                        unawaited(_beginBlock(_blockIdx + 1));
+                      } else {
+                        // Bonus rounds past the target — still credited.
+                        _publishHud();
+                      }
                     },
                   ),
                 );

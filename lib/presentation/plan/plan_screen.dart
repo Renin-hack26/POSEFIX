@@ -884,7 +884,8 @@ class _DaySessionsSlot extends StatelessWidget {
       moves: _movesLine(workout, data.exerciseNames),
       onEdit: () => onEditSession(session),
       // Plan targets ride along: rounds override wins, else block sets
-      // (WS2.3 consumes roundsOverride here instead of dropping it).
+      // (WS2.3 consumes roundsOverride here instead of dropping it);
+      // workout id chains the blocks in sequence (P3 chain).
       onStart: () {
         final block = (workout?.blocks.isNotEmpty ?? false)
             ? workout!.blocks.first
@@ -898,6 +899,7 @@ class _DaySessionsSlot extends StatelessWidget {
         if (rounds != null) params.add('rounds=$rounds');
         if (reps != null) params.add('reps=$reps');
         if (rest != null) params.add('rest=$rest');
+        if (workout != null) params.add('workout=${workout.id}');
         if (params.isNotEmpty) {
           route += '${route.contains('?') ? '&' : '?'}${params.join('&')}';
         }

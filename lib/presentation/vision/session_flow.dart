@@ -75,3 +75,67 @@ String calibrationCompleteLine(CalibrationDepth depth) => switch (depth) {
       CalibrationDepth.unknown =>
         'Calibration skipped — no range measured. Round one, begin!',
     };
+
+/// One sequenced workout block (deduplicated by exercise, order kept —
+/// mirrors [StartSession] so chain indices always line up with the
+/// session's exercises).
+class ChainBlock {
+  const ChainBlock({
+    required this.exerciseId,
+    required this.sets,
+    required this.reps,
+    required this.seconds,
+    required this.restSec,
+  });
+
+  final String exerciseId;
+  final int sets;
+  final int reps;
+
+  /// > 0 → timed block (hold target seconds) instead of a rep target.
+  final int seconds;
+  final int restSec;
+}
+
+/// Unique-in-order blocks of a workout's block exercise ids with their
+/// prescriptions. Null entries resolve nothing — skipped, never crash.
+List<ChainBlock> uniqueBlocks({
+  required List<String> exerciseIds,
+  required int Function(String id) setsFor,
+  required int Function(String id) repsFor,
+  required int Function(String id) secondsFor,
+  required int Function(String id) restFor,
+}) {
+  final seen = <String>{};
+  final out = <ChainBlock>[];
+  for (final id in exerciseIds) {
+    if (id.isEmpty || !seen.add(id)) continue;
+    out.add(ChainBlock(
+      exerciseId: id,
+      sets: setsFor(id),
+      reps: repsFor(id),
+      seconds: secondsFor(id),
+      restSec: restFor(id),
+    ));
+  }
+  return out;
+}
+
+/// Resume index for a chain session: the paused position wins when the
+/// screen stored one; otherwise the first block whose recorded rounds
+/// fall short of its prescription (timed blocks: untouched → redo).
+/// Falls back to 0 when everything reads complete (re-run from the top).
+int chainResumeIndex({
+  required int exerciseCount,
+  required int? pausedIndex,
+  required int Function(int index) roundsDone,
+  required int Function(int index) setsTarget,
+}) {
+  if (pausedIndex != null && pausedIndex >= 0 && pausedIndex < exerciseCount) {
+    return pausedIndex;
+  }
+  for (var i = 0; i < exerciseCount; i++) {
+    if (roundsDone(i) < setsTarget(i)) return i;
+  }
+  return 0;
+}

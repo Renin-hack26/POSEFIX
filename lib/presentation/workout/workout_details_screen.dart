@@ -327,8 +327,8 @@ class _DetailBody extends StatelessWidget {
                   if (sets != null) params.add('rounds=$sets');
                   if (reps != null) params.add('reps=$reps');
                   if (rest != null) params.add('rest=$rest');
-                  final suffix =
-                      params.isEmpty ? '' : '&${params.join('&')}';
+                  params.add('workout=${workout.id}');
+                  final suffix = '&${params.join('&')}';
                   context.push('/vision?ex=$firstExerciseId$suffix');
                 }
               : null,

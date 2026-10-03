@@ -88,6 +88,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             targetRounds: paramInt('rounds'),
             targetReps: paramInt('reps'),
             restSec: paramInt('rest'),
+            workoutId: q['workout'],
           );
         },
       ),

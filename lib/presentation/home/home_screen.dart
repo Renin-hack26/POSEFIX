@@ -331,11 +331,17 @@ class _SessionSlot extends StatelessWidget {
 
     if (active != null) {
       final paused = active.status == SessionStatus.paused;
-      // Resume into the same exercise the in-flight session tracks; the
-      // bare /vision route silently defaults to squat.
-      final resumeEx = active.exercises.isNotEmpty
-          ? active.exercises.first.exerciseId
-          : null;
+      // Resume into the paused exercise (or the first tracked one); the
+      // workout id re-arms the chain so Next/resume continue mid-workout.
+      final pausedIdx = active.pausedState?.exerciseIndex;
+      final resumeEx = (pausedIdx != null &&
+              pausedIdx >= 0 &&
+              pausedIdx < active.exercises.length)
+          ? active.exercises[pausedIdx].exerciseId
+          : (active.exercises.isNotEmpty
+              ? active.exercises.first.exerciseId
+              : null);
+      final wid = active.workoutId;
       return SessionSlot(
         when: paused ? 'PAUSED · TAP TO RESUME' : 'IN PROGRESS',
         title: data.activeWorkout?.name ?? 'Workout in progress',
@@ -343,8 +349,13 @@ class _SessionSlot extends StatelessWidget {
             ? 'Paused mid-session — your progress is saved'
             : 'Session underway — jump back in',
         actionLabel: paused ? 'Resume session' : 'Continue',
-        onStart: () => context.push(
-            resumeEx == null ? '/vision' : '/vision?ex=$resumeEx'),
+        onStart: () {
+          var route = resumeEx == null ? '/vision' : '/vision?ex=$resumeEx';
+          if (resumeEx != null && !wid.startsWith('single_')) {
+            route += '&workout=$wid';
+          }
+          context.push(route);
+        },
       );
     }
 

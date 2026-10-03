@@ -97,7 +97,7 @@
   7 reported → all 7 resolved in Batch 7 (placeholders deleted,
   hasCountedMovements removed, prettyId hyphens, splash comment,
   relativeDay future, pack kinds → counted, StartSession question below).
-- Multi-exercise sessions (P3 remainder): `StartSession` is dead code;
-  entry points run only the first block. Needs user decision: thread
-  `workoutId` through `/vision` for sequential blocks, or keep
-  single-exercise sessions.
+- Multi-exercise sessions (P3 remainder — DONE, user chose "build the
+  chain"): `workoutId` threads through `/vision`; `StartSession` revived;
+  blocks run in sequence with Next; per-exercise persistence + paused
+  resume; summed credit at End.
