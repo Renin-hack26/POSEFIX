@@ -141,28 +141,23 @@ void main() {
         reason: 'required exerciseFromJson/instruction fields: $broken');
   });
 
-  test('workout demo paths follow the assets/videos/ convention', () {
-    // NOTE: the 44 mp4 files are intentionally NOT bundled (assets/videos/
-    // ships empty), so only the path shape is asserted here — never the
-    // file's existence.
-    final broken = <String>[];
+  test('no workout declares an mp4 demo path (assets/videos/ ships empty)', () {
+    // The 44 workout-level `demoVideoAsset: assets/videos/*.mp4` refs were
+    // dead — the mp4s are not bundled (assets/videos/ ships empty) and no
+    // screen ever rendered them — so the pack no longer declares ANY
+    // workout-level demo video. Exercise GIFs under assets/demo/ are
+    // unaffected (asserted above). Re-add a path only with a real file.
+    final withVideo = <String>[];
     for (final w in workoutEntries) {
       final workout = _asMap(w);
-      final id = '${workout['id']}';
-      final asset = workout['demoVideoAsset'];
-      if (asset == null) continue;
-      // BUG-2: the filename must be exactly the workout id — a stale id or
-      // a hand-edited path breaks every library card player.
-      final expected = 'assets/videos/$id.mp4';
-      if (!_present(asset)) {
-        broken.add('$id: blank demoVideoAsset (expected $expected)');
-      } else if (asset != expected) {
-        broken.add('$id: $asset (expected $expected)');
+      if (_present(workout['demoVideoAsset'])) {
+        withVideo.add('${workout['id']}: ${workout['demoVideoAsset']}');
       }
     }
-    expect(broken, isEmpty,
-        reason: 'workout-level demo paths must be exactly '
-            'assets/videos/<id>.mp4 (or null): $broken');
+    expect(withVideo, isEmpty,
+        reason: 'workouts must not reference unbundled mp4s — declare a '
+            'demo video only once the file ships under assets/videos/: '
+            '$withVideo');
   });
 
   test('exactly 4 exercises ship no demo GIF (form-guide fallback)', () {

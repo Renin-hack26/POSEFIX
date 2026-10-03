@@ -128,6 +128,7 @@ class _MealScreenState extends ConsumerState<MealScreen> {
     await ref
         .read(nutritionRepositoryProvider)
         .saveTarget(MealTarget(dailyCalories: value));
+    ref.read(mealsRevisionProvider.notifier).bump();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Daily target: $value kcal')),
@@ -197,6 +198,8 @@ class _MealScreenState extends ConsumerState<MealScreen> {
             mealType: _tag,
             timeMillis: _at.millisecondsSinceEpoch,
           ));
+      // Let Plan (and any other meal consumer) reload its one-shot snapshot.
+      ref.read(mealsRevisionProvider.notifier).bump();
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Meal logged — $calories kcal')));
@@ -594,6 +597,7 @@ class _MealScreenState extends ConsumerState<MealScreen> {
                             await ref
                                 .read(nutritionRepositoryProvider)
                                 .removeEntry(e.id);
+                            ref.read(mealsRevisionProvider.notifier).bump();
                             if (mounted) _reloadToday();
                           },
                         ),

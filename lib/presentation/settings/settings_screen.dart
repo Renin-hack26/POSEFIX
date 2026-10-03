@@ -27,12 +27,9 @@ const _themeOptions = [
 
 /// Device-local keys for flags not listed among [HiveService]'s constants.
 /// The settings box is open key/value storage — these survive restarts.
-const String _kReminderMinuteOfDay =
-    'reminderMinuteOfDay'; // int — minutes since 00:00
+/// (The reminder-time key/default live on [NotificationEngine] — shared and
+/// migration-stable, so a rename can never orphan stored reminder times.)
 const String _kCoachMuted = 'coachMuted'; // bool — true = spoken cues off
-
-/// Default daily reminder time (07:00) until the user picks one.
-const int _defaultReminderMinuteOfDay = 7 * 60;
 
 /// 14 — Settings tab (sample/index.html): profile, preferences, notifications,
 /// coach voice, data and account.
@@ -206,7 +203,7 @@ class _SettingsBodyState extends ConsumerState<_SettingsBody> {
 
   Future<void> _scheduleDailyReminder(NotificationEngine engine) async {
     final minuteOfDay =
-        HiveService.getInt(_kReminderMinuteOfDay) ?? _defaultReminderMinuteOfDay;
+        HiveService.getInt(NotificationEngine.reminderMinuteOfDayKey) ?? NotificationEngine.defaultReminderMinuteOfDay;
     await engine.scheduleDailyReminder(
       hour: minuteOfDay ~/ 60,
       minute: minuteOfDay % 60,
@@ -217,14 +214,14 @@ class _SettingsBodyState extends ConsumerState<_SettingsBody> {
 
   Future<void> _pickReminderTime() async {
     final minuteOfDay =
-        HiveService.getInt(_kReminderMinuteOfDay) ?? _defaultReminderMinuteOfDay;
+        HiveService.getInt(NotificationEngine.reminderMinuteOfDayKey) ?? NotificationEngine.defaultReminderMinuteOfDay;
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: minuteOfDay ~/ 60, minute: minuteOfDay % 60),
     );
     if (picked == null) return;
     await HiveService.setInt(
-        _kReminderMinuteOfDay, picked.hour * 60 + picked.minute);
+        NotificationEngine.reminderMinuteOfDayKey, picked.hour * 60 + picked.minute);
     if (_remindersEnabled) {
       await _scheduleDailyReminder(ref.read(notificationEngineProvider));
     }
@@ -234,7 +231,7 @@ class _SettingsBodyState extends ConsumerState<_SettingsBody> {
 
   String _reminderLabel() {
     final minuteOfDay =
-        HiveService.getInt(_kReminderMinuteOfDay) ?? _defaultReminderMinuteOfDay;
+        HiveService.getInt(NotificationEngine.reminderMinuteOfDayKey) ?? NotificationEngine.defaultReminderMinuteOfDay;
     final hour = minuteOfDay ~/ 60;
     final minute = (minuteOfDay % 60).toString().padLeft(2, '0');
     final suffix = hour < 12 ? 'AM' : 'PM';

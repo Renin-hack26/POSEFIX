@@ -50,6 +50,22 @@ class NotificationEngine {
   /// schedule the single config cannot describe (nor re-arm).
   static const int dailyReminderNotificationId = 0x646179; // 'day'
 
+  /// One channel per notification kind (organized-notifications):
+  /// the daily reminder, one-shot session alerts (rest timers, nudges),
+  /// and the legacy id — kept so alarms scheduled by older builds still
+  /// render on their original channel instead of falling back to default.
+  static const String dailyRemindersChannelId = 'daily_reminders';
+  static const String sessionAlertsChannelId = 'session_alerts';
+  static const String legacyWorkoutChannelId = 'workout_reminders';
+
+  /// Hive settings key for the daily reminder time (minutes since 00:00),
+  /// single-sourced here — Settings previously owned this exact string, and
+  /// a rename would silently orphan every user's stored reminder time.
+  static const String reminderMinuteOfDayKey = 'reminderMinuteOfDay';
+
+  /// Default daily reminder time (07:00) until the user picks one.
+  static const int defaultReminderMinuteOfDay = 7 * 60;
+
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
@@ -134,19 +150,41 @@ class NotificationEngine {
       debugPrint('NotificationEngine: launch details unavailable ($e)');
     }
 
-    // Create channel for workout reminders
-    const androidChannel = AndroidNotificationChannel(
-      'workout_reminders',
-      'Workout Reminders',
-      description: 'Notifications for your scheduled workout sessions',
-      importance: Importance.high,
-      playSound: true,
-      enableVibration: true,
-    );
-    await _notifications
+    // Create one channel per notification kind. The legacy channel is kept
+    // (no new schedules use it) so alarms stored by older builds still
+    // render with their original sound/vibration behavior.
+    const androidChannels = [
+      AndroidNotificationChannel(
+        dailyRemindersChannelId,
+        'Daily Reminders',
+        description: 'Daily workout reminders at your chosen time',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+      ),
+      AndroidNotificationChannel(
+        sessionAlertsChannelId,
+        'Session Alerts',
+        description: 'One-off workout alerts (rest timers, session nudges)',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+      ),
+      AndroidNotificationChannel(
+        legacyWorkoutChannelId,
+        'Workout Reminders',
+        description: 'Notifications for your scheduled workout sessions',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+      ),
+    ];
+    final androidImpl = _notifications
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(androidChannel);
+            AndroidFlutterLocalNotificationsPlugin>();
+    for (final channel in androidChannels) {
+      await androidImpl?.createNotificationChannel(channel);
+    }
 
     // Request permissions
     await _requestPermissions(allowPrompt: requestPermission);
@@ -263,10 +301,9 @@ class NotificationEngine {
       scheduledDate: scheduledDate,
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
-          'workout_reminders',
-          'Workout Reminders',
-          channelDescription:
-              'Notifications for your scheduled workout sessions',
+          dailyRemindersChannelId,
+          'Daily Reminders',
+          channelDescription: 'Daily workout reminders at your chosen time',
           importance: Importance.high,
           priority: Priority.high,
           playSound: true,
@@ -328,9 +365,10 @@ class NotificationEngine {
       scheduledDate: scheduledDate,
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
-          'workout_reminders',
-          'Workout Reminders',
-          channelDescription: 'Notifications for your scheduled workout sessions',
+          sessionAlertsChannelId,
+          'Session Alerts',
+          channelDescription:
+              'One-off workout alerts (rest timers, session nudges)',
           importance: Importance.high,
           priority: Priority.high,
           playSound: true,

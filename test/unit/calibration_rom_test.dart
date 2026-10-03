@@ -3,7 +3,6 @@
 /// session screen derives from the learned primary-angle range.
 library;
 
-import 'package:fixpose/core/pose/pose_analyzer.dart';
 import 'package:fixpose/presentation/vision/session_flow.dart';
 import 'package:flutter_test/flutter_test.dart';
 

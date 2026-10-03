@@ -222,6 +222,25 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
 });
 
 // ---------------------------------------------------------------------------
+// Cross-screen revision counters
+// ---------------------------------------------------------------------------
+
+/// Bumped whenever today's nutrition data changes (meal logged, entry
+/// removed, target edited). Screens that resolve meals once per entry —
+/// Plan (`_PlanData` loads in `initState`) — listen and reload, so the
+/// Plan "Log meal" round-trip no longer returns to a stale snapshot
+/// ("No meals logged yet" after logging, WS: meals-on-Plan root cause).
+final mealsRevisionProvider =
+    NotifierProvider<MealsRevisionNotifier, int>(MealsRevisionNotifier.new);
+
+class MealsRevisionNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
+}
+
+// ---------------------------------------------------------------------------
 // Use cases
 // ---------------------------------------------------------------------------
 

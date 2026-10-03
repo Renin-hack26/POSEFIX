@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/di/app_dependencies.dart';
+import '../../core/search/library_search.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/extensions.dart';
 import '../../domain/entities/exercise.dart';
@@ -173,6 +174,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Meals (and target) are resolved once per entry in initState — but the
+    // Plan screen's own "Log meal" link pushes /meal ON TOP of this tab, so
+    // returning used to show the stale snapshot ("No meals logged yet" right
+    // after logging). Reload whenever today's nutrition data changes.
+    ref.listen(mealsRevisionProvider, (previous, next) {
+      if (previous != next) setState(() => _future = _load());
+    });
     final p = context.palette;
     return Scaffold(
       body: GridBackground(
@@ -1011,15 +1019,74 @@ class _NextSessionCard extends StatelessWidget {
   }
 }
 
-/// Horizontal "Exercise library" carousel from the bundled catalog.
-class _LibrarySection extends StatelessWidget {
+/// Horizontal "Exercise library" carousel from the bundled catalog, with
+/// smart search (WS7.4): exercise names, muscles, difficulty and description,
+/// plus related-word (synonym) expansion and typo tolerance — the same
+/// [LibrarySearch] semantics as the WorkoutScreen, scoped to exercises.
+class _LibrarySection extends StatefulWidget {
   const _LibrarySection({required this.exercises});
 
   final List<Exercise> exercises;
 
   @override
+  State<_LibrarySection> createState() => _LibrarySectionState();
+}
+
+class _LibrarySectionState extends State<_LibrarySection> {
+  String _query = '';
+
+  @override
   Widget build(BuildContext context) {
-    final preview = exercises.take(3).toList();
+    final p = context.palette;
+    final searching = _query.trim().isNotEmpty;
+    final source = searching
+        ? LibrarySearch.filterExercises(widget.exercises, _query)
+        : widget.exercises;
+    // Search shows more matches; browsing keeps the curated 3-card preview.
+    final preview = searching ? source.take(8).toList() : source.take(3).toList();
+    final Widget listing;
+    if (preview.isEmpty && searching) {
+      listing = GlassCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'No exercises match "$_query".',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: p.ink,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Try a muscle (legs, chest), a goal (fat burn), '
+              'or an exercise (squat).',
+              style: TextStyle(fontSize: 12.5, color: p.ink3),
+            ),
+          ],
+        ),
+      );
+    } else if (preview.isEmpty) {
+      listing = const _LibraryEmpty();
+    } else {
+      listing = SizedBox(
+        // 146 = thumb(72) + spacing + text block + 1.2px border + 10px
+        // padding with ~7px slack — at 138 the column overflowed by
+        // ~5px with real device font metrics (stripes on every card).
+        height: 146,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            for (var i = 0; i < preview.length; i++) ...[
+              if (i > 0) const SizedBox(width: 10),
+              _LibraryCard(exercise: preview[i], toneIndex: i % 3),
+            ],
+          ],
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1029,25 +1096,86 @@ class _LibrarySection extends StatelessWidget {
           onAction: preview.isEmpty ? null : () => context.go('/workout'),
         ),
         const SizedBox(height: 10),
-        if (preview.isEmpty)
-          const _LibraryEmpty()
-        else
-          SizedBox(
-            // 146 = thumb(72) + spacing + text block + 1.2px border + 10px
-            // padding with ~7px slack — at 138 the column overflowed by
-            // ~5px with real device font metrics (stripes on every card).
-            height: 146,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (var i = 0; i < preview.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 10),
-                  _LibraryCard(exercise: preview[i], toneIndex: i % 3),
-                ],
-              ],
-            ),
-          ),
+        _LibrarySearchField(
+          onChanged: (v) => setState(() => _query = v),
+          onClear: () => setState(() => _query = ''),
+        ),
+        const SizedBox(height: 10),
+        listing,
       ],
+    );
+  }
+}
+
+/// Compact search field for the plan's exercise library — same glass styling
+/// as the WorkoutScreen field, but without autofocus (the plan screen must
+/// not steal focus on open).
+class _LibrarySearchField extends StatefulWidget {
+  const _LibrarySearchField({required this.onChanged, required this.onClear});
+
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  State<_LibrarySearchField> createState() => _LibrarySearchFieldState();
+}
+
+class _LibrarySearchFieldState extends State<_LibrarySearchField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      height: 42,
+      decoration: BoxDecoration(
+        color: p.glass,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: p.border),
+        boxShadow: [
+          BoxShadow(
+            color: p.shadowSoft,
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _controller,
+        onChanged: widget.onChanged,
+        decoration: InputDecoration(
+          hintText: 'Search exercises...',
+          hintStyle: TextStyle(fontSize: 13, color: p.ink3),
+          prefixIcon: Icon(Icons.search, size: 21, color: p.ink3),
+          suffixIcon: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) => _controller.text.isEmpty
+                ? const SizedBox.shrink()
+                : IconButton(
+                    icon: Icon(Icons.clear, size: 21, color: p.ink3),
+                    onPressed: () {
+                      _controller.clear();
+                      widget.onClear();
+                    },
+                  ),
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+        style: TextStyle(fontSize: 13, color: p.ink),
+      ),
     );
   }
 }

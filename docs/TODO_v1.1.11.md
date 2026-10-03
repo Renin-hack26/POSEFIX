@@ -28,7 +28,7 @@
 | 2.7 | Bottom bar: **Pause / Cancel / End** — Cancel = confirm + discard (`clearActive`, no credit), End = existing complete→summary, Pause = instant w/ banner | ⬜ |
 | 2.8 | **Loading popup before session** (await SoundEngine ready + FSM resolve + analyzer start + camera, with step labels) | ⬜ |
 | 2.9 | Skip-count fix: emit `repRejectedReason` from BrainEngine when trigger commits but ROM/timing gate fails → coach bar "not counted" + haptic (never silent) | ⬜ |
-| 2.10 | Auto-calibration: run `CalibrationConfig` (enabled on 6 exercises, never read today) as pre-session ROM-learning phase; sync with workout | ⬜ |
+| 2.10 | Auto-calibration: run `CalibrationConfig` (enabled on 6 exercises, never read today) as pre-session ROM-learning phase; sync with workout | 🔄 (pure layer DONE Batch 2: `RomCapture`/judge/announce in `session_flow.dart` + 10 tests; screen-phase wiring stays in Batch 4) |
 | 2.11 | Voice enrichment: wire milestone cues (every 5 reps), round/rest announcements, PLANNING §5.3 | ⬜ |
 | 2.12 | Auto-pause on app background (`didChangeAppLifecycleState`, PLANNING 223); elapsed timer | ⬜ |
 
@@ -41,20 +41,20 @@
 | 3.4 | Daily calorie totals surfaced on the meal page (eaten / target + progress bar) | ✅ |
 | 3.5 | Tests: AI estimate contract (6), tag windows (5), meal screen flows (5), log screen (2), report nutrition (entity+prompt+fallback+PDF+screen) | ✅ |
 | 3.6 | Data: `MealEntry.timeMillis` device-local column, schema v1→2 drift migration (`onUpgrade` `addColumn`), log-ordered by time; sync download preserves local time (payload untouched) | ✅ |
-| 3.7 | Routes `/meal` + `/log` reserved (1 slot recipe) + DI provider; entry links: Plan "Log meal → /meal", History "View all → /log" (inline expander superseded by the log page) + header cross-links meal ↔ log | ✅ |
+| 3.7 | Routes `/meal` + `/log` reserved (1 slot recipe) + DI provider; entry links: Plan "Log meal → /meal", History "View all → /log" (inline expander superseded by the log page) + header cross-links meal ↔ log | ✅ (+ Batch 1 meals-on-Plan fix: Plan reloads on `mealsRevision` — the one-shot `initState` snapshot showed stale "no meals" after the /meal round-trip) |
 | 3.8 | Wiring beyond the pages (user request): VEDA AI context feed gets today's kcal/target/meals (chat + local fallback); report gains nutrition (entity fields, AI prompt, rule-based bullet, PDF section, on-screen section — shown only when meals exist) | ✅ |
 
-## WS4 — Strike, library cards, plan slots ✅ grounded (explorer B) · 🔄 agent running → ✅ (agent complete + audit fixes)
+## WS4 — Strike, library cards, plan slots ✅ (Batch 1: strike wired + cards clickable + slots stable)
 | # | Item | Status |
 |---|---|---|
-| 4.1 | Strike starts from **1**: ROOT CAUSE FOUND — `EndSession` usecase is dead code; `_endSession()` bypasses strike credit → wire it (plus no fake "0 day streak" on Home loading/error) | 🔄 |
-| 4.2 | Exercise-library **slot cards clickable** → `_LibraryCard` is a bare Container (no gesture) → Material+InkWell → detail route | 🔄 |
-| 4.3 | Plan **slots stable**: `_DaySessionsSlot` height changes per day → rest-day floor height + AnimatedSize + uniform card dimensions | 🔄 |
+| 4.1 | Strike starts from **1**: ROOT CAUSE FOUND — `EndSession` usecase is dead code; `_endSession()` bypasses strike credit → wire it (plus no fake "0 day streak" on Home loading/error) | ✅ (routed through `endSessionProvider`; `strike_wiring_test` pins it) |
+| 4.2 | Exercise-library **slot cards clickable** → `_LibraryCard` is a bare Container (no gesture) → Material+InkWell → detail route | ✅ (confirmed in code) |
+| 4.3 | Plan **slots stable**: `_DaySessionsSlot` height changes per day → rest-day floor height + AnimatedSize + uniform card dimensions | ✅ (confirmed in code) |
 
 ## WS5 — Content: workouts data + demo preview ✅ (agent complete)
 | # | Item | Status |
 |---|---|---|
-| 5.1 | Content integrity test (blocks→exercises→FSM); repair ambiguous refs; report gaps (44 workouts, 40 exercises; 4 exercises lack GIF; assets/videos/ empty — 44 dead mp4 refs, never rendered) | ✅ (6 tests, no repairs needed) |
+| 5.1 | Content integrity test (blocks→exercises→FSM); repair ambiguous refs; report gaps (44 workouts, 40 exercises; 4 exercises lack GIF; assets/videos/ empty — 44 dead mp4 refs, never rendered) | ✅ (6 tests, no repairs needed; Batch 1: the 44 dead mp4 refs removed from `workouts.json`, test now pins "no mp4 path") |
 | 5.2 | Demo preview fixes: `instruction_video_screen` height jumps (202↔220↔video) + build-time flag mutation + caption layer crossing; mapper null-tolerance; workout-details hero now shows first block's GIF | ✅ |
 
 ## WS6 — Engine coverage + vision/skeleton robustness 🔄 partially done
@@ -70,7 +70,7 @@
 | 7.1 | Unified `LibrarySearch` (domain, pure + unit-tested): score workouts **and exercises** by — workout/exercise **name** (word + prefix), **category / goal / focusMuscles / tags / level**, **exercise names inside `blocks`** ("push" finds every workout containing push-ups), description keywords | ⬜ |
 | 7.2 | **Related-word expansion**: synonym map (legs→quads/hamstrings/glutes/squat, abs/core→plank/crunch, chest→push-up/bench, cardio→fat burn/HIIT/jump, back→row/deadlift, shoulders→press/lateral, arms→curl/tricep, stretch→mobility/flexibility…) expanded at query time; multi-token queries = AND across tokens | ⬜ |
 | 7.3 | Typo tolerance: normalized (case/separator) equality + prefix match + edit-distance ≤1 for tokens ≥5 chars | ⬜ |
-| 7.4 | Wire into `WorkoutScreen._filterWorkouts` (today: **name `contains` only**, workout_screen.dart:282-285), plan `_LibrarySection` (today: no search), empty-state copy suggests related terms | ⬜ |
+| 7.4 | Wire into `WorkoutScreen._filterWorkouts` (today: **name `contains` only**, workout_screen.dart:282-285), plan `_LibrarySection` (today: no search), empty-state copy suggests related terms | ✅ (workout half already wired; Batch 1 added the plan search box over `filterExercises` + related-terms empty state) |
 | 7.5 | Tests: unit (synonyms, multi-token, name-prefix, block-exercise match, no-match) + widget (search field filters with related word) | ⬜ |
 
 ## WS8 — Engine rules + feedback vocabulary + angle readouts ❌ cancelled (user 2026-10-01: "NO NEW IMPLEMENTATION — fix what you had made till now"; re-plan for v1.1.12)

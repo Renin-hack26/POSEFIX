@@ -564,22 +564,22 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       } catch (_) {}
     }
     if (_session != null) {
-      final repository = ref.read(sessionRepositoryProvider);
-      final completedSession = _session!.copyWith(
-        status: SessionStatus.completed,
-        endedAt: DateTime.now(),
-        durationSec: _sessionStartTime != null
-            ? DateTime.now().difference(_sessionStartTime!).inSeconds
-            : 0,
-        totalReps: _reps,
-        formAccuracyPct: _formScoreCount > 0
-            ? _totalFormScoreSum / _formScoreCount
-            : 0,
-      );
-      await repository.completeSession(completedSession);
+      // Route through the EndSession usecase (WS4 4.1): it finalizes the
+      // session AND runs the post-workout chain — strike credit, plan credit,
+      // report. The old direct repository call bypassed all of it, which is
+      // why the strike never moved after a workout.
       final avgForm = _formScoreCount > 0
           ? _totalFormScoreSum / _formScoreCount
           : 0.0;
+      final report = await ref.read(endSessionProvider)(
+        _session!.copyWith(
+          totalReps: _reps,
+          formAccuracyPct: avgForm,
+          durationSec: _sessionStartTime != null
+              ? DateTime.now().difference(_sessionStartTime!).inSeconds
+              : 0,
+        ),
+      );
       final mood = computeMood(
         targetCompletion: 1.0,
         avgForm: avgForm,
@@ -587,7 +587,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       );
       await _audioCues?.onComplete(mood);
       if (mounted) {
-        context.go('/summary?session=${completedSession.id}');
+        context.go('/summary?session=${report.sessionId}');
       }
     } else if (mounted) {
       context.go('/summary');
