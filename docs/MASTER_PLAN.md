@@ -183,7 +183,20 @@ hold target. Resume replays from the paused/first-incomplete block;
 display totals are offset-based so a fresh engine never loses history
 (also fixes the old single-mode resume drop).
 
-## Batch 8 — KGP + R8 + P10 release APK
+## Batch 8 — KGP + R8 + P10 release APK (PREP DONE; release parked)
+
+- R8: `isMinifyEnabled` + `isShrinkResources` on + `proguard-rules.pro`
+  (Play Core split-install dontwarn — Flutter engine references it
+  without the dependency; no deferred components shipped). Release
+  smoke build validates.
+- KGP warning (`flutter_timezone`, `flutter_tts`, `workmanager_android`
+  apply the Kotlin Gradle Plugin): plugin-side, nothing to change
+  in-repo — resolves via future plugin upgrades.
+- P10 release APK: BLOCKED on the user's signing key (release currently
+  signs with debug keys — smoke builds only, never shippable).
+- Convention reminder: `*.apk` is git-ignored (too large for git/GitHub);
+  APKs deliver under `releases/`, never committed. Same for
+  `website/downloads/` (250 MB).
 
 Blocked on user: **P9 custom model**, **release signing key**.
 

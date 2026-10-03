@@ -43,6 +43,10 @@ android {
             // codegen, not reflection. Verified by release smoke builds.
             isMinifyEnabled = true
             isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
