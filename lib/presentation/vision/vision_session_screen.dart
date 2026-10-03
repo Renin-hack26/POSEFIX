@@ -16,7 +16,9 @@ import '../../core/pose/angle_readouts.dart';
 import '../../core/pose/brain_engine.dart';
 import '../../core/pose/exercise_definition.dart';
 import '../../core/pose/pose_analyzer.dart';
+import '../../core/pose/pose_landmarker_source.dart';
 import '../../core/pose/round_tracker.dart';
+import '../../core/pose/trust_gate.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/workout_session.dart';
 import '../../domain/repositories/session_repository.dart';
@@ -102,6 +104,17 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   /// Exercise definition for this session (readouts + hold target).
   ExerciseDefinition? _definition;
 
+  // --- Batch 5 pose stack ------------------------------------------------------
+  /// MediaPipe PoseLandmarker (heavy) source; ML Kit stays the fallback.
+  final PoseLandmarkerSource _landmarkerSource = PoseLandmarkerSource();
+
+  /// True once the landmarker backend is up for this session.
+  bool _useLandmarker = false;
+
+  /// Overlay rotation: the landmarker pre-rotates to upright natively.
+  InputImageRotation _overlayRotation =
+      InputImageRotation.rotation270deg;
+
   /// Exercise-aware angle readouts (WS8.4) — rendered bottom-left/right.
   String? _readoutLeft;
   String? _readoutRight;
@@ -139,6 +152,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   /// Overlay form signal for the skeleton painter (WS6.2): -1 bad, 0
   /// neutral, +1 good — derived from the live feedback severities.
   int _formSignal = 0;
+
+  /// Trust-hold banner copy (null = counting live).
+  String? _trustHoldLabel;
 
   /// Whether the current cue bar copy is a warning (warn/ok color states).
   bool _cueWarn = false;
@@ -199,6 +215,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       poses: _lastPosesFound,
       error: _pipelineError,
       lens: _lens,
+      backend: _useLandmarker ? 'landmarker' : 'mlkit',
       reps: _reps,
       roundReps: roundReps,
       roundLabel: roundLabel,
@@ -210,6 +227,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       framing: _framing,
       coachCue: _coachCue,
       cueWarn: _cueWarn,
+      trustHold: _trustHoldLabel,
       paused: _paused,
       readoutLeft: _readoutLeft,
       readoutRight: _readoutRight,
@@ -229,7 +247,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     _skeletonPainter.pose = _latestPose;
     _skeletonPainter.imageWidth = _imageWidth;
     _skeletonPainter.imageHeight = _imageHeight;
-    _skeletonPainter.rotation = _rotation;
+    _skeletonPainter.rotation = _overlayRotation;
     _skeletonPainter.mirrored = _lens == CameraLensDirection.front;
     _skeletonPainter.formSignal = _formSignal;
     _overlayTick.tick();
@@ -263,6 +281,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     'Loading your session',
     'Setting repetition targets',
     'Starting the analyzer',
+    'Loading the pose model',
     'Starting the camera',
   ];
 
@@ -352,7 +371,19 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       return;
     }
 
+    // Batch 5 primary backend: PoseLandmarker (heavy). Any failure here —
+    // missing model, native load error — falls back to ML Kit (step 4
+    // already warmed it), so the camera never dies on the new stack.
     _setBootStep(5);
+    try {
+      _useLandmarker = await _landmarkerSource.init();
+    } catch (_) {
+      _useLandmarker = false;
+    }
+    debugPrint(
+        'VisionSession: pose backend = ${_useLandmarker ? 'landmarker-heavy' : 'mlkit-fallback'}');
+
+    _setBootStep(6);
     await _initCamera();
     if (!mounted || _disposed) return;
     _setBootStep(-1);
@@ -663,16 +694,42 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     unawaited(_feed(analyzer, image));
   }
 
+  int get _rotationDegrees => switch (_rotation) {
+        InputImageRotation.rotation0deg => 0,
+        InputImageRotation.rotation90deg => 90,
+        InputImageRotation.rotation180deg => 180,
+        InputImageRotation.rotation270deg => 270,
+      };
+
   Future<void> _feed(PoseAnalyzer analyzer, CameraImage image) async {
     try {
       _imageWidth = image.width.toDouble();
       _imageHeight = image.height.toDouble();
-      final PoseFrameResult? result = await analyzer.processCameraImage(
-        image,
-        imageWidth: image.width.toDouble(),
-        imageHeight: image.height.toDouble(),
-        rotation: _rotation,
-      );
+      PoseFrameResult? result;
+      if (_useLandmarker) {
+        // Batch 5 primary path: heavy landmarker natively, ML Kit types
+        // downstream (adapter), same pipeline either way. A dropped frame
+        // just yields to the next one.
+        final frame =
+            await _landmarkerSource.detect(image, _rotationDegrees);
+        if (frame == null) return;
+        _imageWidth = frame.frameW;
+        _imageHeight = frame.frameH;
+        _overlayRotation = InputImageRotation.rotation0deg;
+        result = await analyzer.processLandmarkerFrame(
+          frame,
+          inferenceMs: frame.inferenceMs.round(),
+          nowMs: DateTime.now().millisecondsSinceEpoch,
+        );
+      } else {
+        _overlayRotation = _rotation;
+        result = await analyzer.processCameraImage(
+          image,
+          imageWidth: image.width.toDouble(),
+          imageHeight: image.height.toDouble(),
+          rotation: _rotation,
+        );
+      }
       if (!mounted || _disposed) return;
       // Always refresh telemetry so the HUD proves the pipeline is alive
       // even when ML Kit returns zero poses — but only notify when the
@@ -795,6 +852,16 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       _state = brain.currentState;
       _coachCue = cue;
       _cueWarn = cueWarn;
+      // Batch 5 trust surface: a vetoed rep or a held frame explains
+      // itself in the trust banner instead of freezing silently.
+      if (brain.repHoldReason != HoldReason.none) {
+        _trustHoldLabel = 'Rep held — ${brain.repHoldReason.label}';
+      } else if (result.trust?.held == true) {
+        _trustHoldLabel =
+            'Counting paused — ${result.trust!.reason.label}';
+      } else {
+        _trustHoldLabel = null;
+      }
       // Exercise-aware angle readouts from the engine's live (smoothed)
       // angles + the duration hold clock (WS8.1/8.4).
       final definition = _definition;
@@ -1170,6 +1237,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
                     poses: snap.poses,
                     error: snap.error,
                     lens: snap.lens,
+                    backend: snap.backend,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1190,6 +1258,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
                         paused: snap.paused,
                         exerciseName:
                             _definition?.displayName ?? 'Live session',
+                        trustHold: snap.trustHold,
                       ),
                     ),
                   ),
@@ -1288,12 +1357,16 @@ class _PipelineStatus extends StatelessWidget {
     required this.poses,
     required this.error,
     required this.lens,
+    required this.backend,
   });
 
   final int frames;
   final int poses;
   final String? error;
   final CameraLensDirection lens;
+
+  /// Active pose backend tag.
+  final String backend;
 
   @override
   Widget build(BuildContext context) {
@@ -1305,7 +1378,7 @@ class _PipelineStatus extends StatelessWidget {
     } else if (frames == 0) {
       text = 'camera $lensLabel · starting feed…';
     } else {
-      text = 'camera $lensLabel · frames $frames · poses $poses';
+      text = 'camera $lensLabel · frames $frames · poses $poses · $backend';
     }
     return Container(
       width: double.infinity,
@@ -1336,6 +1409,7 @@ class _HudOverlay extends StatelessWidget {
     required this.framing,
     required this.paused,
     required this.exerciseName,
+    required this.trustHold,
   });
 
   final int roundReps;
@@ -1348,6 +1422,9 @@ class _HudOverlay extends StatelessWidget {
   final FramingCue framing;
   final bool paused;
   final String exerciseName;
+
+  /// Trust-hold banner copy (null = counting live).
+  final String? trustHold;
 
   @override
   Widget build(BuildContext context) {
@@ -1384,6 +1461,10 @@ class _HudOverlay extends StatelessWidget {
         if (framing != FramingCue.ok) ...[
           const SizedBox(height: 10),
           FramingCueCard(framing: framing),
+        ],
+        if (trustHold != null) ...[
+          const SizedBox(height: 10),
+          _TrustHoldBanner(label: trustHold!),
         ],
         if (paused) ...[
           const _PausedBanner(),
@@ -1760,6 +1841,45 @@ class _PausedBanner extends StatelessWidget {
   }
 }
 
+/// Trust-hold banner (Batch 5): why counting is frozen — the hold reason
+/// surfaced instead of a silent counter.
+class _TrustHoldBanner extends StatelessWidget {
+  const _TrustHoldBanner({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: p.glass,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: p.amberPillFg, width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.shield_outlined, size: 18, color: p.amberPillFg),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: p.ink,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SessionControlButton extends StatelessWidget {
   const _SessionControlButton({
     required this.icon,
@@ -1840,6 +1960,7 @@ class _HudSnapshot {
     required this.poses,
     required this.error,
     required this.lens,
+    required this.backend,
     required this.reps,
     required this.roundReps,
     required this.roundLabel,
@@ -1851,6 +1972,7 @@ class _HudSnapshot {
     required this.framing,
     required this.coachCue,
     required this.cueWarn,
+    required this.trustHold,
     required this.paused,
     required this.readoutLeft,
     required this.readoutRight,
@@ -1868,6 +1990,7 @@ class _HudSnapshot {
     poses: 0,
     error: null,
     lens: CameraLensDirection.front,
+    backend: 'mlkit',
     reps: 0,
     roundReps: 0,
     roundLabel: '—',
@@ -1879,6 +2002,7 @@ class _HudSnapshot {
     framing: FramingCue.ok,
     coachCue: null,
     cueWarn: false,
+    trustHold: null,
     paused: false,
     readoutLeft: null,
     readoutRight: null,
@@ -1895,6 +2019,9 @@ class _HudSnapshot {
   final int poses;
   final String? error;
   final CameraLensDirection lens;
+
+  /// Active pose backend (`landmarker` heavy or `mlkit` fallback).
+  final String backend;
   final int reps;
 
   /// Reps in the current round + `current/total` round + elapsed labels.
@@ -1911,6 +2038,9 @@ class _HudSnapshot {
 
   /// Warn/ok color state of the cue slot.
   final bool cueWarn;
+
+  /// Trust-hold banner copy (null = counting live).
+  final String? trustHold;
   final bool paused;
 
   /// Exercise-aware angle readouts, preformatted (`Knee 142°`).
@@ -1963,9 +2093,6 @@ class SkeletonOverlayPainter extends CustomPainter {
   static final Paint paintDot = Paint()
     ..style = PaintingStyle.fill
     ..color = const Color(0xFF00E676); // chartreuse accent
-  static final Paint paintDotLow = Paint()
-    ..style = PaintingStyle.fill
-    ..color = const Color(0xFFFF6D00); // low confidence
   static final Paint paintLine = Paint()
     ..style = PaintingStyle.stroke
     ..strokeWidth = 3
@@ -1990,6 +2117,28 @@ class SkeletonOverlayPainter extends CustomPainter {
     ..strokeWidth = 3.5
     ..strokeCap = StrokeCap.round
     ..color = const Color(0xFF00E676);
+
+  /// Batch 5 overlay tiers (port of the 39-bone 3-tier rendering):
+  /// structural bones thick, appendages medium, facial detail thin.
+  /// Widths scale with the canvas height (nominal 720p, like the
+  /// reference) so phones and tablets render the same hierarchy.
+  static final Paint paintSecond = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3
+    ..strokeCap = StrokeCap.round
+    ..color = const Color(0xFF00E676).withValues(alpha: 0.55);
+  static final Paint paintSecondLow = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3
+    ..strokeCap = StrokeCap.round
+    ..color = const Color(0xFFFF6D00).withValues(alpha: 0.55);
+
+  /// Hollow ring for occluded joints (Batch 5): a joint below the solid
+  /// threshold still reads as "there, but hidden" rather than gone.
+  static final Paint paintGhost = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2
+    ..color = Colors.white.withValues(alpha: 0.5);
   static final Paint paintFace = Paint()
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1.5
@@ -2017,11 +2166,10 @@ class SkeletonOverlayPainter extends CustomPainter {
   );
 
   /// MediaPipe Pose landmark connections (33-body model, skeleton lines).
+  /// Tiered per the Batch 5 merge (structural = major, hands/feet =
+  /// second, face = detail via [_face]): facial pairs live ONLY in [_face]
+  /// so the jaw is drawn once, thin — never a thick double stroke.
   static const List<(int, int)> _body = [
-    // Face: nose → eyes → ears → mouth
-    (0, 1), (1, 2), (2, 3), (3, 7),
-    (0, 4), (4, 5), (5, 6), (6, 8),
-    (9, 10),
     // Torso: shoulders → hips
     (11, 12),
     (11, 23), (12, 24), (23, 24),
@@ -2034,6 +2182,15 @@ class SkeletonOverlayPainter extends CustomPainter {
     // Right leg
     (24, 26), (26, 28), (28, 30), (28, 32), (30, 32),
   ];
+
+  /// Appendage bones (hands + feet) — medium tier. Everything else in
+  /// [_body] is structural (thick tier).
+  static const Set<(int, int)> _secondBones = {
+    (15, 17), (15, 19), (15, 21), (17, 19),
+    (16, 18), (16, 20), (16, 22), (18, 20),
+    (27, 29), (27, 31), (29, 31),
+    (28, 30), (28, 32), (30, 32),
+  };
 
   /// Face structure: jaw line (ear → mouth → mouth → ear), eyes, nose.
   static const List<(int, int)> _face = [
@@ -2085,10 +2242,13 @@ class SkeletonOverlayPainter extends CustomPainter {
     // per frame except the tiny per-frame landmark map.
 
     // Map landmarks: upright pixels → widget coordinates (cover + mirror).
+    // Defensive: a missing, low-confidence or non-finite joint has no
+    // trustworthy position — it draws nothing, never a line to nowhere.
     final landmarks = <int, Offset>{};
     for (int i = 0; i < 33; i++) {
       final lm = pose!.landmarks[PoseLandmarkType.values[i]];
       if (lm == null || lm.likelihood < 0.3) continue;
+      if (!lm.x.isFinite || !lm.y.isFinite) continue;
       final double nx = (lm.x / upW).clamp(0.0, 1.0);
       final double ny = (lm.y / upH).clamp(0.0, 1.0);
       double wx = offX + nx * upW * scale;
@@ -2103,18 +2263,25 @@ class SkeletonOverlayPainter extends CustomPainter {
     double? likelihoodOf(int i) =>
         pose!.landmarks[PoseLandmarkType.values[i]]?.likelihood;
 
-    // Body skeleton (lines colored by joint confidence; form signal
-    // overrides the confident tier — WS6.2/FR-5 green/red form coloring).
+    // Body skeleton: tiered widths (structural thick, appendages medium),
+    // confidence tiers (shaky segments dim), form signal overrides the
+    // confident tier (WS6.2/FR-5 green/red form coloring).
     for (final (a, b) in _body) {
       final pa = landmarks[a];
       final pb = landmarks[b];
       if (pa == null || pb == null) continue;
       final conf = math.min(likelihoodOf(a) ?? 0, likelihoodOf(b) ?? 0);
-      final linePaint = conf < 0.5
-          ? paintLineLow
-          : (formSignal < 0
-              ? paintLineBad
-              : (formSignal > 0 ? paintLineGood : paintLine));
+      final secondTier = _secondBones.contains((a, b));
+      final Paint linePaint;
+      if (conf < 0.5) {
+        linePaint = secondTier ? paintSecondLow : paintLineLow;
+      } else if (formSignal < 0) {
+        linePaint = paintLineBad;
+      } else if (formSignal > 0) {
+        linePaint = paintLineGood;
+      } else {
+        linePaint = secondTier ? paintSecond : paintLine;
+      }
       canvas.drawLine(pa, pb, linePaint);
     }
 
@@ -2182,9 +2349,13 @@ class SkeletonOverlayPainter extends CustomPainter {
       final pt = landmarks[i];
       if (pt == null) continue;
       final lm = pose!.landmarks[PoseLandmarkType.values[i]];
-      final dotPaint =
-          (lm != null && lm.likelihood >= 0.5) ? paintDot : paintDotLow;
-      canvas.drawCircle(pt, 5, dotPaint);
+      final solid = lm != null && lm.likelihood >= 0.5;
+      if (solid) {
+        canvas.drawCircle(pt, 5, paintDot);
+      } else {
+        // Occluded joint: hollow ring — "there, but hidden".
+        canvas.drawCircle(pt, 5, paintGhost);
+      }
       if (_bigJoints.contains(i)) {
         canvas.drawCircle(pt, 9, paintAnchor); // shoulder / hip ring
       }

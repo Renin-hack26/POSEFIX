@@ -35,6 +35,7 @@ dependencies:
   wakelock_plus: ^1.8.0
   workmanager: ^0.10.10
   supabase_flutter: ^2.18.0
+  tflite_flutter: ^0.12.1
 
 dev_dependencies:
   flutter_test:
@@ -52,6 +53,11 @@ flutter:
   assets:
     - assets/data/
     - assets/demo/
+    # Pose stack (Batch 5): MediaPipe heavy landmarker + MoveNet Thunder
+    # verifier (~41 MB combined, user-approved). Single files — never bare
+    # dirs (see the WS8 pubspec note).
+    - assets/models/pose_landmarker_heavy.task
+    - assets/models/movenet_thunder_fp16.tflite
     # NOTE (WS8): assets/videos|animations|avatars|images|tips carry no
     # bundled files, so they are deliberately NOT declared — an asset dir
     # listed here but missing on disk fails `flutter analyze`

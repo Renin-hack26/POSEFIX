@@ -24,6 +24,7 @@ import 'package:flutter/foundation.dart';
 
 import 'exercise_definition.dart';
 import 'pose_math.dart' show LmPoint;
+import 'trust_gate.dart';
 
 /// Why a trigger cycle was NOT counted (WS2 TODO 2.9 — "skip-count fix").
 ///
@@ -56,6 +57,8 @@ class BrainResult {
     this.repRejectedReason,
     this.bilateral,
     this.holdSeconds = 0.0,
+    this.trust,
+    this.repHoldReason = HoldReason.none,
   });
 
   final String exerciseId;
@@ -78,6 +81,15 @@ class BrainResult {
   /// session hold chip (`HOLD 12s / 30s`).
   final double holdSeconds;
 
+  /// Frame trust (Batch 5): null in trust-blind mode (legacy/tests), where
+  /// the engine behaves exactly as before.
+  final TrustBreakdown? trust;
+
+  /// Rep-level hold (Batch 5): non-none exactly on the frame where the FSM
+  /// completed a rep but the trust accumulator vetoed the commit. The rep
+  /// is HELD with its reason — never silently counted, never a phantom.
+  final HoldReason repHoldReason;
+
   BrainResult copyWith({
     String? currentState,
     String? previousState,
@@ -90,6 +102,9 @@ class BrainResult {
     RepRejectedReason? repRejectedReason,
     BilateralStatus? bilateral,
     double? holdSeconds,
+    TrustBreakdown? trust,
+    HoldReason? repHoldReason,
+    bool clearRejection = false,
   }) =>
       BrainResult(
         exerciseId: exerciseId,
@@ -101,9 +116,12 @@ class BrainResult {
         formScore: formScore ?? this.formScore,
         repJustCompleted: repJustCompleted ?? this.repJustCompleted,
         stateJustChanged: stateJustChanged ?? this.stateJustChanged,
-        repRejectedReason: repRejectedReason ?? this.repRejectedReason,
+        repRejectedReason:
+            clearRejection ? null : (repRejectedReason ?? this.repRejectedReason),
         bilateral: bilateral ?? this.bilateral,
         holdSeconds: holdSeconds ?? this.holdSeconds,
+        trust: trust ?? this.trust,
+        repHoldReason: repHoldReason ?? this.repHoldReason,
       );
 }
 
@@ -626,6 +644,16 @@ class BrainEngine {
   /// time credit instead of a meaningless rep tick).
   double _holdSeconds = 0;
 
+  /// Rep-level trust accumulator (Batch 5): every fed frame's breakdown is
+  /// pushed; a trigger commit goes through only on a passing verdict.
+  final TrustAccumulator _trustAccum = TrustAccumulator();
+
+  /// Latest frame breakdown (null in trust-blind mode).
+  TrustBreakdown? _lastTrust;
+
+  /// Last emitted result — held frames re-emit it frozen (no FSM advance).
+  BrainResult? _lastResult;
+
   // Visit-memory: ROM states seen since the last counted rep.
   final Set<String> _visited = {};
   final Set<String> _visitedLeft = {};
@@ -678,15 +706,26 @@ class BrainEngine {
   /// [angles]: angleName -> degrees (from PoseAnalyzer).
   /// [landmarkCoords]: landmarkName -> normalized 0..1 point.
   /// [timestamp]: seconds (monotonic within a session).
+  /// [frameTrust]: Batch 5 trust breakdown, or null for trust-blind mode
+  /// (legacy/tests — the engine behaves exactly as before). A held frame
+  /// never advances the FSM: the previous result is re-emitted frozen.
   BrainResult processFrame({
     required Map<String, double> angles,
     required Map<String, LmPoint> landmarkCoords,
     required double timestamp,
+    TrustBreakdown? frameTrust,
   }) {
     // Wall-clock gap since the previous analyzed frame — drives the
     // stabilizer's time-aware confirmation window.
     final double? lastT = _lastT;
     _frameDt = lastT == null ? 0.0 : timestamp - lastT;
+    if (frameTrust != null) {
+      _lastTrust = frameTrust;
+      _trustAccum.push(frameTrust);
+      if (frameTrust.held) {
+        return _heldResult(frameTrust);
+      }
+    }
     _updateWindows(angles);
     final vels = _velocities(angles, timestamp);
     final context = _buildContext(angles, landmarkCoords, vels);
@@ -694,7 +733,49 @@ class BrainEngine {
         ? _processBilateral(context, timestamp, angles)
         : _processUnilateral(context, timestamp, angles);
     _currentFormScore = _calculateFormScore(context, result.feedback);
-    return result.copyWith(formScore: _currentFormScore);
+    final out = result.copyWith(formScore: _currentFormScore, trust: frameTrust);
+    _lastResult = out;
+    return out;
+  }
+
+  /// Frozen re-emission for a held frame: same state/count as the last
+  /// emitted result, no completion or rejection flags, trust attached.
+  BrainResult _heldResult(TrustBreakdown breakdown) {
+    final prev = _lastResult;
+    if (prev == null) {
+      return BrainResult(
+        exerciseId: definition.id,
+        currentState: 'unknown',
+        previousState: 'unknown',
+        repCount: 0,
+        angles: const {},
+        feedback: const [],
+        formScore: 100,
+        trust: breakdown,
+      );
+    }
+    return prev.copyWith(
+      repJustCompleted: false,
+      stateJustChanged: false,
+      clearRejection: true,
+      trust: breakdown,
+    );
+  }
+
+  /// Trust verdict for a rep that passed the ROM/timing gates: (commit?,
+  /// reason). Thin history (< minFrames, e.g. low analysis fps) falls back
+  /// to the current frame — every fed frame already cleared 0.85
+  /// individually, so committing stays consistent instead of freezing fast
+  /// workouts.
+  (bool, HoldReason) _trustRepVerdict() {
+    final current = _lastTrust;
+    if (current == null) return (true, HoldReason.none); // trust-blind
+    if (_trustAccum.n < _trustAccum.minFrames) {
+      return (!current.held,
+          current.held ? current.reason : HoldReason.none);
+    }
+    final (commit, _, reason) = _trustAccum.verdict();
+    return (commit, reason);
   }
 
   /// Inter-frame gap of the frame currently being processed (seconds).
@@ -831,6 +912,7 @@ class BrainEngine {
 
     var repCompleted = false;
     RepRejectedReason? rejection;
+    var repHold = HoldReason.none;
     // committedBefore != 'unknown': the very first commit of a session
     // (usually straight into the standing trigger) is not a completed
     // cycle — gating it keeps a phantom "not counted" off the coach bar
@@ -843,25 +925,35 @@ class BrainEngine {
       final timingOk =
           (timestamp - _lastCountTime) >= rule.minRepDuration;
       if (romOk && timingOk) {
-        _repCount += rule.repIncrement;
-        _lastCountTime = timestamp;
-        repCompleted = true;
-        _visited.clear();
-        _visited.add(current);
-        if (_repStartTime != null) {
-          _repDurations.add(timestamp - _repStartTime!);
+        // Batch 5: the FSM says rep — trust has the final word.
+        final (commit, reason) = _trustRepVerdict();
+        if (commit) {
+          _repCount += rule.repIncrement;
+          _lastCountTime = timestamp;
+          repCompleted = true;
+          _visited.clear();
+          _visited.add(current);
+          if (_repStartTime != null) {
+            _repDurations.add(timestamp - _repStartTime!);
+          }
+          _repStartTime = timestamp;
+          _repFormScores.add(_currentFormScore);
+          _avgFormScore =
+              (_repFormScores.reduce((a, b) => a + b) / _repFormScores.length)
+                  .round();
+        } else {
+          // Trust-held rep: looks complete but the rep-level trust vetoed
+          // it — held with its reason, never silently counted.
+          repHold = reason;
         }
-        _repStartTime = timestamp;
-        _repFormScores.add(_currentFormScore);
-        _avgFormScore =
-            (_repFormScores.reduce((a, b) => a + b) / _repFormScores.length)
-                .round();
+        _trustAccum.reset();
       } else {
         // Trigger committed but a gate refused the count — report WHY so the
         // coach bar can say "not counted" instead of dropping it silently.
         rejection = romOk
             ? RepRejectedReason.tooFast
             : RepRejectedReason.rangeOfMotion;
+        _trustAccum.reset();
       }
     }
 
@@ -890,6 +982,7 @@ class BrainEngine {
       stateJustChanged: changed,
       repRejectedReason: rejection,
       holdSeconds: _holdSeconds,
+      repHoldReason: repHold,
     );
   }
 
@@ -947,7 +1040,16 @@ class BrainEngine {
     var rightRep = false;
     RepRejectedReason? leftRejection;
     RepRejectedReason? rightRejection;
+    var repHold = HoldReason.none;
     final rule = definition.counterRule;
+
+    // Batch 5: each side's FSM rep passes the trust verdict independently;
+    // the accumulator restarts at every rep boundary either way.
+    (bool, HoldReason) gateRep() {
+      final verdict = _trustRepVerdict();
+      _trustAccum.reset();
+      return verdict;
+    }
 
     if (changedLeft &&
         prevLeft != 'unknown' &&
@@ -957,15 +1059,21 @@ class BrainEngine {
       final timingOk =
           (timestamp - _lastLeftCountTime) >= rule.minRepDuration;
       if (romOk && timingOk) {
-        _leftCount++;
-        _lastLeftCountTime = timestamp;
-        leftRep = true;
-        _visitedLeft.clear();
-        _visitedLeft.add(_stabLeft.state);
+        final (commit, reason) = gateRep();
+        if (commit) {
+          _leftCount++;
+          _lastLeftCountTime = timestamp;
+          leftRep = true;
+          _visitedLeft.clear();
+          _visitedLeft.add(_stabLeft.state);
+        } else {
+          repHold = reason;
+        }
       } else {
         leftRejection = romOk
             ? RepRejectedReason.tooFast
             : RepRejectedReason.rangeOfMotion;
+        _trustAccum.reset();
       }
     }
     if (changedRight &&
@@ -976,15 +1084,21 @@ class BrainEngine {
       final timingOk =
           (timestamp - _lastRightCountTime) >= rule.minRepDuration;
       if (romOk && timingOk) {
-        _rightCount++;
-        _lastRightCountTime = timestamp;
-        rightRep = true;
-        _visitedRight.clear();
-        _visitedRight.add(_stabRight.state);
+        final (commit, reason) = gateRep();
+        if (commit) {
+          _rightCount++;
+          _lastRightCountTime = timestamp;
+          rightRep = true;
+          _visitedRight.clear();
+          _visitedRight.add(_stabRight.state);
+        } else if (repHold == HoldReason.none) {
+          repHold = reason;
+        }
       } else {
         rightRejection = romOk
             ? RepRejectedReason.tooFast
             : RepRejectedReason.rangeOfMotion;
+        _trustAccum.reset();
       }
     }
     // WS9.2: one count per completed cycle — a simultaneous curl fires
@@ -1024,6 +1138,7 @@ class BrainEngine {
         rightRepJustCompleted: rightRep,
       ),
       holdSeconds: _holdSeconds,
+      repHoldReason: repHold,
     );
   }
 
@@ -1097,6 +1212,9 @@ class BrainEngine {
     _currentFormScore = 100;
     _avgFormScore = 100;
     _holdSeconds = 0;
+    _trustAccum.reset();
+    _lastTrust = null;
+    _lastResult = null;
   }
 
   /// Snapshot for reports / VEDA context.

@@ -17,9 +17,16 @@ class MainActivity : FlutterActivity() {
     private val channelName = "fixpose/sfx"
     private var soundPool: SoundPool? = null
     private val soundIds = mutableMapOf<String, Int>()
+    private var poseBridge: PoseLandmarkerBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // Batch 5 pose stack: MediaPipe PoseLandmarker (heavy) bridge.
+        poseBridge = PoseLandmarkerBridge(
+            flutterEngine.dartExecutor.binaryMessenger,
+            applicationContext,
+        )
 
         val attrs = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -69,6 +76,8 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         soundPool?.release()
         soundPool = null
+        poseBridge?.close()
+        poseBridge = null
         super.onDestroy()
     }
 }

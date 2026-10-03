@@ -43,6 +43,8 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Batch 5 pose stack: MediaPipe Tasks Vision (PoseLandmarker heavy).
+    implementation("com.google.mediapipe:tasks-vision:0.10.14")
 }
 
 kotlin {

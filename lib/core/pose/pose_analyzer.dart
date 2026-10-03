@@ -36,7 +36,10 @@ import '../audio/cue_vocabulary.dart';
 import '../constants/form_rules.dart';
 import 'brain_engine.dart';
 import 'exercise_definition.dart';
+import 'movenet_verifier.dart';
+import 'pose_landmarker_source.dart';
 import 'pose_math.dart' as pm;
+import 'trust_gate.dart';
 
 /// Why rep counting is currently paused.
 enum LockReason {
@@ -95,6 +98,7 @@ class PoseFrameResult {
     required this.visibleCount,
     required this.requiredCount,
     this.brain,
+    this.trust,
   });
 
   final int timestampMs;
@@ -106,6 +110,10 @@ class PoseFrameResult {
   final int visibleCount;
   final int requiredCount;
   final BrainResult? brain;
+
+  /// Batch 5 frame trust (null when no pose was found or trust is blind).
+  /// The session screen surfaces [TrustBreakdown.reason] while held.
+  final TrustBreakdown? trust;
 }
 
 class PoseAnalyzer {
@@ -165,6 +173,19 @@ class PoseAnalyzer {
   /// near-perfectly. Real humans vary — human jitter clears the suspicion.
   bool _videoSuspected = false;
 
+  /// Batch 5 second opinion (throttled — agreement is a slow signal).
+  final MoveNetVerifier _verifier = MoveNetVerifier();
+  MoveNetResult? _lastMoveNet;
+  int _lastVerifyMs = 0;
+  static const int _verifyIntervalMs = 250;
+
+  /// World landmarks of the frame being analyzed (landmarker source only;
+  /// null on the ML Kit path, which has no metric world space).
+  List<List<double>>? _pendingWorld;
+
+  /// Primary-angle history for the temporal trust signal.
+  final List<double> _trustAngleHistory = [];
+
   /// Rep-duration samples (seconds) for regularity analysis.
   final List<double> _repDurations = [];
 
@@ -186,6 +207,9 @@ class PoseAnalyzer {
         mode: PoseDetectionMode.stream,
       ),
     );
+    // Batch 5 second opinion — best-effort: without it the trust gate runs
+    // single-source (weight redistribution, never inflated agreement).
+    await _verifier.load();
   }
 
   /// Feeds one camera frame through the pipeline. Returns null for dropped
@@ -259,6 +283,7 @@ class PoseAnalyzer {
       int visible = 0,
       FramingCue framing = FramingCue.ok,
       BrainResult? brain,
+      TrustBreakdown? trust,
     }) =>
         PoseFrameResult(
           timestampMs: nowMs,
@@ -270,6 +295,7 @@ class PoseAnalyzer {
           visibleCount: visible,
           requiredCount: _requiredCount,
           brain: brain,
+          trust: trust,
         );
 
     if (poses.isEmpty) {
@@ -421,10 +447,28 @@ class PoseAnalyzer {
           framing: framing,
         );
       }
+      // Batch 5 trust gate: a held frame never advances the FSM — the
+      // screen surfaces the hold reason instead of counting on a guess.
+      final trust = _computeTrust(
+        pose: pose,
+        angles: angles,
+        imageWidth: imageWidth,
+        imageHeight: imageHeight,
+      );
+      if (trust.held) {
+        return base(
+          reason: LockReason.ok,
+          locked: true,
+          visible: visible.length,
+          framing: framing,
+          trust: trust,
+        );
+      }
       brain = _brain.processFrame(
         angles: angles,
         landmarkCoords: norm,
         timestamp: nowMs / 1000.0,
+        frameTrust: trust,
       );
     }
 
@@ -437,6 +481,98 @@ class PoseAnalyzer {
     );
   }
 
+  /// Frame trust from the four signals (Batch 5 port of the reference
+  /// blend). Single-source when MoveNet has no opinion (ML Kit path or a
+  /// throttled/missing pass) — weight redistribution, never inflated.
+  TrustBreakdown _computeTrust({
+    required Pose pose,
+    required Map<String, double> angles,
+    required double imageWidth,
+    required double imageHeight,
+  }) {
+    final vis = List<double>.generate(33, (i) {
+      final lm = pose.landmarks[PoseLandmarkType.values[i]];
+      return lm == null ? 0.0 : lm.likelihood.clamp(0.0, 1.0);
+    });
+    final primary = angles[definition.primaryAngle.name];
+    if (primary != null) {
+      _trustAngleHistory.add(primary);
+      if (_trustAngleHistory.length > 13) _trustAngleHistory.removeAt(0);
+    }
+    final mpXY = List<List<double>>.generate(33, (i) {
+      final lm = pose.landmarks[PoseLandmarkType.values[i]];
+      if (lm == null) return [double.nan, double.nan];
+      return [lm.x / imageWidth, lm.y / imageHeight];
+    });
+    final mv = _lastMoveNet;
+    var agreement = 0.0;
+    var available = false;
+    if (mv != null && mv.hasOpinion) {
+      final r = crossModelAgreement(mpXY, vis, mv.imageXY, mv.vis);
+      agreement = r.score;
+      available = r.perJoint.isNotEmpty;
+    }
+    return TrustBreakdown(
+      visibility: visibilityScore(vis),
+      agreement: agreement,
+      temporal: temporalScore(_trustAngleHistory),
+      geometry: geometryScore(mpXY, _pendingWorld),
+      agreementAvailable: available,
+    );
+  }
+
+  // -- landmarker source (Batch 5 primary) -------------------------------------
+
+  /// Feeds one PoseLandmarker frame through the shared pipeline. The frame
+  /// is adapted to the analyzer's landmark space (upright pixels), so
+  /// smoothing, angles, trust, rhythm and the brain run unchanged; the ML
+  /// Kit path stays as the fallback. Returns null only for malformed
+  /// frames — the caller just continues.
+  Future<PoseFrameResult?> processLandmarkerFrame(
+    LandmarkerFrame33 frame, {
+    required int inferenceMs,
+    required int nowMs,
+  }) async {
+    framesSeen++;
+    // Throttled second opinion (agreement is a slow signal).
+    if (nowMs - _lastVerifyMs >= _verifyIntervalMs) {
+      _lastVerifyMs = nowMs;
+      _lastMoveNet = await _verifier.verify(frame.thumb);
+    }
+    _pendingWorld = frame.world;
+    try {
+      if (frame.imageXY.length != 33) {
+        lastError = 'landmarker frame has ${frame.imageXY.length} joints';
+        return null;
+      }
+      final pose = Pose(landmarks: {
+        for (var i = 0; i < 33; i++)
+          PoseLandmarkType.values[i]: PoseLandmark(
+            type: PoseLandmarkType.values[i],
+            x: frame.imageXY[i][0] * frame.frameW,
+            y: frame.imageXY[i][1] * frame.frameH,
+            z: frame.z[i],
+            likelihood: frame.vis[i].clamp(0.0, 1.0),
+          ),
+      });
+      lastPosesFound = 1;
+      lastError = null;
+      final result = _handlePoses(
+        [pose],
+        imageWidth: frame.frameW,
+        imageHeight: frame.frameH,
+        inferenceMs: inferenceMs,
+        nowMs: nowMs,
+      );
+      if (!_controller.isClosed) _controller.add(result);
+      return result;
+    } catch (e) {
+      lastError = '$e';
+      return null;
+    } finally {
+      _pendingWorld = null;
+    }
+  }
   /// Rep-rhythm sampling from the primary angle: one movement cycle = one
   /// below→above crossing of the rolling mid-threshold. Feeds the
   /// video-playback hysteresis — suspect at CV < 3% over >=4 cycles
@@ -602,6 +738,10 @@ class PoseAnalyzer {
     _weakQualityFrames = 0;
     _busy = false;
     _videoSuspected = false;
+    _pendingWorld = null;
+    _lastMoveNet = null;
+    _lastVerifyMs = 0;
+    _trustAngleHistory.clear();
     _resetRhythm();
   }
 
@@ -616,6 +756,7 @@ class PoseAnalyzer {
   Future<void> dispose() async {
     await _detector?.close();
     _detector = null;
+    _verifier.close();
     if (!_controller.isClosed) await _controller.close();
   }
 

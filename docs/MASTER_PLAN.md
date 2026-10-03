@@ -111,25 +111,43 @@ Implemented against the spec tests committed in `39a9f82`:
 - Tests: `round_tracker_test` (5). Gates: analyze 0; test 225/226 (sole
   failure = the known sqlite env issue).
 
-## Batch 5 — Pose stack (EXPANDED)
+## Batch 5 — Pose stack (EXPANDED) (DONE — 2026-10-03; user waived the
+demo-verdict gate: "implement now")
 
 One coherent pose-stack batch:
 
-1. **Model migration**: `google_mlkit_pose_detection` →
-   `com.google.mediapipe:tasks-vision` PoseLandmarker, bundled
-   `pose_landmarker_heavy.task` (matches Open Vission primary stack).
-2. **MoveNet Thunder second opinion** via TFLite — `movenet_thunder_fp16.tflite`
-   (12.6 MB) bundled; per-frame dual inference.
-3. **Trust gate port** (`trust.py` → Dart): visibility 0.35 / agreement 0.30 /
-   temporal 0.20 / geometry 0.15, threshold 0.85, hard gates + hold reasons;
-   frames below trust never advance the Brain Engine FSM; rep commits require
-   rep-level trust ≥ 0.85 (30th-percentile accumulator). Runs on
-   `BrainEngine.processFrame` — benefits all 46+ exercises at once.
-4. **Visibility-aware side selection** (`side_value`/`min_side`) so occluded
-   limbs never feed counters.
-5. **Overlay upgrade**: merge Open Vission's 3-tier 39-bone rendering,
-   hollow rings for occluded joints, defensive drawing into
-   `SkeletonOverlayPainter`.
+1. **Model migration**: `google_mlkit_pose_detection` → native
+   `tasks-vision:0.10.14` PoseLandmarker over `fixpose/pose_landmarker`
+   (`PoseLandmarkerBridge.kt`: VIDEO/1-pose/0.5³, YUV→upright pre-rotate,
+   letterboxed 256 thumb + pad math). Bundled
+   `assets/models/pose_landmarker_heavy.task` (29.2 MB, user-chosen).
+   Dart `PoseLandmarkerSource` (one-in-flight, drop-not-queue, null on any
+   failure). ML Kit stays the runtime fallback — the camera never dies on
+   the new stack.
+2. **MoveNet Thunder second opinion** (`tflite_flutter`, Dart-side):
+   `MoveNetVerifier` over the Kotlin thumbnail with pad-undo mapping,
+   injectable interpreter (faked in tests), 250 ms throttle; unavailable
+   ⇒ single-source mode. Bundled `movenet_thunder_fp16.tflite` (12 MB).
+3. **Trust gate port** (`trust_gate.dart`): visibility 0.35 / agreement
+   0.30 / temporal 0.20 / geometry 0.15, threshold 0.85, hard gates +
+   hold reasons, single-source redistribution; 30th-percentile
+   (linear-interp, like the reference) rep accumulator with the
+   LOW_VISIBILITY-only exception; thin-history fallback to the frame
+   verdict. `BrainEngine.processFrame(frameTrust:)` — held frames freeze
+   the FSM, commits go through the verdict; trust-blind (null) mode is
+   byte-identical legacy behavior.
+4. **Visibility-aware side selection** (`sideValue` 0.45 / `minSide`
+   0.4, combine-only-when-solid) in the trust module; bilateral engine
+   keys already sides-derived (Batch 3).
+5. **Overlay upgrade**: 39-bone 3-tier rendering merged into
+   `SkeletonOverlayPainter` (structural thick / appendages medium / face
+   thin-once, confidence dimming kept, WS6.2 form override kept);
+   hollow rings for occluded joints; finite guards. Deliberate
+   deviations: limb-group rainbow palette NOT adopted (conflicts with
+   the form-confidence color language); tier widths fixed (no per-frame
+   Paint allocation).
+6. HUD: backend tag (`landmarker`/`mlkit`) in pipeline telemetry +
+   trust-hold banner (frame reason or vetoed-rep reason).
 
 Gated on the Batch 0 demo verdict.
 
