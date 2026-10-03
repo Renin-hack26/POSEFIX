@@ -22,8 +22,10 @@ class SuggestionsCarousel extends StatelessWidget {
   /// Suggested workouts shown left to right.
   final List<SuggestionItem> items;
 
-  /// Opens the tapped suggestion (workout details).
-  final VoidCallback onOpen;
+  /// Opens the tapped suggestion by index (the caller resolves the workout
+  /// id — a shared VoidCallback always opened the first library workout no
+  /// matter which card was tapped).
+  final void Function(int index) onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +35,7 @@ class SuggestionsCarousel extends StatelessWidget {
         children: [
           for (var i = 0; i < items.length; i++) ...[
             if (i > 0) const SizedBox(width: 10),
-            _SuggestionCard(item: items[i], onTap: onOpen),
+            _SuggestionCard(item: items[i], onTap: () => onOpen(i)),
           ],
         ],
       ),

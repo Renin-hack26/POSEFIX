@@ -4,11 +4,16 @@ import '../../../core/theme/app_theme.dart';
 
 /// "Follow along" posture card pinned to the top-right of the vision screen
 /// (sample `.avatar-guide`): target-pose silhouette plus caption.
+/// [phase] syncs the card to the live FSM state (P3 avatar phase-sync) —
+/// the exerciser sees which phase to mirror, not a static picture.
 class PostureAvatar extends StatelessWidget {
-  const PostureAvatar({super.key, this.caption = 'FOLLOW ALONG'});
+  const PostureAvatar({super.key, this.caption = 'FOLLOW ALONG', this.phase});
 
   /// Caption under the target pose.
   final String caption;
+
+  /// Live exercise phase (e.g. `Bottom`), null while unknown.
+  final String? phase;
 
   @override
   Widget build(BuildContext context) {
@@ -41,15 +46,32 @@ class PostureAvatar extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-            child: Text(
-              caption,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.6,
-                color: Colors.white.withAlpha(191),
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  caption,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                    color: Colors.white.withAlpha(191),
+                  ),
+                ),
+                if (phase != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    phase!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.accentBright.withAlpha(242),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],

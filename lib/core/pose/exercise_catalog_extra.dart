@@ -303,6 +303,11 @@ const ExerciseDefinition supermanDefinition = ExerciseDefinition(
     'right_shoulder': MpLandmark.rightShoulder,
     'left_hip': MpLandmark.leftHip,
     'right_hip': MpLandmark.rightHip,
+    // body_line needs the ankle vertex; without it the angle is skipped,
+    // angles stay empty and the rep never counts. Six landmarks also meet
+    // the visibility gate.
+    'left_ankle': MpLandmark.leftAnkle,
+    'right_ankle': MpLandmark.rightAnkle,
   },
   angles: [
     AngleDef(
@@ -366,6 +371,11 @@ const ExerciseDefinition inchwormDefinition = ExerciseDefinition(
     'right_knee': MpLandmark.rightKnee,
     'left_shoulder': MpLandmark.leftShoulder,
     'right_shoulder': MpLandmark.rightShoulder,
+    // secondary needs the ankle vertex; without it the angle is skipped
+    // (missing context reads as 0), folded can never hold and the rep
+    // never counts.
+    'left_ankle': MpLandmark.leftAnkle,
+    'right_ankle': MpLandmark.rightAnkle,
   },
   angles: [
     AngleDef(
@@ -383,7 +393,7 @@ const ExerciseDefinition inchwormDefinition = ExerciseDefinition(
       description: 'Knee flexion angle',
     ),
   ],
-  stateOrder: ['standing', 'folded'],
+  stateOrder: ['folded', 'standing'],
   states: [
     ExerciseState(
       name: 'folded',
@@ -552,6 +562,10 @@ const ExerciseDefinition russianTwistDefinition = ExerciseDefinition(
     'right_wrist': MpLandmark.rightWrist,
     'left_hip': MpLandmark.leftHip,
     'right_hip': MpLandmark.rightHip,
+    // primary needs the knee vertex; without it the angle is skipped and
+    // the chest_tall feedback never evaluates on real data.
+    'left_knee': MpLandmark.leftKnee,
+    'right_knee': MpLandmark.rightKnee,
   },
   angles: [
     AngleDef(
@@ -1335,6 +1349,10 @@ const ExerciseDefinition cobraStretchDefinition = ExerciseDefinition(
     'right_shoulder': MpLandmark.rightShoulder,
     'left_hip': MpLandmark.leftHip,
     'right_hip': MpLandmark.rightHip,
+    // body_line needs the knee vertex; without it the angle is skipped,
+    // angles stay empty and the hold clock has no state to accumulate.
+    'left_knee': MpLandmark.leftKnee,
+    'right_knee': MpLandmark.rightKnee,
   },
   angles: [
     AngleDef(

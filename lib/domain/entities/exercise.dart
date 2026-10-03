@@ -7,12 +7,13 @@ library;
 
 /// How reps are produced for this exercise during a live session.
 enum ExerciseKind {
-  /// FR-2 movements (squat, pushup, jumpingJack): automatic ROM state-machine
-  /// counting from pose angles.
+  /// Automatic ROM state-machine counting from pose angles (every bundled
+  /// exercise resolves to an FSM definition — the registry is the source
+  /// of truth, and the integrity suite pins it).
   counted,
 
-  /// Everything else: camera + overlay + cues stay live, the user taps to
-  /// count (no angle state machine yet).
+  /// Legacy value: kept for contract stability (old packs). No manual-tap
+  /// counting UI exists — every resolved exercise counts automatically.
   manual,
 }
 

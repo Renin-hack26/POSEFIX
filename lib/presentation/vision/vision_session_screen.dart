@@ -1442,7 +1442,12 @@ class _HudOverlay extends StatelessWidget {
               targetReps: targetReps > 0 ? targetReps : null,
             ),
             const Spacer(),
-            PostureAvatar(caption: exerciseName.toUpperCase()),
+            PostureAvatar(
+              caption: exerciseName.toUpperCase(),
+              phase: state == 'unknown'
+                  ? null
+                  : prettifyExerciseState(state),
+            ),
           ],
         ),
         const SizedBox(height: 10),

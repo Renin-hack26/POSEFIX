@@ -435,8 +435,13 @@ String _relativeDay(DateTime date) {
   final now = DateTime.now().startOfDay;
   final day = date.startOfDay;
   final diff = now.difference(day).inDays;
-  if (diff <= 0) return 'Today';
+  if (diff == 0) return 'Today';
   if (diff == 1) return 'Yesterday';
+  if (diff < 0) {
+    // Future dates never read as Today (old `diff <= 0` did).
+    final ahead = -diff;
+    return ahead == 1 ? 'Tomorrow' : 'In $ahead days';
+  }
   return '$diff days ago';
 }
 

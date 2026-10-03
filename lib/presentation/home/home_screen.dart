@@ -263,7 +263,8 @@ class _HomeBody extends StatelessWidget {
         if (suggestions.isNotEmpty)
           SuggestionsCarousel(
             items: suggestions,
-            onOpen: () => context.push('/workout-details'),
+            onOpen: (i) => context.push(
+                '/workout-details?id=${d.suggestions[i].id}'),
           ),
         const SizedBox(height: 20),
         const SectionHeader(title: 'Time spent this week'),
@@ -330,6 +331,11 @@ class _SessionSlot extends StatelessWidget {
 
     if (active != null) {
       final paused = active.status == SessionStatus.paused;
+      // Resume into the same exercise the in-flight session tracks; the
+      // bare /vision route silently defaults to squat.
+      final resumeEx = active.exercises.isNotEmpty
+          ? active.exercises.first.exerciseId
+          : null;
       return SessionSlot(
         when: paused ? 'PAUSED · TAP TO RESUME' : 'IN PROGRESS',
         title: data.activeWorkout?.name ?? 'Workout in progress',
@@ -337,7 +343,8 @@ class _SessionSlot extends StatelessWidget {
             ? 'Paused mid-session — your progress is saved'
             : 'Session underway — jump back in',
         actionLabel: paused ? 'Resume session' : 'Continue',
-        onStart: () => context.push('/vision'),
+        onStart: () => context.push(
+            resumeEx == null ? '/vision' : '/vision?ex=$resumeEx'),
       );
     }
 
@@ -355,7 +362,8 @@ class _SessionSlot extends StatelessWidget {
         title: workout.name,
         details:
             '$exercises exercises · $sets sets · about ${workout.durationMin} min',
-        onStart: () => context.push('/workout-details'),
+        onStart: () =>
+            context.push('/workout-details?id=${workout.id}'),
       );
     }
 

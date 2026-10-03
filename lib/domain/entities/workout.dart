@@ -78,9 +78,4 @@ class Workout {
   final String demoVideoAsset;
   final int estimatedCalories;
   final List<String> tags;
-
-  /// Every block exercise is [ExerciseKind.counted] → auto rep counting.
-  bool get hasCountedMovements => blocks.any((b) => b.exerciseId == 'squat' ||
-      b.exerciseId == 'pushup' ||
-      b.exerciseId == 'jumpingJack');
 }

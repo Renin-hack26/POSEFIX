@@ -107,7 +107,7 @@ void main() {
               accentThumb: i.isEven,
             ),
         ],
-        onOpen: () {},
+        onOpen: (_) {},
       ),
     );
     await expectLater(find.byType(SuggestionsCarousel),

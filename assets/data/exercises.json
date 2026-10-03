@@ -68,7 +68,7 @@
   {
     "id": "lunge",
     "name": "Forward Lunge",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["legs"],
     "secondaryMuscles": ["glutes", "core"],
     "difficulty": "beginner",
@@ -90,7 +90,7 @@
   {
     "id": "glute-bridge",
     "name": "Glute Bridge",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["glutes"],
     "secondaryMuscles": ["legs", "core"],
     "difficulty": "beginner",
@@ -112,7 +112,7 @@
   {
     "id": "plank",
     "name": "Forearm Plank",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["core"],
     "secondaryMuscles": ["shoulders"],
     "difficulty": "beginner",
@@ -134,7 +134,7 @@
   {
     "id": "mountain-climber",
     "name": "Mountain Climber",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["cardio"],
     "secondaryMuscles": ["core", "shoulders"],
     "difficulty": "intermediate",
@@ -156,7 +156,7 @@
   {
     "id": "burpee",
     "name": "Burpee",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["fullBody"],
     "secondaryMuscles": ["cardio", "legs"],
     "difficulty": "advanced",
@@ -178,7 +178,7 @@
   {
     "id": "high-knees",
     "name": "High Knees",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["cardio"],
     "secondaryMuscles": ["legs", "core"],
     "difficulty": "intermediate",
@@ -200,7 +200,7 @@
   {
     "id": "butt-kicks",
     "name": "Butt Kicks",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["cardio"],
     "secondaryMuscles": ["legs"],
     "difficulty": "beginner",
@@ -222,7 +222,7 @@
   {
     "id": "dead-bug",
     "name": "Dead Bug",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["core"],
     "secondaryMuscles": ["arms"],
     "difficulty": "beginner",
@@ -244,7 +244,7 @@
   {
     "id": "bird-dog",
     "name": "Bird Dog",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["core"],
     "secondaryMuscles": ["back", "glutes"],
     "difficulty": "beginner",
@@ -266,7 +266,7 @@
   {
     "id": "superman",
     "name": "Superman Hold",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["back"],
     "secondaryMuscles": ["glutes", "core"],
     "difficulty": "beginner",
@@ -288,7 +288,7 @@
   {
     "id": "side-plank",
     "name": "Side Plank",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["core"],
     "secondaryMuscles": ["shoulders"],
     "difficulty": "intermediate",
@@ -310,7 +310,7 @@
   {
     "id": "calf-raise",
     "name": "Standing Calf Raise",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["legs"],
     "secondaryMuscles": [],
     "difficulty": "beginner",
@@ -332,7 +332,7 @@
   {
     "id": "wall-sit",
     "name": "Wall Sit",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["legs"],
     "secondaryMuscles": ["glutes"],
     "difficulty": "intermediate",
@@ -354,7 +354,7 @@
   {
     "id": "chair-dip",
     "name": "Chair Dip",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["arms"],
     "secondaryMuscles": ["chest", "shoulders"],
     "difficulty": "intermediate",
@@ -376,7 +376,7 @@
   {
     "id": "knee-push-up",
     "name": "Knee Push-Up",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["chest"],
     "secondaryMuscles": ["arms", "shoulders"],
     "difficulty": "beginner",
@@ -398,7 +398,7 @@
   {
     "id": "incline-push-up",
     "name": "Incline Push-Up",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["chest"],
     "secondaryMuscles": ["arms", "shoulders"],
     "difficulty": "beginner",
@@ -420,7 +420,7 @@
   {
     "id": "pike-push-up",
     "name": "Pike Push-Up",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["shoulders"],
     "secondaryMuscles": ["arms", "chest"],
     "difficulty": "intermediate",
@@ -442,7 +442,7 @@
   {
     "id": "inchworm",
     "name": "Inchworm",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["fullBody"],
     "secondaryMuscles": ["core", "mobility"],
     "difficulty": "intermediate",
@@ -464,7 +464,7 @@
   {
     "id": "skater-jump",
     "name": "Skater Jump",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["cardio"],
     "secondaryMuscles": ["legs", "glutes"],
     "difficulty": "intermediate",
@@ -486,7 +486,7 @@
   {
     "id": "sumo-squat",
     "name": "Sumo Squat",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["legs"],
     "secondaryMuscles": ["glutes", "core"],
     "difficulty": "beginner",
@@ -508,7 +508,7 @@
   {
     "id": "good-morning",
     "name": "Bodyweight Good Morning",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["glutes"],
     "secondaryMuscles": ["back", "legs"],
     "difficulty": "intermediate",
@@ -530,7 +530,7 @@
   {
     "id": "hip-thrust",
     "name": "Elevated Hip Thrust",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["glutes"],
     "secondaryMuscles": ["legs", "core"],
     "difficulty": "intermediate",
@@ -552,7 +552,7 @@
   {
     "id": "cossack-squat",
     "name": "Cossack Squat",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["legs"],
     "secondaryMuscles": ["glutes", "mobility"],
     "difficulty": "intermediate",
@@ -574,7 +574,7 @@
   {
     "id": "bicycle-crunch",
     "name": "Bicycle Crunch",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["core"],
     "secondaryMuscles": ["legs"],
     "difficulty": "intermediate",
@@ -596,7 +596,7 @@
   {
     "id": "leg-raise",
     "name": "Lying Leg Raise",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["core"],
     "secondaryMuscles": ["legs"],
     "difficulty": "intermediate",
@@ -618,7 +618,7 @@
   {
     "id": "russian-twist",
     "name": "Russian Twist",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["core"],
     "secondaryMuscles": ["arms"],
     "difficulty": "intermediate",
@@ -640,7 +640,7 @@
   {
     "id": "v-up",
     "name": "V-Up",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["core"],
     "secondaryMuscles": ["legs"],
     "difficulty": "advanced",
@@ -662,7 +662,7 @@
   {
     "id": "flutter-kick",
     "name": "Flutter Kick",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["core"],
     "secondaryMuscles": ["legs"],
     "difficulty": "beginner",
@@ -684,7 +684,7 @@
   {
     "id": "cat-cow",
     "name": "Cat-Cow",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["mobility"],
     "secondaryMuscles": ["back", "core"],
     "difficulty": "beginner",
@@ -706,7 +706,7 @@
   {
     "id": "greatest-stretch",
     "name": "World's Greatest Stretch",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["mobility"],
     "secondaryMuscles": ["legs", "glutes"],
     "difficulty": "beginner",
@@ -728,7 +728,7 @@
   {
     "id": "thoracic-rotation",
     "name": "Thoracic Rotation",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["mobility"],
     "secondaryMuscles": ["back", "shoulders"],
     "difficulty": "beginner",
@@ -750,7 +750,7 @@
   {
     "id": "shoulder-dislocates",
     "name": "Towel Shoulder Dislocates",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["mobility"],
     "secondaryMuscles": ["shoulders", "arms"],
     "difficulty": "beginner",
@@ -772,7 +772,7 @@
   {
     "id": "warrior-flow",
     "name": "Warrior Flow",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["mobility"],
     "secondaryMuscles": ["legs", "shoulders"],
     "difficulty": "beginner",
@@ -794,7 +794,7 @@
   {
     "id": "downward-dog",
     "name": "Downward Dog",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["mobility"],
     "secondaryMuscles": ["shoulders", "legs"],
     "difficulty": "beginner",
@@ -816,7 +816,7 @@
   {
     "id": "cobra-stretch",
     "name": "Cobra Stretch",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["mobility"],
     "secondaryMuscles": ["back", "core"],
     "difficulty": "beginner",
@@ -838,7 +838,7 @@
   {
     "id": "childs-pose",
     "name": "Child's Pose",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["mobility"],
     "secondaryMuscles": ["back", "arms"],
     "difficulty": "beginner",
@@ -860,7 +860,7 @@
   {
     "id": "bear-crawl",
     "name": "Bear Crawl In Place",
-    "kind": "manual",
+    "kind": "counted",
     "primaryMuscles": ["fullBody"],
     "secondaryMuscles": ["core", "arms"],
     "difficulty": "intermediate",

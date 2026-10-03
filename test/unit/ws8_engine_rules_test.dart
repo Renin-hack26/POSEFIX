@@ -130,8 +130,25 @@ void main() {
               'still wires exactly these: $enabled');
     });
 
-    test('smoothing windows are valid; mapping honors them', () {
+    test('every angle vertex is a tracked landmark', () {
+      // Blind-audit catch: superman/cobra/russian_twist/inchworm referenced
+      // vertices absent from their landmarks map, so the analyzer skipped
+      // those angles (empty angles / dead states) and the reps never counted.
+      final missing = <String>[];
       for (final def in _allDefs()) {
+        for (final angle in def.angles) {
+          for (final idx in angle.points) {
+            if (!def.landmarks.containsValue(idx)) {
+              missing.add('${def.id}/${angle.name}: vertex $idx untracked');
+            }
+          }
+        }
+      }
+      expect(missing, isEmpty,
+          reason: 'angle vertices without a tracked landmark: $missing');
+    });
+
+    test('smoothing windows are valid; mapping honors them', () {      for (final def in _allDefs()) {
         expect(def.smoothing.window, greaterThanOrEqualTo(1),
             reason: '${def.id}: smoothing window');
       }

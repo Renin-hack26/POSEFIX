@@ -10,8 +10,9 @@ import '../shared/grid_background.dart';
 
 /// 01 — Splash (sample/index.html).
 ///
-/// 1.7 s entrance → routes to permissions (first install), onboarding (signed-in
-/// with no plan), sign-in (signed-in with plan) or sign-in (signed-out).
+/// 1.7 s entrance → routes to permissions (first install), onboarding
+/// (signed-in — onboarding forwards to /home when a plan already exists),
+/// or sign-in (signed-out).
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 

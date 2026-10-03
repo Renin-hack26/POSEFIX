@@ -656,7 +656,13 @@ class PoseAnalyzer {
       'push_up': 'pushup',
       'jumping_jack': 'jumpingJack',
     };
-    return FormRules.minVisibleLandmarks[keyById[definition.id]] ?? 6;
+    final mapped = FormRules.minVisibleLandmarks[keyById[definition.id]];
+    if (mapped != null) return mapped;
+    // Definitions with fewer than 6 tracked landmarks (calf_raise: 3,
+    // tricep_dip: 3, superman: 4, …) can never satisfy the flat fallback
+    // of 6 — every frame gated as occluded and counting stayed dead.
+    // Require all tracked landmarks when fewer than 6 are tracked.
+    return definition.landmarks.length < 6 ? definition.landmarks.length : 6;
   }
 
   pm.LmPoint? _torsoCentroid(
@@ -720,8 +726,12 @@ class PoseAnalyzer {
       if (h > 0.01 && w / h < 1.1) return FramingCue.turnSideways;
       return FramingCue.ok;
     }
-    if (h < 0.5) return FramingCue.stepBack;
-    if (w < 0.2 && h < 0.4) return FramingCue.stepCloser;
+    if (h < 0.5) {
+      // Tiny subject (far from the camera) must be checked first: it also
+      // satisfies h < 0.5, so testing it second made stepCloser unreachable.
+      if (w < 0.2 && h < 0.4) return FramingCue.stepCloser;
+      return FramingCue.stepBack;
+    }
     return FramingCue.ok;
   }
 

@@ -481,11 +481,13 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
     return '${months[date.month - 1]} ${date.day}';
   }
 
-  /// "side_lunge" → "Side lunge" (fallback when the catalog name is missing).
+  /// "side_lunge" → "Side Lunge" (fallback when the catalog name is missing).
   String _prettyId(String id) {
-    final words = id.replaceAll('_', ' ');
-    if (words.isEmpty) return words;
-    return '${words[0].toUpperCase()}${words.substring(1)}';
+    final words = id
+        .split(RegExp(r'[_-]+'))
+        .where((w) => w.isNotEmpty)
+        .map((w) => '${w[0].toUpperCase()}${w.substring(1)}');
+    return words.join(' ');
   }
 
   void _shareSession(_SummaryData data) {

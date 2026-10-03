@@ -91,3 +91,13 @@
 ## Cross-cutting
 - Gates per workstream: `flutter analyze` 0 issues · `flutter test` all green · no commits by subagents (coordinator gates + commits).
 - Releases: staged APKs for on-device testing (v1.1.11+…).
+- Blind QA audit (2026-10-03, ses_efd0bcc9): 5 fixed (required-count floor
+  dead-gating 10 exercises, framing stepCloser unreachable, 4 defs missing
+  angle vertices, inchworm stateOrder overlap, id-less home navigation) +
+  7 reported → all 7 resolved in Batch 7 (placeholders deleted,
+  hasCountedMovements removed, prettyId hyphens, splash comment,
+  relativeDay future, pack kinds → counted, StartSession question below).
+- Multi-exercise sessions (P3 remainder): `StartSession` is dead code;
+  entry points run only the first block. Needs user decision: thread
+  `workoutId` through `/vision` for sequential blocks, or keep
+  single-exercise sessions.

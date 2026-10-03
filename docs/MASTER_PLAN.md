@@ -156,7 +156,29 @@ Reference (read-only): `C:\Users\imu\Desktop\New folder\openvission\`
 
 ## Batch 6 — WS6.3
 
-## Batch 7 — P1 auth E2E + P3 + P8
+## Batch 7 — P1 auth E2E + P3 + P8 (IN PROGRESS)
+
+- P1: sign-in gates on the `check-user` existence check first (same as the
+  forgot flow) — unknown emails get `UserNotFoundException` ("User doesn't
+  exist") instead of the misleading "Incorrect password" (Supabase cannot
+  distinguish); pinned by `sign_in_gating_test` (mocktail). Splash /
+  onboarding / sign-out routing verified in code (session persistence via
+  the SDK). Validators pinned (`validators_test`, 9 tests).
+- P3: chain verified end to end (video → vision → summary → home →
+  report, all links carry ids); `PostureAvatar` phase-syncs to the live
+  FSM state. Open item: multi-exercise sessions (see below).
+- P8: analyze 0, suite 273/274 (sole failure = the sqlite env issue);
+  docs current. FPS validation needs on-device runs (B8/field testing).
+
+### Open item — multi-exercise sessions (P3 remainder)
+
+The blind audit independently confirmed: `StartSession` (multi-exercise
+session from a workout's blocks) is dead code, and every entry point
+starts only the FIRST block's exercise (`single_<ex>` sessions). A full
+workout (N blocks) cannot flow as one session today. Options: (a) thread
+`workoutId` through `/vision` and run blocks in sequence (new session
+flow, medium), or (b) leave single-exercise sessions (current behavior).
+Needs a user decision — see TODO cross-cutting.
 
 ## Batch 8 — KGP + R8 + P10 release APK
 

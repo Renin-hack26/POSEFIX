@@ -64,8 +64,16 @@ class UserRepositoryImpl implements UserRepository {
   Future<void> signIn({
     required String email,
     required String password,
-  }) =>
-      _remote.signIn(email: email, password: password);
+  }) async {
+    // P1 "User doesn't exist": Supabase answers "Invalid login
+    // credentials" for unknown emails and wrong passwords alike, so the
+    // existence gate (same `check-user` as the forgot flow) runs first —
+    // unknown emails get the honest message instead of "Incorrect password".
+    if (!await _remote.userExists(email: email)) {
+      throw const UserNotFoundException();
+    }
+    await _remote.signIn(email: email, password: password);
+  }
 
   @override
   Future<OtpDispatch> requestPasswordReset({required String email}) async {
