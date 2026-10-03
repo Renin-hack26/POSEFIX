@@ -1096,6 +1096,7 @@ class BrainEngine {
     _repFormScores.clear();
     _currentFormScore = 100;
     _avgFormScore = 100;
+    _holdSeconds = 0;
   }
 
   /// Snapshot for reports / VEDA context.

@@ -14,23 +14,23 @@
 | 1.5 | **Background worker** (`workmanager` periodic task): self-heal reminder scheduling from prefs while app closed; re-arm idempotently | ✅ |
 | 1.6 | Unit tests for daily-occurrence/next-schedule logic + `flutter analyze` clean | ✅ (14 tests) |
 
-## WS2 — Camera vision session: layout, rounds, pops, HUD ✅ grounded (explorer A) — launch after WS4 frees vision_session_screen
+## WS2 — Camera vision session: layout, rounds, pops, HUD ✅ (Batch 4: full HUD overhaul shipped)
 
-> **Outcome 2026-10-01: PARTIAL / aborted mid-flight.** The agent's engine-side work SHIPPED (pose_analyzer LockReason trust pipeline incl. videoPlayback rhythm guard, vision_hud banner copy, brain_engine rejection machinery) but its `vision_session_screen` rewrite targeted files that do not exist (`core/theme/colors.dart`, `domain/models/*`) and its tests targeted APIs it never built — 562 analyze errors. Screen + vision_hud restored from `f70c5da` (last green), dead `session_flow` pair deleted (archived in git `db0e324`), WS9 wired on top. HUD overhaul items (rounds/rest/popups/calibration overlay) → v1.1.12.
+> **Outcome 2026-10-01: PARTIAL / aborted mid-flight.** (original note kept for history; Batch 4 re-implemented the scope cleanly on the shipped screen — no rewrite, no dead files.)
 | # | Item | Status |
 |---|---|---|
-| 2.1 | Layout per `sample/index.html` §10: HUD **top-left** (REPS/ROUND/TIME — orphaned `VisionHud` exists), posture avatar **top-right** (orphaned `PostureAvatar` exists), cue bar **fixed bottom** (no stacked scrollable column = the "scattering"), controls **bottom-center** (flip · pause · end); frame guide via orphaned `FramingGuide` | ⬜ |
-| 2.2 | Feedback = single fixed cue slot with warn/ok color states (sample styles.css) — never stacked/scattered | ⬜ |
-| 2.3 | Rep counter: `12/13` target (from block reps), **Round 2/3**, elapsed TIME, rest-period countdown + "ready for next round"; consume `PlanSession.roundsOverride`; write `SessionExercise.roundsCompleted/repsPerRound/roundTimesSec` (model exists, always 0 today) | ⬜ |
-| 2.4 | **Pre-session editor** (in-screen sheet): rounds & reps editable before start | ⬜ |
-| 2.5 | Wrong pose: **0.8 s cross-symbol popup + buzz** (Flutter `HapticFeedback` + existing Sfx — no new dep), severity-colored cue card | ⬜ |
-| 2.6 | Round complete: **tick popup** (+ wired `SessionAudioCues.onSet/onRestStart/onRestEnd` — hooks exist, never called); all rounds: **congrats popup w/ log + Next** (`onMilestone` too) | ⬜ |
-| 2.7 | Bottom bar: **Pause / Cancel / End** — Cancel = confirm + discard (`clearActive`, no credit), End = existing complete→summary, Pause = instant w/ banner | ⬜ |
-| 2.8 | **Loading popup before session** (await SoundEngine ready + FSM resolve + analyzer start + camera, with step labels) | ⬜ |
-| 2.9 | Skip-count fix: emit `repRejectedReason` from BrainEngine when trigger commits but ROM/timing gate fails → coach bar "not counted" + haptic (never silent) | ⬜ |
-| 2.10 | Auto-calibration: run `CalibrationConfig` (enabled on 6 exercises, never read today) as pre-session ROM-learning phase; sync with workout | 🔄 (pure layer DONE Batch 2: `RomCapture`/judge/announce in `session_flow.dart` + 10 tests; screen-phase wiring stays in Batch 4) |
-| 2.11 | Voice enrichment: wire milestone cues (every 5 reps), round/rest announcements, PLANNING §5.3 | ⬜ |
-| 2.12 | Auto-pause on app background (`didChangeAppLifecycleState`, PLANNING 223); elapsed timer | ⬜ |
+| 2.1 | Layout per `sample/index.html` §10: HUD **top-left** (REPS/ROUND/TIME — orphaned `VisionHud` exists), posture avatar **top-right** (orphaned `PostureAvatar` exists), cue bar **fixed bottom** (no stacked scrollable column = the "scattering"), controls **bottom-center** (flip · pause · end); frame guide via orphaned `FramingGuide` | ✅ (adopted all three orphans: VisionHud cluster + avatar + guide-on-no-lock; cue bar extracted to a fixed bottom slot; controls bottom-center) |
+| 2.2 | Feedback = single fixed cue slot with warn/ok color states (sample styles.css) — never stacked/scattered | ✅ (fixed slot, warn amber / ok accent, priority rest > calibration > live cue) |
+| 2.3 | Rep counter: `12/13` target (from block reps), **Round 2/3**, elapsed TIME, rest-period countdown + "ready for next round"; consume `PlanSession.roundsOverride`; write `SessionExercise.roundsCompleted/repsPerRound/roundTimesSec` (model exists, always 0 today) | ✅ (`RoundTracker` pure tracker; route carries rounds/reps/rest from plan + details; round reps/target + round + 1 s TIME chips; rest countdown banner; rounds persist per save) |
+| 2.4 | **Pre-session editor** (in-screen sheet): rounds & reps editable before start | ✅ (bottom sheet after resolve, before camera; duration edits hold secs; dismiss backs out) |
+| 2.5 | Wrong pose: **0.8 s cross-symbol popup + buzz** (Flutter `HapticFeedback` + existing Sfx — no new dep), severity-colored cue card | ✅ (✕ flash amber/red + medium haptic on every gate-refused rep) |
+| 2.6 | Round complete: **tick popup** (+ wired `SessionAudioCues.onSet/onRestStart/onRestEnd` — hooks exist, never called); all rounds: **congrats popup w/ log + Next** (`onMilestone` too) | ✅ (✓ flash + onSet; rest SFX + vocab lines at both ends; congrats Log→summary / Next→bonus + onMilestone) |
+| 2.7 | Bottom bar: **Pause / Cancel / End** — Cancel = confirm + discard (`clearActive`, no credit), End = existing complete→summary, Pause = instant w/ banner | ✅ |
+| 2.8 | **Loading popup before session** (await SoundEngine ready + FSM resolve + analyzer start + camera, with step labels) | ✅ (6-step checklist overlay incl. TTS warm-up) |
+| 2.9 | Skip-count fix: emit `repRejectedReason` from BrainEngine when trigger commits but ROM/timing gate fails → coach bar "not counted" + haptic (never silent) | ✅ (reason already emitted; Batch 4 added the haptic + flash — voice existed via WS9.3) |
+| 2.10 | Auto-calibration: run `CalibrationConfig` (enabled on 6 exercises, never read today) as pre-session ROM-learning phase; sync with workout | ✅ (5 s locked-frame ROM feed → verdict line spoken + engine reset; pure layer from Batch 2) |
+| 2.11 | Voice enrichment: wire milestone cues (every 5 reps), round/rest announcements, PLANNING §5.3 | ✅ (milestone cycled every 5 via arbiter `announce`; round/last-round/rest vocab lines queued) |
+| 2.12 | Auto-pause on app background (`didChangeAppLifecycleState`, PLANNING 223); elapsed timer | ✅ (observer auto-pauses; elapsed clock freezes across pauses; 1 s TIME tick) |
 
 ## WS3 — Nutrition: meal page + log page + AI calorie entry ✅ (coordinator; entry links pending WS4)
 | # | Item | Status |
@@ -61,7 +61,7 @@
 | # | Item | Status |
 |---|---|---|
 | 6.1 | FSM coverage: **`chair-dip` had no engine → camera dead-end in 3 workouts** → alias to `tricep_dip` + `test/unit/exercise_registry_test.dart` (all 40 exercises + 236 block refs resolve) | ✅ |
-| 6.2 | Skeleton overlay refinement: form-based green/red coloring (FR-5), wire quality display (folded into WS2 scope) | ⬜ WS2 |
+| 6.2 | Skeleton overlay refinement: form-based green/red coloring (FR-5), wire quality display (folded into WS2 scope) | ✅ (Batch 4: painter `formSignal` — warnings red, praise full chartreuse, neutral standard; confidence tiers kept for shaky segments; driven per frame from feedback severities) |
 | 6.3 | Any-angle pose robustness: thresholds/normalization pass (folded into WS2 scope; full model training = P9 user-delivered model — ⏸) | ⬜ WS2 |
 
 ## WS7 — Smart library search (user request 2026-10-01) ✅ (agent complete: 24 tests, analyze clean; plan-screen search box deferred to integration)

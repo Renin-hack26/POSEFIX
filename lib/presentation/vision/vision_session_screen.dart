@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
@@ -15,28 +16,47 @@ import '../../core/pose/angle_readouts.dart';
 import '../../core/pose/brain_engine.dart';
 import '../../core/pose/exercise_definition.dart';
 import '../../core/pose/pose_analyzer.dart';
+import '../../core/pose/round_tracker.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/workout_session.dart';
 import '../../domain/repositories/session_repository.dart';
 import '../../engines/session_audio/session_audio_cues.dart';
 import '../shared/glass_card.dart';
 import '../shared/primary_button.dart';
+import '../workout/widgets/framing_guide.dart';
+import '../workout/widgets/posture_avatar.dart';
+import '../workout/widgets/vision_hud.dart';
+import 'session_flow.dart';
 import 'vision_hud.dart';
 
 /// Live workout vision screen: back-camera preview + [PoseAnalyzer] rep
 /// counting with spoken coaching. Live skeleton overlay shows exactly what
 /// ML Kit detects on each frame.
+///
+/// Optional [targetRounds]/[targetReps]/[restSec] carry the plan block's
+/// targets (rounds override wins); otherwise the pre-session editor offers
+/// the definition defaults and the user confirms.
 class VisionSessionScreen extends ConsumerStatefulWidget {
-  const VisionSessionScreen({super.key, required this.exerciseId});
+  const VisionSessionScreen({
+    super.key,
+    required this.exerciseId,
+    this.targetRounds,
+    this.targetReps,
+    this.restSec,
+  });
 
   final String exerciseId;
+  final int? targetRounds;
+  final int? targetReps;
+  final int? restSec;
 
   @override
   ConsumerState<VisionSessionScreen> createState() =>
       _VisionSessionScreenState();
 }
 
-class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
+class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
+    with WidgetsBindingObserver {
   CameraController? _camera;
   PoseAnalyzer? _analyzer;
   InputImageRotation _rotation = InputImageRotation.rotation270deg; // front cam, portrait
@@ -47,8 +67,15 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   String? _cameraError;
   bool _ready = false;
   bool _paused = false;
+
+  /// Pause window start — the elapsed clock shifts forward on resume so
+  /// paused time never counts (WS2.12).
+  DateTime? _pauseBegan;
   bool _inFlight = false;
   bool _disposed = false;
+
+  /// Boot-step label for the loading overlay (WS2.8), null once live.
+  String? _bootStep;
 
   LockReason _lastLockReason = LockReason.ok;
   DateTime _lastLockVoiceAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -83,6 +110,43 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   double _holdSeconds = 0;
   int _holdTarget = 0;
 
+  // --- WS2 rounds / rest / milestones ---------------------------------------
+  RoundTracker? _rounds;
+  int _targetReps = 0;
+  bool _resting = false;
+  DateTime? _restEndsAt;
+  int _lastMilestone = 0;
+
+  // --- WS2.10 calibration phase ----------------------------------------------
+  bool _calibrating = false;
+  int _calibRemaining = 0;
+  final RomCapture _rom = RomCapture();
+
+  // --- WS2.5/2.6/2.9 transient popups ------------------------------------------
+  /// 'tooFast' | 'range' while the 0.8 s wrong-pose flash is up.
+  String? _rejectFlash;
+
+  /// True while the round-complete tick is up (auto-dismiss).
+  bool _tickFlash = false;
+
+  /// True while the all-rounds congrats sheet is up.
+  bool _showCongrats = false;
+  Timer? _flashTimer;
+
+  /// 1 s ticker: elapsed TIME chip, rest countdown, calibration countdown.
+  Timer? _ticker;
+
+  /// Overlay form signal for the skeleton painter (WS6.2): -1 bad, 0
+  /// neutral, +1 good — derived from the live feedback severities.
+  int _formSignal = 0;
+
+  /// Whether the current cue bar copy is a warning (warn/ok color states).
+  bool _cueWarn = false;
+
+  /// Latest engine clock (rep count + timestamp) — rest rebase anchors here.
+  int _lastEngineCount = 0;
+  double _lastEngineT = 0;
+
   /// Actual image-stream dimensions (sensor pixels) for overlay transform.
   /// Updated from every frame; falls back to previewSize until first frame.
   double _imageWidth = 0;
@@ -112,22 +176,50 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
 
   /// Publishes current per-frame fields to the HUD listeners.
   void _publishHud() {
+    final tracker = _rounds;
+    final now = DateTime.now();
+    final roundReps = _calibrating
+        ? 0
+        : (tracker != null
+            ? tracker.repsThisRound(_lastEngineCount).clamp(0, 1 << 30)
+            : _reps);
+    final roundLabel = tracker != null
+        ? '${tracker.currentRound}/${tracker.targetRounds}'
+        : '—';
+    final timeLabel = _sessionStartTime != null
+        ? formatElapsed(now.difference(_sessionStartTime!))
+        : '00:00';
+    var restRemaining = 0;
+    if (_resting && _restEndsAt != null) {
+      restRemaining =
+          _restEndsAt!.difference(now).inSeconds.clamp(0, 1 << 30);
+    }
     _hud.value = _HudSnapshot(
       frames: _framesSeen,
       poses: _lastPosesFound,
       error: _pipelineError,
       lens: _lens,
       reps: _reps,
+      roundReps: roundReps,
+      roundLabel: roundLabel,
+      timeLabel: timeLabel,
+      targetReps: tracker?.targetReps ?? _targetReps,
       state: _state,
       formScore: _formScore,
       lockReason: _lockReason,
       framing: _framing,
       coachCue: _coachCue,
+      cueWarn: _cueWarn,
       paused: _paused,
       readoutLeft: _readoutLeft,
       readoutRight: _readoutRight,
       holdSeconds: _holdSeconds,
       holdTarget: _holdTarget,
+      rejectKind: _rejectFlash,
+      tickFlash: _tickFlash,
+      showCongrats: _showCongrats,
+      calibRemaining: _calibrating ? _calibRemaining : -1,
+      restRemaining: restRemaining,
     );
   }
 
@@ -139,16 +231,49 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     _skeletonPainter.imageHeight = _imageHeight;
     _skeletonPainter.rotation = _rotation;
     _skeletonPainter.mirrored = _lens == CameraLensDirection.front;
+    _skeletonPainter.formSignal = _formSignal;
     _overlayTick.tick();
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_boot());
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // WS2.12: backgrounding auto-pauses the session — counting never runs
+    // while the user can't see the cue bar. Resume is always manual.
+    if ((state == AppLifecycleState.paused ||
+            state == AppLifecycleState.inactive) &&
+        _ready &&
+        !_paused &&
+        !_disposed &&
+        mounted) {
+      _togglePause();
+    }
+  }
+
+  /// Boot-step labels for the loading overlay (WS2.8).
+  static const List<String> _bootSteps = [
+    'Finding your exercise',
+    'Warming up the coach voice',
+    'Loading your session',
+    'Setting repetition targets',
+    'Starting the analyzer',
+    'Starting the camera',
+  ];
+
+  void _setBootStep(int? index) {
+    if (!mounted || _disposed) return;
+    setState(() => _bootStep =
+        (index == null || index < 0) ? null : _bootSteps[index]);
+  }
+
   Future<void> _boot() async {
+    _setBootStep(0);
     final definition = ExerciseRegistry.instance.resolve(widget.exerciseId);
     if (definition == null) {
       if (!mounted) return;
@@ -163,9 +288,17 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     // definition's target instead of counting reps (WS8.1).
     _holdTarget =
         definition.type == 'duration' ? definition.targetDuration : 0;
+
+    _setBootStep(1);
     final soundEngine = ref.read(soundEngineProvider);
     _audioCues = SessionAudioCues(soundEngine);
+    try {
+      await soundEngine.initialize();
+    } catch (_) {
+      // Voice is best-effort; the session runs silent if TTS fails.
+    }
 
+    _setBootStep(2);
     final sessionRepository = ref.read(sessionRepositoryProvider);
     final active = await sessionRepository.activeSession();
     if (active != null) {
@@ -180,6 +313,32 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       await _createNewSession(sessionRepository);
     }
 
+    // Pre-session target editor (WS2.4) — plan values win, definition
+    // defaults otherwise; dismissing backs out of the session.
+    _setBootStep(3);
+    if (!mounted || _disposed) return;
+    final targets = await _editTargets(definition);
+    if (targets == null) {
+      if (!mounted) return;
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        context.go('/plan');
+      }
+      return;
+    }
+    if (definition.type != 'duration') {
+      _rounds = RoundTracker(
+        targetRounds: targets.rounds,
+        targetReps: targets.reps,
+        restSec: targets.rest,
+      );
+      _targetReps = targets.reps;
+    } else {
+      _holdTarget = targets.holdSecs;
+    }
+
+    _setBootStep(4);
     try {
       final analyzer = ref.read(poseAnalyzerProvider(widget.exerciseId));
       _analyzer = analyzer;
@@ -193,7 +352,163 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       return;
     }
 
+    _setBootStep(5);
     await _initCamera();
+    if (!mounted || _disposed) return;
+    _setBootStep(-1);
+    _startTicker();
+    // Pre-session calibration (WS2.10) runs where the definition enables
+    // it; otherwise the session starts immediately with the vocab line.
+    if (_definition?.calibration.enabled ?? false) {
+      _startCalibration();
+    } else {
+      final line = CueVocabulary.lines
+          .firstWhere((l) => l.id == 'session-start');
+      _coachCue = line.display;
+      unawaited(_audioCues?.announce(line.spoken));
+      _publishHud();
+    }
+  }
+
+  /// Pre-session target editor (WS2.4): plan route values win, definition
+  /// defaults otherwise. Null = dismissed → back out of the session.
+  Future<_Targets?> _editTargets(ExerciseDefinition definition) {
+    final isDuration = definition.type == 'duration';
+    final initial = _Targets(
+      rounds: widget.targetRounds ?? definition.defaultSets,
+      reps: widget.targetReps ?? definition.defaultReps,
+      rest: widget.restSec ?? 30,
+      holdSecs: _holdTarget > 0 ? _holdTarget : definition.targetDuration,
+    );
+    return showModalBottomSheet<_Targets>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _TargetEditorSheet(
+        definition: definition,
+        initial: initial,
+        isDuration: isDuration,
+      ),
+    );
+  }
+
+  void _startTicker() {
+    _ticker?.cancel();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_disposed || !mounted) return;
+      // Rest countdown expiry.
+      if (_resting && _restEndsAt != null) {
+        final left = _restEndsAt!.difference(DateTime.now()).inSeconds;
+        if (left <= 0) _finishRest();
+      }
+      // Calibration countdown.
+      if (_calibrating) {
+        _calibRemaining--;
+        if (_calibRemaining <= 0) {
+          _finishCalibration();
+          return;
+        }
+      }
+      _publishHud();
+    });
+  }
+
+  // --- calibration phase (WS2.10) --------------------------------------------
+
+  void _startCalibration() {
+    _rom.reset();
+    _calibrating = true;
+    _calibRemaining = 5;
+    _coachCue = 'Move through your full range — calibrating…';
+    _publishHud();
+  }
+
+  void _finishCalibration() {
+    _calibrating = false;
+    _calibRemaining = 0;
+    final line =
+        calibrationCompleteLine(judgeCalibrationDepth(_rom.spanDeg));
+    _coachCue = line;
+    unawaited(_audioCues?.speakUrgent(line));
+    // Fresh counting state — calibration movement never counts.
+    try {
+      _analyzer?.reset();
+    } catch (_) {}
+    _publishHud();
+  }
+
+  // --- rounds / rest / milestones (WS2.3/2.6/2.11) ------------------------------
+
+  /// Milestones (every 5 reps) + round events for a freshly counted rep.
+  void _onRepCounted(BrainResult brain, double tSec) {
+    final milestone = _reps ~/ 5;
+    if (milestone > _lastMilestone && milestone > 0) {
+      _lastMilestone = milestone;
+      unawaited(
+          _audioCues?.announce(CueVocabulary.milestone(milestone).spoken));
+    }
+    final tracker = _rounds;
+    if (tracker == null || tracker.isComplete || _resting) return;
+    final event = tracker.observe(brain.repCount, tSec);
+    if (event == null) return;
+    if (event == RoundEvent.targetComplete) {
+      _presentCongrats();
+      return;
+    }
+    // Round complete: tick flash + set sound + (optional) rest break.
+    _tickFlash = true;
+    _flashTimer?.cancel();
+    _flashTimer = Timer(const Duration(milliseconds: 800), () {
+      if (_disposed || !mounted) return;
+      _tickFlash = false;
+      _rejectFlash = null;
+      _publishHud();
+    });
+    unawaited(_audioCues?.onSet());
+    final enteringLast = tracker.isLastRound;
+    unawaited(_audioCues?.announce(CueVocabulary.byId(
+            enteringLast ? 'last-round' : 'round-complete')
+        .spoken));
+    if (tracker.restSec <= 0) {
+      tracker.rebase(brain.repCount, tSec);
+    } else {
+      _resting = true;
+      _restEndsAt = DateTime.now().add(Duration(seconds: tracker.restSec));
+      unawaited(_audioCues?.onRestStart());
+      unawaited(
+          _audioCues?.announce(CueVocabulary.byId('rest-start').spoken));
+    }
+    _publishHud();
+  }
+
+  void _finishRest() {
+    _resting = false;
+    _restEndsAt = null;
+    _rounds?.rebase(_lastEngineCount, _lastEngineT);
+    unawaited(_audioCues?.onRestEnd());
+    unawaited(_audioCues?.announce(CueVocabulary.byId('rest-end').spoken));
+    _publishHud();
+  }
+
+  void _presentCongrats() {
+    _showCongrats = true;
+    unawaited(_audioCues?.onMilestone());
+    _publishHud();
+  }
+
+  /// Wrong-pose flash (WS2.5/2.9): 0.8 s severity card + haptic.
+  void _flashReject(RepRejectedReason rejected) {
+    _rejectFlash =
+        rejected == RepRejectedReason.tooFast ? 'tooFast' : 'range';
+    HapticFeedback.mediumImpact();
+    _flashTimer?.cancel();
+    _flashTimer = Timer(const Duration(milliseconds: 800), () {
+      if (_disposed || !mounted) return;
+      _rejectFlash = null;
+      _tickFlash = false;
+      _publishHud();
+    });
+    _publishHud();
   }
 
   Future<void> _createNewSession(SessionRepository repository) async {
@@ -213,6 +528,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     );
     _session = session;
     _sessionStartTime = now;
+    _lastMilestone = 0;
     await repository.saveActive(session);
   }
 
@@ -226,6 +542,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     );
     _reps = exercise.totalReps;
     _lastSavedRepCount = _reps;
+    _lastMilestone = _reps ~/ 5;
     _totalFormScoreSum = (exercise.formAccuracyPct * _reps).round();
     _formScoreCount = _reps;
     _formScore = exercise.formAccuracyPct.round();
@@ -386,16 +703,30 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   void _handleResult(PoseFrameResult result) {
     final brain = result.brain;
     String? cue;
+    bool cueWarn = false;
     if (brain != null) {
-      if (brain.repJustCompleted) {
-        _reps = brain.repCount;
-        _totalFormScoreSum += brain.formScore;
-        _formScoreCount++;
-        _formScore = (_totalFormScoreSum / _formScoreCount).round();
-        _audioCues?.onRep();
-        if (_reps > _lastSavedRepCount) {
-          _lastSavedRepCount = _reps;
-          _saveSession();
+      final tSec = result.timestampMs / 1000.0;
+      _lastEngineCount = brain.repCount;
+      _lastEngineT = tSec;
+      if (_calibrating) {
+        // WS2.10: learn the primary-angle ROM on locked frames; counting
+        // stays frozen until the phase ends with an engine reset.
+        if (result.lockReason == LockReason.ok && _definition != null) {
+          final v = brain.angles[_definition!.primaryAngle.name];
+          if (v != null) _rom.add(v);
+        }
+      } else {
+        if (brain.repJustCompleted) {
+          _reps = brain.repCount;
+          _totalFormScoreSum += brain.formScore;
+          _formScoreCount++;
+          _formScore = (_totalFormScoreSum / _formScoreCount).round();
+          _audioCues?.onRep();
+          if (_reps > _lastSavedRepCount) {
+            _lastSavedRepCount = _reps;
+            _saveSession();
+          }
+          _onRepCounted(brain, tSec);
         }
       }
       // Every coaching string resolves through the central vocabulary, so
@@ -420,15 +751,18 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       if (messages.isNotEmpty) {
         cue = messages.first;
       }
+      cueWarn = warnings.isNotEmpty;
       // WS9.3: a gate-refused rep is EXPLAINED (coach bar + rate-limited
       // spoken warning) — never a silent drop that looks like a stuck
-      // counter.
+      // counter. WS2.5/2.9: plus the 0.8 s severity flash + haptic.
       final RepRejectedReason? rejected = brain.repRejectedReason;
-      if (rejected != null) {
+      if (rejected != null && !_calibrating) {
         final String why =
             CueVocabulary.lineForRejection(rejected).display;
         cue = why;
+        cueWarn = true;
         _audioCues?.onWarning(why);
+        _flashReject(rejected);
       }
     }
     if (result.framing != _lastSpokenFraming) {
@@ -457,9 +791,10 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     _lockReason = result.lockReason;
     _framing = result.framing;
     if (brain != null) {
-      _reps = brain.repCount;
+      if (!_calibrating) _reps = brain.repCount;
       _state = brain.currentState;
       _coachCue = cue;
+      _cueWarn = cueWarn;
       // Exercise-aware angle readouts from the engine's live (smoothed)
       // angles + the duration hold clock (WS8.1/8.4).
       final definition = _definition;
@@ -472,17 +807,45 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
         _readoutRight = null;
       }
       _holdSeconds = brain.holdSeconds;
+      // Overlay form signal (WS6.2): warnings/errors paint the skeleton
+      // red, pure praise paints it green, otherwise neutral.
+      var signal = 0;
+      for (final fb in brain.feedback) {
+        if (fb.severity == 'warning' || fb.severity == 'error') {
+          signal = -1;
+          break;
+        }
+      }
+      if (signal == 0) {
+        for (final fb in brain.feedback) {
+          if (fb.severity == 'info') {
+            signal = 1;
+            break;
+          }
+        }
+      }
+      _formSignal = signal;
     }
   }
 
   Future<void> _saveSession() async {
     if (_session == null) return;
     final repository = ref.read(sessionRepositoryProvider);
+    final existing = _session!.exercises.first;
+    final tracker = _rounds;
     final updatedExercise = _session!.exercises.first.copyWith(
       totalReps: _reps,
       formAccuracyPct: _formScoreCount > 0
           ? _totalFormScoreSum / _formScoreCount
           : 100,
+      // WS2.3: round progress persists per save (summary + dashboard read it).
+      roundsCompleted: tracker?.repsPerRound.length ?? existing.roundsCompleted,
+      repsPerRound: tracker != null
+          ? List<int>.of(tracker.repsPerRound)
+          : existing.repsPerRound,
+      roundTimesSec: tracker != null
+          ? List<double>.of(tracker.roundTimesSec)
+          : existing.roundTimesSec,
     );
     final updatedSession = _session!.copyWith(
       exercises: [updatedExercise],
@@ -505,9 +868,17 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   }
 
   void _togglePause() async {
+    final now = DateTime.now();
     setState(() {
       _paused = !_paused;
     });
+    if (_paused) {
+      _pauseBegan = now;
+    } else if (_pauseBegan != null && _sessionStartTime != null) {
+      // Freeze the elapsed clock across the pause.
+      _sessionStartTime = _sessionStartTime!.add(now.difference(_pauseBegan!));
+      _pauseBegan = null;
+    }
     _publishHud(); // paused banner lives in the HUD snapshot
     await _saveSession();
   }
@@ -534,6 +905,42 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
     );
     if (confirmed == true && mounted) {
       await _endSession();
+    }
+  }
+
+  /// Cancel (WS2.7): confirm + discard — the active session is cleared with
+  /// no credit, no strike, no summary.
+  Future<void> _confirmCancel() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Discard session?'),
+        content: const Text(
+          'This workout will not be saved and earns no credit.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep going'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ref.read(sessionRepositoryProvider).clearActive();
+    } catch (_) {
+      // Discarding is best-effort; navigation still leaves the session.
+    }
+    if (!mounted) return;
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      context.go('/plan');
     }
   }
 
@@ -579,6 +986,11 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   @override
   void dispose() {
     _disposed = true;
+    WidgetsBinding.instance.removeObserver(this);
+    _ticker?.cancel();
+    _ticker = null;
+    _flashTimer?.cancel();
+    _flashTimer = null;
     final CameraController? controller = _camera;
     _camera = null;
     if (controller != null) {
@@ -625,14 +1037,47 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
 
   Widget _buildBody() {
     if (_initializing) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 12),
-            Text('Starting camera…'),
-          ],
+      // Loading popup (WS2.8): step labels track sound + FSM + session +
+      // targets + analyzer + camera readiness.
+      final stepIndex =
+          _bootStep == null ? _bootSteps.length : _bootSteps.indexOf(_bootStep!);
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 48),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(child: CircularProgressIndicator()),
+              const SizedBox(height: 20),
+              for (var i = 0; i < _bootSteps.length; i++)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      Icon(
+                        i < stepIndex
+                            ? Icons.check_circle
+                            : (i == stepIndex
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked),
+                        size: 18,
+                        color: i <= stepIndex ? Colors.green : Colors.grey,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        _bootSteps[i],
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight:
+                              i == stepIndex ? FontWeight.w800 : FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       );
     }
@@ -699,6 +1144,16 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
             );
           },
         ),
+        // 1b. Frame guide (WS2.1) — only until the coach locks on.
+        Positioned.fill(
+          child: ValueListenableBuilder<_HudSnapshot>(
+            valueListenable: _hud,
+            builder: (context, snap, _) =>
+                snap.lockReason == LockReason.noPerson && _ready
+                    ? const FramingGuide()
+                    : const SizedBox.shrink(),
+          ),
+        ),
         // 2. Floating translucent HUD (never covers the body's center).
         SafeArea(
           child: Padding(
@@ -724,18 +1179,51 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
                     child: ValueListenableBuilder<_HudSnapshot>(
                       valueListenable: _hud,
                       builder: (context, snap, _) => _HudOverlay(
-                        reps: snap.reps,
+                        roundReps: snap.roundReps,
+                        roundLabel: snap.roundLabel,
+                        timeLabel: snap.timeLabel,
+                        targetReps: snap.targetReps,
                         state: snap.state,
                         formScore: snap.formScore,
                         lockReason: snap.lockReason,
                         framing: snap.framing,
-                        coachCue: snap.coachCue,
                         paused: snap.paused,
+                        exerciseName:
+                            _definition?.displayName ?? 'Live session',
                       ),
                     ),
                   ),
                 ),
                 const Spacer(),
+                // 2b. Single fixed cue slot (WS2.2): rest > calibration >
+                // live cue. Warn/ok color states, never stacked.
+                ValueListenableBuilder<_HudSnapshot>(
+                  valueListenable: _hud,
+                  builder: (context, snap, _) {
+                    if (snap.restRemaining > 0) {
+                      return _CoachCueCard(
+                        text: 'REST ${snap.restRemaining}s — '
+                            'next up: Round ${_rounds?.currentRound ?? ''}',
+                        warn: false,
+                      );
+                    }
+                    if (snap.calibRemaining >= 0) {
+                      return _CoachCueCard(
+                        text: 'Calibrating — move through your full range '
+                            '(${snap.calibRemaining}s)',
+                        warn: false,
+                      );
+                    }
+                    if (snap.coachCue == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return _CoachCueCard(
+                      text: snap.coachCue!,
+                      warn: snap.cueWarn,
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
                 // Exercise-aware angle readouts (WS8.4) — bottom-left +
                 // bottom-right over the preview, above the controls.
                 ValueListenableBuilder<_HudSnapshot>(
@@ -751,10 +1239,41 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
                 _SessionControls(
                   paused: _paused,
                   onPause: _togglePause,
+                  onCancel: _confirmCancel,
                   onEnd: _confirmEndSession,
                 ),
               ],
             ),
+          ),
+        ),
+        // 3. Transient popups (WS2.5/2.6) — centered, non-blocking.
+        Positioned.fill(
+          child: ValueListenableBuilder<_HudSnapshot>(
+            valueListenable: _hud,
+            builder: (context, snap, _) {
+              if (snap.showCongrats) {
+                return Center(
+                  child: _CongratsSheet(
+                    onLog: () {
+                      setState(() => _showCongrats = false);
+                      unawaited(_endSession());
+                    },
+                    onNext: () {
+                      // Bonus rounds past the target — still credited.
+                      setState(() => _showCongrats = false);
+                      _publishHud();
+                    },
+                  ),
+                );
+              }
+              if (snap.rejectKind != null) {
+                return Center(child: _RejectFlash(kind: snap.rejectKind!));
+              }
+              if (snap.tickFlash) {
+                return const Center(child: _TickFlash());
+              }
+              return const SizedBox.shrink();
+            },
           ),
         ),
       ],
@@ -802,47 +1321,60 @@ class _PipelineStatus extends StatelessWidget {
   }
 }
 
-/// HUD overlay — rep counter, state, form score, lock/framing banners, controls.
+/// HUD overlay — top cluster (reps/round/time + avatar + state/form),
+/// lock/framing banners. The cue bar lives in its own fixed bottom slot
+/// (WS2.1/2.2) — never stacked inside this scrolling column.
 class _HudOverlay extends StatelessWidget {
   const _HudOverlay({
-    required this.reps,
+    required this.roundReps,
+    required this.roundLabel,
+    required this.timeLabel,
+    required this.targetReps,
     required this.state,
     required this.formScore,
     required this.lockReason,
     required this.framing,
-    required this.coachCue,
     required this.paused,
+    required this.exerciseName,
   });
 
-  final int reps;
+  final int roundReps;
+  final String roundLabel;
+  final String timeLabel;
+  final int targetReps;
   final String state;
   final int formScore;
   final LockReason lockReason;
   final FramingCue framing;
-  final String? coachCue;
   final bool paused;
+  final String exerciseName;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Top row: rep counter + state/form score
+        // Top row: reps/round/time cluster + posture avatar (WS2.1).
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            RepCounter(reps: reps),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  ExerciseStateChip(state: state),
-                  const SizedBox(height: 8),
-                  FormScoreReadout(formScore: formScore),
-                ],
-              ),
+            VisionHud(
+              reps: roundReps,
+              round: roundLabel,
+              time: timeLabel,
+              targetReps: targetReps > 0 ? targetReps : null,
             ),
+            const Spacer(),
+            PostureAvatar(caption: exerciseName.toUpperCase()),
+          ],
+        ),
+        const SizedBox(height: 10),
+        // State + form chips under the row (full width, compact).
+        Row(
+          children: [
+            Expanded(child: ExerciseStateChip(state: state)),
+            const SizedBox(width: 10),
+            Expanded(child: FormScoreReadout(formScore: formScore)),
           ],
         ),
         if (lockReason != LockReason.ok) ...[
@@ -853,11 +1385,6 @@ class _HudOverlay extends StatelessWidget {
           const SizedBox(height: 10),
           FramingCueCard(framing: framing),
         ],
-        const SizedBox(height: 10),
-        if (coachCue != null) ...[
-          _CoachCueCard(text: coachCue!),
-          const SizedBox(height: 10),
-        ],
         if (paused) ...[
           const _PausedBanner(),
           const SizedBox(height: 10),
@@ -867,16 +1394,19 @@ class _HudOverlay extends StatelessWidget {
   }
 }
 
-/// Bottom floating control bar — pause/resume + end, always reachable.
+/// Bottom floating control bar — pause/resume + cancel + end (WS2.7),
+/// always reachable.
 class _SessionControls extends StatelessWidget {
   const _SessionControls({
     required this.paused,
     required this.onPause,
+    required this.onCancel,
     required this.onEnd,
   });
 
   final bool paused;
   final VoidCallback onPause;
+  final VoidCallback onCancel;
   final VoidCallback onEnd;
 
   @override
@@ -889,6 +1419,12 @@ class _SessionControls extends StatelessWidget {
           label: paused ? 'Resume' : 'Pause',
           primary: true,
           onTap: onPause,
+        ),
+        const SizedBox(width: 16),
+        _SessionControlButton(
+          icon: Icons.close,
+          label: 'Cancel',
+          onTap: onCancel,
         ),
         const SizedBox(width: 16),
         _SessionControlButton(
@@ -1035,25 +1571,29 @@ class _ErrorCard extends StatelessWidget {
   }
 }
 
-/// Latest spoken coaching cue.
+/// Single fixed cue slot (WS2.2): the latest coaching line with warn/ok
+/// color states — never stacked, never scattered.
 class _CoachCueCard extends StatelessWidget {
-  const _CoachCueCard({required this.text});
+  const _CoachCueCard({required this.text, required this.warn});
 
   final String text;
+  final bool warn;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final accent = warn ? p.amberPillFg : p.accentDeep;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: p.glass,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: p.border, width: 1.2),
+        border: Border.all(color: warn ? p.amberPillFg : p.border, width: 1.2),
       ),
       child: Row(
         children: [
-          Icon(Icons.volume_up, size: 20, color: p.accentDeep),
+          Icon(warn ? Icons.warning_amber : Icons.volume_up,
+              size: 20, color: accent),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1064,6 +1604,122 @@ class _CoachCueCard extends StatelessWidget {
                 color: p.ink,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Wrong-pose flash (WS2.5): ✕ mark, 0.8 s, severity-colored.
+class _RejectFlash extends StatelessWidget {
+  const _RejectFlash({required this.kind});
+
+  /// 'tooFast' (amber) or 'range' (red).
+  final String kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final color = kind == 'range' ? AppColors.danger : p.amberPillFg;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: p.glass,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color, width: 2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.close, size: 34, color: color),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              kind == 'range'
+                  ? 'Not counted — go through your full range'
+                  : 'Too fast — rep not counted',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: p.ink,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Round-complete tick flash (WS2.6): ✓ mark, auto-dismiss.
+class _TickFlash extends StatelessWidget {
+  const _TickFlash();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.glass,
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFF00E676), width: 2.5),
+      ),
+      child: const Icon(Icons.check, size: 44, color: Color(0xFF00E676)),
+    );
+  }
+}
+
+/// All-rounds congrats sheet (WS2.6): Log → summary, Next → bonus rounds.
+class _CongratsSheet extends StatelessWidget {
+  const _CongratsSheet({required this.onLog, required this.onNext});
+
+  final VoidCallback onLog;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 32),
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: p.glass,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: p.border, width: 1.2),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.celebration, size: 44, color: Color(0xFF00E676)),
+          const SizedBox(height: 10),
+          Text(
+            'Target reached — outstanding!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: p.ink,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Log it to the summary, or keep going for bonus reps.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: p.ink3),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: PrimaryButton(label: 'Log', onPressed: onLog),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: PrimaryButton(label: 'Next', onPressed: onNext),
+              ),
+            ],
           ),
         ],
       ),
@@ -1185,16 +1841,26 @@ class _HudSnapshot {
     required this.error,
     required this.lens,
     required this.reps,
+    required this.roundReps,
+    required this.roundLabel,
+    required this.timeLabel,
+    required this.targetReps,
     required this.state,
     required this.formScore,
     required this.lockReason,
     required this.framing,
     required this.coachCue,
+    required this.cueWarn,
     required this.paused,
     required this.readoutLeft,
     required this.readoutRight,
     required this.holdSeconds,
     required this.holdTarget,
+    required this.rejectKind,
+    required this.tickFlash,
+    required this.showCongrats,
+    required this.calibRemaining,
+    required this.restRemaining,
   });
 
   static const _HudSnapshot initial = _HudSnapshot(
@@ -1203,16 +1869,26 @@ class _HudSnapshot {
     error: null,
     lens: CameraLensDirection.front,
     reps: 0,
+    roundReps: 0,
+    roundLabel: '—',
+    timeLabel: '00:00',
+    targetReps: 0,
     state: 'unknown',
     formScore: 100,
     lockReason: LockReason.noPerson,
     framing: FramingCue.ok,
     coachCue: null,
+    cueWarn: false,
     paused: false,
     readoutLeft: null,
     readoutRight: null,
     holdSeconds: 0,
     holdTarget: 0,
+    rejectKind: null,
+    tickFlash: false,
+    showCongrats: false,
+    calibRemaining: -1,
+    restRemaining: 0,
   );
 
   final int frames;
@@ -1220,11 +1896,21 @@ class _HudSnapshot {
   final String? error;
   final CameraLensDirection lens;
   final int reps;
+
+  /// Reps in the current round + `current/total` round + elapsed labels.
+  final int roundReps;
+  final String roundLabel;
+  final String timeLabel;
+  final int targetReps;
+
   final String state;
   final int formScore;
   final LockReason lockReason;
   final FramingCue framing;
   final String? coachCue;
+
+  /// Warn/ok color state of the cue slot.
+  final bool cueWarn;
   final bool paused;
 
   /// Exercise-aware angle readouts, preformatted (`Knee 142°`).
@@ -1234,6 +1920,19 @@ class _HudSnapshot {
   /// Duration hold clock + target seconds (0 = repetition exercise).
   final double holdSeconds;
   final int holdTarget;
+
+  /// 'tooFast' | 'range' while the 0.8 s wrong-pose flash is up.
+  final String? rejectKind;
+
+  /// Round-complete tick flash + congrats sheet flags.
+  final bool tickFlash;
+  final bool showCongrats;
+
+  /// Calibration countdown seconds (-1 = phase off).
+  final int calibRemaining;
+
+  /// Rest-break countdown seconds (0 = not resting).
+  final int restRemaining;
 }
 
 class SkeletonOverlayPainter extends CustomPainter {
@@ -1249,6 +1948,9 @@ class SkeletonOverlayPainter extends CustomPainter {
   // Mutable: the session screen updates these in place and ticks `repaint`,
   // so a camera frame never requires building a new painter widget.
   Pose? pose;
+
+  /// Form signal (WS6.2): -1 bad, 0 neutral, +1 good.
+  int formSignal = 0;
 
   /// Raw (unrotated) camera buffer dimensions.
   double imageWidth;
@@ -1274,6 +1976,20 @@ class SkeletonOverlayPainter extends CustomPainter {
     ..strokeWidth = 3
     ..strokeCap = StrokeCap.round
     ..color = const Color(0xFFFF6D00).withValues(alpha: 0.85);
+
+  /// Form signals (WS6.2/FR-5): bad form paints the skeleton red, clean
+  /// praise-worthy form paints it full chartreuse; neutral keeps the
+  /// standard paint. Confidence tiers still dim shaky segments.
+  static final Paint paintLineBad = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3.5
+    ..strokeCap = StrokeCap.round
+    ..color = const Color(0xFFFF5252).withValues(alpha: 0.95);
+  static final Paint paintLineGood = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3.5
+    ..strokeCap = StrokeCap.round
+    ..color = const Color(0xFF00E676);
   static final Paint paintFace = Paint()
     ..style = PaintingStyle.stroke
     ..strokeWidth = 1.5
@@ -1387,13 +2103,19 @@ class SkeletonOverlayPainter extends CustomPainter {
     double? likelihoodOf(int i) =>
         pose!.landmarks[PoseLandmarkType.values[i]]?.likelihood;
 
-    // Body skeleton (lines colored by joint confidence).
+    // Body skeleton (lines colored by joint confidence; form signal
+    // overrides the confident tier — WS6.2/FR-5 green/red form coloring).
     for (final (a, b) in _body) {
       final pa = landmarks[a];
       final pb = landmarks[b];
       if (pa == null || pb == null) continue;
       final conf = math.min(likelihoodOf(a) ?? 0, likelihoodOf(b) ?? 0);
-      canvas.drawLine(pa, pb, conf >= 0.5 ? paintLine : paintLineLow);
+      final linePaint = conf < 0.5
+          ? paintLineLow
+          : (formSignal < 0
+              ? paintLineBad
+              : (formSignal > 0 ? paintLineGood : paintLine));
+      canvas.drawLine(pa, pb, linePaint);
     }
 
     // Face jaw line + eyes (thin white).
@@ -1485,6 +2207,202 @@ class SkeletonOverlayPainter extends CustomPainter {
         oldDelegate.imageWidth != imageWidth ||
         oldDelegate.imageHeight != imageHeight ||
         oldDelegate.rotation != rotation ||
-        oldDelegate.mirrored != mirrored;
+        oldDelegate.mirrored != mirrored ||
+        oldDelegate.formSignal != formSignal;
+  }
+}
+
+/// Repetition/hold targets confirmed in the pre-session editor (WS2.4).
+class _Targets {
+  const _Targets({
+    required this.rounds,
+    required this.reps,
+    required this.rest,
+    required this.holdSecs,
+  });
+
+  final int rounds;
+  final int reps;
+  final int rest;
+  final int holdSecs;
+}
+
+/// Pre-session editor sheet (WS2.4): rounds + reps per round + rest
+/// editable before the camera starts; duration work edits hold seconds.
+class _TargetEditorSheet extends StatefulWidget {
+  const _TargetEditorSheet({
+    required this.definition,
+    required this.initial,
+    required this.isDuration,
+  });
+
+  final ExerciseDefinition definition;
+  final _Targets initial;
+  final bool isDuration;
+
+  @override
+  State<_TargetEditorSheet> createState() => _TargetEditorSheetState();
+}
+
+class _TargetEditorSheetState extends State<_TargetEditorSheet> {
+  late int _rounds = widget.initial.rounds.clamp(1, 10);
+  late int _reps = widget.initial.reps.clamp(1, 200);
+  late int _rest = widget.initial.rest.clamp(0, 300);
+  late int _holdSecs = widget.initial.holdSecs.clamp(10, 600);
+
+  void _confirm() => Navigator.of(context).pop(_Targets(
+        rounds: _rounds,
+        reps: _reps,
+        rest: _rest,
+        holdSecs: _holdSecs,
+      ));
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 14, 22, 30),
+      decoration: BoxDecoration(
+        color: p.glass,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: p.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              widget.definition.displayName,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: p.ink,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.isDuration
+                  ? 'Set your hold target — the clock runs while you hold.'
+                  : 'Set your rounds — the coach tracks each one.',
+              style: TextStyle(fontSize: 13, color: p.ink3),
+            ),
+            const SizedBox(height: 16),
+            if (widget.isDuration)
+              _StepperRow(
+                label: 'Hold target',
+                value: '$_holdSecs s',
+                onMinus: () => setState(
+                    () => _holdSecs = (_holdSecs - 5).clamp(10, 600)),
+                onPlus: () => setState(
+                    () => _holdSecs = (_holdSecs + 5).clamp(10, 600)),
+              )
+            else ...[
+              _StepperRow(
+                label: 'Rounds',
+                value: '$_rounds',
+                onMinus: () =>
+                    setState(() => _rounds = (_rounds - 1).clamp(1, 10)),
+                onPlus: () =>
+                    setState(() => _rounds = (_rounds + 1).clamp(1, 10)),
+              ),
+              _StepperRow(
+                label: 'Reps per round',
+                value: '$_reps',
+                onMinus: () =>
+                    setState(() => _reps = (_reps - 1).clamp(1, 200)),
+                onPlus: () =>
+                    setState(() => _reps = (_reps + 1).clamp(1, 200)),
+              ),
+              _StepperRow(
+                label: 'Rest between rounds',
+                value: _rest == 0 ? 'none' : '${_rest}s',
+                onMinus: () =>
+                    setState(() => _rest = (_rest - 5).clamp(0, 300)),
+                onPlus: () =>
+                    setState(() => _rest = (_rest + 5).clamp(0, 300)),
+              ),
+            ],
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: PrimaryButton(
+                    label: 'Start',
+                    onPressed: _confirm,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StepperRow extends StatelessWidget {
+  const _StepperRow({
+    required this.label,
+    required this.value,
+    required this.onMinus,
+    required this.onPlus,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback onMinus;
+  final VoidCallback onPlus;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: p.ink,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.remove_circle_outline),
+            onPressed: onMinus,
+          ),
+          SizedBox(
+            width: 64,
+            child: Text(
+              value,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: p.ink,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline),
+            onPressed: onPlus,
+          ),
+        ],
+      ),
+    );
   }
 }

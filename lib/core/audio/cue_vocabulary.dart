@@ -485,6 +485,8 @@ class CueVocabulary {
     );
   }
 
+  static CueLine byId(String id) => _byId(id);
+
   static CueLine _byId(String id) =>
       lines.firstWhere((l) => l.id == id);
 }

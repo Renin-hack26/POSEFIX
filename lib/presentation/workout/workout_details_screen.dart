@@ -276,6 +276,8 @@ class _DetailBody extends StatelessWidget {
     final workout = data.workout!;
     final plan = data.plan;
     final firstExerciseId = plan.isNotEmpty ? plan.first.block.exerciseId : null;
+    // Plan block targets ride along: rounds (sets), reps, rest (WS2.3).
+    final firstBlock = plan.isNotEmpty ? plan.first.block : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,7 +319,18 @@ class _DetailBody extends StatelessWidget {
           label: 'Start workout',
           icon: Icons.play_arrow,
           onPressed: firstExerciseId != null
-              ? () => context.push('/vision?ex=$firstExerciseId')
+              ? () {
+                  final params = <String>[];
+                  final sets = firstBlock?.sets;
+                  final reps = firstBlock?.reps;
+                  final rest = firstBlock?.restSec;
+                  if (sets != null) params.add('rounds=$sets');
+                  if (reps != null) params.add('reps=$reps');
+                  if (rest != null) params.add('rest=$rest');
+                  final suffix =
+                      params.isEmpty ? '' : '&${params.join('&')}';
+                  context.push('/vision?ex=$firstExerciseId$suffix');
+                }
               : null,
         ),
         const SizedBox(height: 20),

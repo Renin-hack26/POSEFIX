@@ -878,8 +878,26 @@ class _DaySessionsSlot extends StatelessWidget {
       title: workout?.name ?? 'Planned session',
       moves: _movesLine(workout, data.exerciseNames),
       onEdit: () => onEditSession(session),
-      onStart: () =>
-          context.push('/vision${firstExercise == null ? '' : '?ex=$firstExercise'}'),
+      // Plan targets ride along: rounds override wins, else block sets
+      // (WS2.3 consumes roundsOverride here instead of dropping it).
+      onStart: () {
+        final block = (workout?.blocks.isNotEmpty ?? false)
+            ? workout!.blocks.first
+            : null;
+        final rounds = session.roundsOverride ?? block?.sets;
+        final reps = block?.reps;
+        final rest = block?.restSec;
+        var route =
+            '/vision${firstExercise == null ? '' : '?ex=$firstExercise'}';
+        final params = <String>[];
+        if (rounds != null) params.add('rounds=$rounds');
+        if (reps != null) params.add('reps=$reps');
+        if (rest != null) params.add('rest=$rest');
+        if (params.isNotEmpty) {
+          route += '${route.contains('?') ? '&' : '?'}${params.join('&')}';
+        }
+        context.push(route);
+      },
     );
   }
 }

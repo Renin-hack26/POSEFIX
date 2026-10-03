@@ -90,7 +90,26 @@ Implemented against the spec tests committed in `39a9f82`:
 - Drive-by: removed 5 dead asset-dir entries from pubspec (the dirs were
   never bundled — same dead-ref class as B1's mp4 cleanup).
 
-## Batch 4 — WS2 HUD + WS6.2 + auto-pause
+## Batch 4 — WS2 HUD + WS6.2 + auto-pause (DONE — 2026-10-03)
+
+- 2.1/2.2 adopted the three orphan sample widgets (VisionHud cluster,
+  PostureAvatar, FramingGuide-on-no-lock); cue bar extracted to a fixed
+  bottom slot with warn/ok states; controls bottom-center + Cancel.
+- 2.3 `RoundTracker` (pure, tested): plan/details routes carry
+  rounds/reps/rest (roundsOverride wins); round reps/target + round + 1 s
+  TIME chips; rest countdown with rebase; rounds persist per save.
+- 2.4 pre-session editor sheet (duration edits hold secs; dismiss backs
+  out). 2.8 six-step loading overlay incl. TTS warm-up.
+- 2.5/2.9 wrong-pose ✕ flash 0.8 s (amber/red) + haptic on every refused
+  rep. 2.6 ✓ tick + set/rest SFX + vocab lines; congrats Log/Next +
+  onMilestone.
+- 2.7 Cancel = confirm + `clearActive`, no credit. 2.10 five-second
+  locked-frame ROM calibration → verdict + engine reset (enabled defs).
+- 2.11 milestones every 5 + round/last-round/rest announcements via the
+  arbiter. 2.12 background auto-pause; elapsed clock freezes on pause.
+- WS6.2 painter `formSignal` green/red form coloring.
+- Tests: `round_tracker_test` (5). Gates: analyze 0; test 225/226 (sole
+  failure = the known sqlite env issue).
 
 ## Batch 5 — Pose stack (EXPANDED)
 

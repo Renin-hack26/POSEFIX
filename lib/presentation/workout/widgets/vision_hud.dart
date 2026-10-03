@@ -10,6 +10,7 @@ class VisionHud extends StatelessWidget {
     required this.reps,
     required this.round,
     required this.time,
+    this.targetReps,
   });
 
   /// Counted reps of the current exercise.
@@ -20,6 +21,9 @@ class VisionHud extends StatelessWidget {
 
   /// Elapsed session time, e.g. `04:35`.
   final String time;
+
+  /// Per-round rep target — shown as `OF 12` under the count (WS2.3).
+  final int? targetReps;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +47,10 @@ class VisionHud extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               const _HudLabel('REPS'),
+              if (targetReps != null && targetReps! > 0) ...[
+                const SizedBox(height: 2),
+                _HudLabel('OF $targetReps'),
+              ],
             ],
           ),
         ),

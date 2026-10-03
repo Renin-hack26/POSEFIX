@@ -144,6 +144,16 @@ class SessionAudioCues {
     }
   }
 
+  /// Queued (non-interrupting) announcement — milestones, round/rest lines
+  /// (WS2.11): goes through the arbiter behind any live form warning.
+  Future<void> announce(String text) async {
+    try {
+      await _engine.speakCue(text);
+    } catch (_) {
+      // Audio must never break the workout flow.
+    }
+  }
+
   /// Mood-matched session-complete fanfare + spoken line.
   Future<void> onComplete(SessionMood mood) async {
     try {

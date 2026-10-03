@@ -80,9 +80,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/vision',
-        builder: (context, state) => VisionSessionScreen(
-          exerciseId: state.uri.queryParameters['ex'] ?? 'squat',
-        ),
+        builder: (context, state) {
+          final q = state.uri.queryParameters;
+          int? paramInt(String key) => int.tryParse(q[key] ?? '');
+          return VisionSessionScreen(
+            exerciseId: q['ex'] ?? 'squat',
+            targetRounds: paramInt('rounds'),
+            targetReps: paramInt('reps'),
+            restSec: paramInt('rest'),
+          );
+        },
       ),
       GoRoute(
         path: '/summary',
