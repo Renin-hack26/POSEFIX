@@ -51,6 +51,7 @@ class _PlanData {
     required this.history,
     required this.workouts,
     required this.exerciseNames,
+    this.mealsError,
   });
 
   final TrainingPlan? plan;
@@ -58,6 +59,10 @@ class _PlanData {
   final List<MealEntry> meals;
   final MealTarget? target;
   final List<WorkoutSession> history;
+
+  /// Non-null when the meals query failed — the section must say so
+  /// instead of lying with "No meals logged yet".
+  final String? mealsError;
 
   /// workoutId ? resolved workout (session card + history rows).
   final Map<String, Workout> workouts;
@@ -92,10 +97,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
 
     final todayKey = DateTime.now().dateKey;
     List<MealEntry> meals = const [];
+    String? mealsError;
     try {
       meals = await nutritionRepo.entriesFor(todayKey);
-    } catch (_) {
+    } catch (e) {
+      // Never conflate "failed to load" with "nothing logged".
       meals = const [];
+      mealsError = '$e';
     }
     MealTarget? target;
     try {
@@ -144,6 +152,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       history: history,
       workouts: workouts,
       exerciseNames: exerciseNames,
+      mealsError: mealsError,
     );
   }
 
@@ -231,6 +240,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                 return _PlanBody(
                   data: data,
                   onEditSession: _editSession,
+                  onMealsRetry: _retry,
                 );
               },
             ),
@@ -284,12 +294,18 @@ class _NoPlanState extends StatelessWidget {
 }
 
 class _PlanBody extends StatefulWidget {
-  const _PlanBody({required this.data, required this.onEditSession});
+  const _PlanBody(
+      {required this.data,
+      required this.onEditSession,
+      required this.onMealsRetry});
 
   final _PlanData data;
 
   /// Opens the session editor sheet for a scheduled session.
   final ValueChanged<PlanSession> onEditSession;
+
+  /// Retries the whole plan load (used by the meals error card).
+  final VoidCallback onMealsRetry;
 
   @override
   State<_PlanBody> createState() => _PlanBodyState();
@@ -390,6 +406,8 @@ class _PlanBodyState extends State<_PlanBody> {
         _MealsSection(
           meals: widget.data.meals,
           target: widget.data.target,
+          loadError: widget.data.mealsError,
+          onRetry: widget.onMealsRetry,
         ),
         const SizedBox(height: 20),
         _HistorySection(data: widget.data),
@@ -431,8 +449,13 @@ String _formatStartMin(int startTimeMin) {
   return '$hour12:${minute.toString().padLeft(2, '0')} $suffix';
 }
 
-String _relativeDay(DateTime date) {
-  final now = DateTime.now().startOfDay;
+/// One-line error for cards (full exception strings are long).
+String _shortError(String e) {
+  final oneLine = e.replaceAll('\n', ' ').trim();
+  return oneLine.length <= 90 ? oneLine : '${oneLine.substring(0, 90)}…';
+}
+
+String _relativeDay(DateTime date) {  final now = DateTime.now().startOfDay;
   final day = date.startOfDay;
   final diff = now.difference(day).inDays;
   if (diff == 0) return 'Today';
@@ -1340,10 +1363,20 @@ IconData _iconForMuscle(List<MuscleGroup> muscles) {
 
 /// "Meals today": kcal card with progress bar + per-type tiles from real entries.
 class _MealsSection extends StatelessWidget {
-  const _MealsSection({required this.meals, required this.target});
+  const _MealsSection({
+    required this.meals,
+    required this.target,
+    this.loadError,
+    this.onRetry,
+  });
 
   final List<MealEntry> meals;
   final MealTarget? target;
+
+  /// Query failure — rendered instead of the totals so "couldn't load"
+  /// is never confused with "nothing logged".
+  final String? loadError;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -1390,7 +1423,29 @@ class _MealsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        GlassCard(
+        if (loadError != null)
+          GlassCard(
+            child: Row(
+              children: [
+                Icon(Icons.cloud_off, size: 20, color: p.ink3),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Couldn\u2019t load today\u2019s meals (${_shortError(loadError!)}). '
+                    'Your logged meals are safe on this device.',
+                    style: TextStyle(fontSize: 12.5, color: p.ink2),
+                  ),
+                ),
+                if (onRetry != null)
+                  TextButton(
+                    onPressed: onRetry,
+                    child: const Text('Retry'),
+                  ),
+              ],
+            ),
+          )
+        else
+          GlassCard(
           padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -554,7 +554,24 @@ class _MealScreenState extends ConsumerState<MealScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                if (entries.isEmpty)
+                if (snap.hasError)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Couldn\u2019t load today\u2019s meals. '
+                          'Your entries are safe — retry to reload.',
+                          style:
+                              TextStyle(fontSize: 12.5, color: p.ink2),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _reloadToday,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  )
+                else if (entries.isEmpty)
                   Text(
                     'Nothing logged yet today.',
                     style: TextStyle(fontSize: 12.5, color: p.ink3),

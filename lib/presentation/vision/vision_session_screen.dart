@@ -2643,16 +2643,9 @@ class SkeletonOverlayPainter extends CustomPainter {
       if (_bigJoints.contains(i)) {
         canvas.drawCircle(pt, 9, paintAnchor); // shoulder / hip ring
       }
-      paintText.text = TextSpan(
-        text: '$i',
-        style: const TextStyle(
-          fontSize: 9,
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      );
-      paintText.layout();
-      paintText.paint(canvas, pt.translate(-4, -9));
+      // NOTE: joint index numbers used to render here (debug aid) — removed:
+      // 33 white labels stamped on every joint read as clutter over the
+      // lines/nodes. Live angles still show on the elbow/knee arcs above.
     }
   }
 

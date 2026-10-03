@@ -52,12 +52,33 @@ class _HomeData {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  late final Future<_HomeData> _future;
+  // Not final: the dashboard reloads on return (see didChangeDependencies)
+  // and on manual retry.
+  late Future<_HomeData> _future;
+
+  /// didChangeDependencies fires on every route change; only the
+  /// false→true edge means "returned here".
+  bool _depInitDone = false;
+  bool _wasCurrent = false;
 
   @override
   void initState() {
     super.initState();
     _future = _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The dashboard (strike included) resolves once in initState, but the
+    // tab state survives navigation — finishing a workout and coming back
+    // used to show the stale strike forever. Reload on return.
+    final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
+    if (_depInitDone && isCurrent && !_wasCurrent) {
+      setState(() => _future = _load());
+    }
+    _depInitDone = true;
+    _wasCurrent = isCurrent;
   }
 
   Future<_HomeData> _load() async {

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/storage/app_database.dart';
 import '../../../domain/entities/meal.dart';
@@ -21,6 +22,18 @@ class NutritionDao extends DatabaseAccessor<AppDatabase>
         syncedAt: row.syncedAt,
       );
 
+  /// A single unreadable row (e.g. a mealType string from an older build
+  /// that no longer matches the enum) must never sink the whole day's
+  /// list — skip it loudly instead of failing the query.
+  MealEntry? _entryFromRowOrNull(MealEntryRow row) {
+    try {
+      return _entryFromRow(row);
+    } catch (e) {
+      debugPrint('nutrition: skipping unreadable meal row ${row.id} ($e)');
+      return null;
+    }
+  }
+
   // --- entries -----------------------------------------------------------
 
   Future<List<MealEntry>> entriesFor(String dateKey) async {
@@ -28,7 +41,10 @@ class NutritionDao extends DatabaseAccessor<AppDatabase>
           ..where((t) => t.dateKey.equals(dateKey))
           ..orderBy([(t) => OrderingTerm.desc(t.timeMillis)]))
         .get();
-    return rows.map(_entryFromRow).toList();
+    return rows
+        .map(_entryFromRowOrNull)
+        .whereType<MealEntry>()
+        .toList();
   }
 
   /// Meals in [fromDateKey, toDateKey] (inclusive) — log page + report.
@@ -46,7 +62,10 @@ class NutritionDao extends DatabaseAccessor<AppDatabase>
             (t) => OrderingTerm.desc(t.timeMillis),
           ]))
         .get();
-    return rows.map(_entryFromRow).toList();
+    return rows
+        .map(_entryFromRowOrNull)
+        .whereType<MealEntry>()
+        .toList();
   }
 
   Future<void> upsertEntry(MealEntry entry) =>
@@ -97,7 +116,12 @@ class NutritionDao extends DatabaseAccessor<AppDatabase>
           ..where((t) => t.syncedAt.isNull())
           ..orderBy([(t) => OrderingTerm.asc(t.dateKey)]))
         .get();
-    return rows.map(_entryFromRow).toList();
+    // Tolerant like the list queries: one bad row must not sink the
+    // whole upload pass (it retries next sweep).
+    return rows
+        .map(_entryFromRowOrNull)
+        .whereType<MealEntry>()
+        .toList();
   }
 
   Future<void> markEntrySynced(String id, DateTime at) =>

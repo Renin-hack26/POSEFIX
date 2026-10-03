@@ -19,7 +19,7 @@ class EndSession {
   final PlanRepository _plan;
   final StrikeEngine _engine;
 
-  static const int _minCreditSeconds = 60;
+  static const int minCreditSeconds = 60;
 
   Future<Report> call(WorkoutSession session,
       {bool abandoned = false}) async {
@@ -27,7 +27,7 @@ class EndSession {
     final finalized = _finalize(session, endedAt: now, abandoned: abandoned);
     await _sessions.completeSession(finalized);
 
-    if (finalized.durationSec >= _minCreditSeconds) {
+    if (finalized.durationSec >= minCreditSeconds) {
       await _creditStrike(finalized);
       await _creditPlan(finalized);
     }

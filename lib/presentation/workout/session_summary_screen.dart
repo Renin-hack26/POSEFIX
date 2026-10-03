@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/di/app_dependencies.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/workout_session.dart';
+import '../../domain/usecases/end_session.dart';
 import '../shared/glass_card.dart';
 import '../shared/grid_background.dart';
 import '../shared/primary_button.dart';
@@ -88,7 +89,11 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
       );
       activeDays = {
         for (final s in window)
-          if (s.status == SessionStatus.completed)
+          // Same bar as the header strike badge (EndSession credit rule):
+          // sub-minute sessions never counted, so they must not mint
+          // streak days here either — or the two numbers disagree.
+          if (s.status == SessionStatus.completed &&
+              s.durationSec >= EndSession.minCreditSeconds)
             DateTime(s.startedAt.year, s.startedAt.month, s.startedAt.day),
       };
     } catch (_) {
@@ -391,7 +396,21 @@ class _SessionSummaryScreenState extends ConsumerState<SessionSummaryScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
+        // Honest credit rule (same bar as EndSession): a sub-minute session
+        // is a fine warm-up but never moves the strike — say so instead of
+        // leaving a "0 day" badge unexplained.
+        if (session.durationSec < EndSession.minCreditSeconds)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Under a minute — nice warm-up. Sessions of 1 minute or more '
+              'count toward your strike.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: p.ink2),
+            ),
+          ),
+        const SizedBox(height: 8),
         // ---- Actions ----
         Row(
           children: [
