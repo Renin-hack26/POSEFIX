@@ -32,6 +32,7 @@ import 'dart:ui' show Size;
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
+import '../audio/cue_vocabulary.dart';
 import '../constants/form_rules.dart';
 import 'brain_engine.dart';
 import 'exercise_definition.dart';
@@ -69,16 +70,18 @@ enum FramingCue {
   turnSideways,
 }
 
-/// Spoken copy per framing cue.
-String framingCueLine(FramingCue cue) => switch (cue) {
-      FramingCue.ok => '',
-      FramingCue.stepBack => 'Step back so I can see your full body.',
-      FramingCue.stepCloser => 'Move a little closer to the camera.',
-      FramingCue.moveLeft => 'Move left to stay in frame.',
-      FramingCue.moveRight => 'Move right to stay in frame.',
-      FramingCue.turnSideways =>
-        'Turn sideways to the camera for this exercise.',
-    };
+/// Spoken copy per framing cue (single source: [CueVocabulary]).
+String framingCueLine(FramingCue cue) =>
+    CueVocabulary.lineForFraming(cue)?.display ?? '';
+
+/// EMA base alpha honoring the exercise's [SmoothingConfig] (8.1): the
+/// classic `alpha = 2 / (window + 1)` mapping, so a `window: 3` definition
+/// responds faster than the `window: 5` default. Definitions without
+/// smoothing keep the shared [FormRules.emaSmoothingAlpha] behavior.
+double smoothingAlphaFor(SmoothingConfig config) {
+  if (!config.enabled) return FormRules.emaSmoothingAlpha;
+  return (2.0 / (config.window + 1)).clamp(0.05, 0.9);
+}
 
 /// One analyzed frame.
 class PoseFrameResult {
@@ -368,17 +371,19 @@ class PoseAnalyzer {
     // Smooth + normalize. Velocity-aware EMA: fast landmark motion raises
     // the effective alpha (up to 0.75) so quick reps keep their full
     // amplitude and still cross the FSM depth thresholds; slow motion keeps
-    // the classic 0.3 smoothing against camera noise.
+    // the classic 0.3 smoothing against camera noise. The base alpha honors
+    // the exercise's smoothing window (8.1).
     final px = <int, pm.LmPoint>{};
     final norm = <String, pm.LmPoint>{};
+    final baseAlpha = smoothingAlphaFor(definition.smoothing);
     for (final entry in visible.entries) {
       final idx = definition.landmarks[entry.key]!;
       final fx = (_smoothX[idx] ??= pm.EmaFilter(
-          FormRules.emaSmoothingAlpha,
+          baseAlpha,
           adaptiveGain: 0.012,
           maxAlpha: 0.75));
       final fy = (_smoothY[idx] ??= pm.EmaFilter(
-          FormRules.emaSmoothingAlpha,
+          baseAlpha,
           adaptiveGain: 0.012,
           maxAlpha: 0.75));
       final sx = fx.push(entry.value.x);

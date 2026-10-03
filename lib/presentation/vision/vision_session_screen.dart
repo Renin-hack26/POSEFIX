@@ -9,7 +9,9 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import '../../core/audio/cue_vocabulary.dart';
 import '../../core/di/app_dependencies.dart';
+import '../../core/pose/angle_readouts.dart';
 import '../../core/pose/brain_engine.dart';
 import '../../core/pose/exercise_definition.dart';
 import '../../core/pose/pose_analyzer.dart';
@@ -70,8 +72,16 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
   /// Latest raw pose from ML Kit for skeleton overlay.
   Pose? _latestPose;
 
-  /// Live joint angles (deg) for the HUD — L/R elbow and knee.
-  Map<String, double> _angles = const {};
+  /// Exercise definition for this session (readouts + hold target).
+  ExerciseDefinition? _definition;
+
+  /// Exercise-aware angle readouts (WS8.4) — rendered bottom-left/right.
+  String? _readoutLeft;
+  String? _readoutRight;
+
+  /// Hold clock for duration exercises (WS8.1) + its target.
+  double _holdSeconds = 0;
+  int _holdTarget = 0;
 
   /// Actual image-stream dimensions (sensor pixels) for overlay transform.
   /// Updated from every frame; falls back to previewSize until first frame.
@@ -114,7 +124,10 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       framing: _framing,
       coachCue: _coachCue,
       paused: _paused,
-      angles: _angles,
+      readoutLeft: _readoutLeft,
+      readoutRight: _readoutRight,
+      holdSeconds: _holdSeconds,
+      holdTarget: _holdTarget,
     );
   }
 
@@ -145,6 +158,11 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       });
       return;
     }
+    _definition = definition;
+    // Duration exercises (plank, wall-sit…) run a hold clock against the
+    // definition's target instead of counting reps (WS8.1).
+    _holdTarget =
+        definition.type == 'duration' ? definition.targetDuration : 0;
     final soundEngine = ref.read(soundEngineProvider);
     _audioCues = SessionAudioCues(soundEngine);
 
@@ -353,7 +371,6 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
         // Prefer the EMA-smoothed pose for the overlay — stable joints and
         // lines instead of raw per-frame jitter.
         _latestPose = analyzer.smoothedPose ?? analyzer.latestPose;
-        _angles = _jointAngles(_latestPose);
         _publishOverlay();
         _publishHud();
       } else if (telemetryChanged) {
@@ -381,12 +398,20 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
           _saveSession();
         }
       }
+      // Every coaching string resolves through the central vocabulary, so
+      // the cue slot and the voice render the same entry (WS8.3).
       final List<String> warnings = <String>[];
       final List<String> messages = <String>[];
       for (final fb in brain.feedback) {
-        messages.add(fb.message);
-        if (fb.severity == 'warning' || fb.severity == 'error') {
-          warnings.add(fb.audioCue);
+        final line = CueVocabulary.feedback(
+          name: fb.name,
+          message: fb.message,
+          audioCue: fb.audioCue,
+          severity: fb.severity,
+        );
+        messages.add(line.display);
+        if (line.actions.contains(CueAction.speak)) {
+          warnings.add(line.spoken);
         }
       }
       if (warnings.isNotEmpty) {
@@ -400,9 +425,8 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       // counter.
       final RepRejectedReason? rejected = brain.repRejectedReason;
       if (rejected != null) {
-        final String why = rejected == RepRejectedReason.tooFast
-            ? 'Too fast — rep not counted'
-            : 'Not counted — go through your full range';
+        final String why =
+            CueVocabulary.lineForRejection(rejected).display;
         cue = why;
         _audioCues?.onWarning(why);
       }
@@ -436,61 +460,19 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
       _reps = brain.repCount;
       _state = brain.currentState;
       _coachCue = cue;
-    }
-  }
-
-  /// Live joint angles (degrees) for the HUD, computed from the overlay
-  /// pose. Returns an empty map when landmarks are missing or occluded.
-  static const Map<String, (PoseLandmarkType, PoseLandmarkType, PoseLandmarkType)>
-      _angleSpecs = {
-    'L elbow': (
-      PoseLandmarkType.leftShoulder,
-      PoseLandmarkType.leftElbow,
-      PoseLandmarkType.leftWrist,
-    ),
-    'R elbow': (
-      PoseLandmarkType.rightShoulder,
-      PoseLandmarkType.rightElbow,
-      PoseLandmarkType.rightWrist,
-    ),
-    'L knee': (
-      PoseLandmarkType.leftHip,
-      PoseLandmarkType.leftKnee,
-      PoseLandmarkType.leftAnkle,
-    ),
-    'R knee': (
-      PoseLandmarkType.rightHip,
-      PoseLandmarkType.rightKnee,
-      PoseLandmarkType.rightAnkle,
-    ),
-  };
-
-  Map<String, double> _jointAngles(Pose? pose) {
-    if (pose == null) return const {};
-    double? ang(PoseLandmarkType a, PoseLandmarkType b, PoseLandmarkType c) {
-      final la = pose.landmarks[a];
-      final lb = pose.landmarks[b];
-      final lc = pose.landmarks[c];
-      if (la == null || lb == null || lc == null) return null;
-      if (la.likelihood < 0.4 || lb.likelihood < 0.4 || lc.likelihood < 0.4) {
-        return null;
+      // Exercise-aware angle readouts from the engine's live (smoothed)
+      // angles + the duration hold clock (WS8.1/8.4).
+      final definition = _definition;
+      if (definition != null) {
+        final pair = angleReadouts(definition, brain.angles);
+        _readoutLeft = pair?.left.text;
+        _readoutRight = pair?.right?.text;
+      } else {
+        _readoutLeft = null;
+        _readoutRight = null;
       }
-      final ux = la.x - lb.x;
-      final uy = la.y - lb.y;
-      final vx = lc.x - lb.x;
-      final vy = lc.y - lb.y;
-      final n = math.sqrt(ux * ux + uy * uy) * math.sqrt(vx * vx + vy * vy);
-      if (n == 0) return null;
-      final cos = ((ux * vx + uy * vy) / n).clamp(-1.0, 1.0);
-      return math.acos(cos) * 180.0 / math.pi;
+      _holdSeconds = brain.holdSeconds;
     }
-
-    final out = <String, double>{};
-    for (final entry in _angleSpecs.entries) {
-      final v = ang(entry.value.$1, entry.value.$2, entry.value.$3);
-      if (v != null) out[entry.key] = v;
-    }
-    return out;
   }
 
   Future<void> _saveSession() async {
@@ -749,12 +731,23 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen> {
                         framing: snap.framing,
                         coachCue: snap.coachCue,
                         paused: snap.paused,
-                        angles: snap.angles,
                       ),
                     ),
                   ),
                 ),
                 const Spacer(),
+                // Exercise-aware angle readouts (WS8.4) — bottom-left +
+                // bottom-right over the preview, above the controls.
+                ValueListenableBuilder<_HudSnapshot>(
+                  valueListenable: _hud,
+                  builder: (context, snap, _) => _ReadoutRow(
+                    left: snap.readoutLeft,
+                    right: snap.readoutRight,
+                    holdSeconds: snap.holdSeconds,
+                    holdTarget: snap.holdTarget,
+                  ),
+                ),
+                const SizedBox(height: 8),
                 _SessionControls(
                   paused: _paused,
                   onPause: _togglePause,
@@ -819,7 +812,6 @@ class _HudOverlay extends StatelessWidget {
     required this.framing,
     required this.coachCue,
     required this.paused,
-    required this.angles,
   });
 
   final int reps;
@@ -829,18 +821,12 @@ class _HudOverlay extends StatelessWidget {
   final FramingCue framing;
   final String? coachCue;
   final bool paused;
-  final Map<String, double> angles;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Live joint angles (elbows + knees) — measurement readout.
-        if (angles.isNotEmpty) ...[
-          _AngleChips(angles: angles),
-          const SizedBox(height: 10),
-        ],
         // Top row: rep counter + state/form score
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -915,37 +901,72 @@ class _SessionControls extends StatelessWidget {
   }
 }
 
-/// Compact live-angle readout — one chip per measured joint.
-class _AngleChips extends StatelessWidget {
-  const _AngleChips({required this.angles});
+/// Exercise-aware angle readouts (WS8.4) + duration hold chip (WS8.1):
+/// bottom-left + bottom-right over the preview, translucent so the body
+/// stays visible behind them. Hidden while nothing measurable is live.
+class _ReadoutRow extends StatelessWidget {
+  const _ReadoutRow({
+    required this.left,
+    required this.right,
+    required this.holdSeconds,
+    required this.holdTarget,
+  });
 
-  final Map<String, double> angles;
+  final String? left;
+  final String? right;
+  final double holdSeconds;
+  final int holdTarget;
+
+  @override
+  Widget build(BuildContext context) {
+    final holdChip = holdTarget > 0
+        ? _AngleReadout(
+            text: 'HOLD ${holdSeconds.round()}s / ${holdTarget}s')
+        : null;
+    if (left == null && right == null && holdChip == null) {
+      return const SizedBox.shrink();
+    }
+    return Row(
+      children: [
+        if (left != null)
+          _AngleReadout(text: left!)
+        else
+          const Spacer(),
+        if (holdChip != null) ...[
+          const SizedBox(width: 8),
+          holdChip,
+        ],
+        const Spacer(),
+        if (right != null) _AngleReadout(text: right!),
+      ],
+    );
+  }
+}
+
+/// One translucent readout pill (sample-style low-opacity glass, small type).
+class _AngleReadout extends StatelessWidget {
+  const _AngleReadout({required this.text});
+
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
-      children: [
-        for (final entry in angles.entries)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: p.glass,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: p.border, width: 1.2),
-            ),
-            child: Text(
-              '${entry.key} ${entry.value.round()}°',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: p.ink,
-              ),
-            ),
-          ),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: p.track.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: p.border, width: 1),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: p.ink,
+        ),
+      ),
     );
   }
 }
@@ -1170,7 +1191,10 @@ class _HudSnapshot {
     required this.framing,
     required this.coachCue,
     required this.paused,
-    required this.angles,
+    required this.readoutLeft,
+    required this.readoutRight,
+    required this.holdSeconds,
+    required this.holdTarget,
   });
 
   static const _HudSnapshot initial = _HudSnapshot(
@@ -1185,7 +1209,10 @@ class _HudSnapshot {
     framing: FramingCue.ok,
     coachCue: null,
     paused: false,
-    angles: {},
+    readoutLeft: null,
+    readoutRight: null,
+    holdSeconds: 0,
+    holdTarget: 0,
   );
 
   final int frames;
@@ -1199,7 +1226,14 @@ class _HudSnapshot {
   final FramingCue framing;
   final String? coachCue;
   final bool paused;
-  final Map<String, double> angles;
+
+  /// Exercise-aware angle readouts, preformatted (`Knee 142°`).
+  final String? readoutLeft;
+  final String? readoutRight;
+
+  /// Duration hold clock + target seconds (0 = repetition exercise).
+  final double holdSeconds;
+  final int holdTarget;
 }
 
 class SkeletonOverlayPainter extends CustomPainter {

@@ -52,8 +52,8 @@ flutter:
   assets:
     - assets/data/
     - assets/demo/
-    - assets/videos/
-    - assets/animations/
-    - assets/avatars/
-    - assets/images/
-    - assets/tips/
+    # NOTE (WS8): assets/videos|animations|avatars|images|tips carry no
+    # bundled files, so they are deliberately NOT declared — an asset dir
+    # listed here but missing on disk fails `flutter analyze`
+    # (asset_directory_does_not_exist) and `flutter build`. Re-add an entry
+    # together with its first real file (see docs/DEPLOYMENT.md for videos).

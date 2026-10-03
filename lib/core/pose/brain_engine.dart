@@ -55,6 +55,7 @@ class BrainResult {
     this.stateJustChanged = false,
     this.repRejectedReason,
     this.bilateral,
+    this.holdSeconds = 0.0,
   });
 
   final String exerciseId;
@@ -72,6 +73,11 @@ class BrainResult {
   final RepRejectedReason? repRejectedReason;
   final BilateralStatus? bilateral;
 
+  /// Cumulative seconds spent in the definition's hold state (duration
+  /// exercises: plank, wall-sit…) — 0 for repetition work. Powers the
+  /// session hold chip (`HOLD 12s / 30s`).
+  final double holdSeconds;
+
   BrainResult copyWith({
     String? currentState,
     String? previousState,
@@ -83,6 +89,7 @@ class BrainResult {
     bool? stateJustChanged,
     RepRejectedReason? repRejectedReason,
     BilateralStatus? bilateral,
+    double? holdSeconds,
   }) =>
       BrainResult(
         exerciseId: exerciseId,
@@ -96,6 +103,7 @@ class BrainResult {
         stateJustChanged: stateJustChanged ?? this.stateJustChanged,
         repRejectedReason: repRejectedReason ?? this.repRejectedReason,
         bilateral: bilateral ?? this.bilateral,
+        holdSeconds: holdSeconds ?? this.holdSeconds,
       );
 }
 
@@ -613,6 +621,11 @@ class BrainEngine {
   String _previousState = 'unknown';
   int _repCount = 0;
 
+  /// Cumulative seconds in the definition's hold state (8.1: duration
+  /// exercises finally consume `holdState` — plank-style holds accumulate
+  /// time credit instead of a meaningless rep tick).
+  double _holdSeconds = 0;
+
   // Visit-memory: ROM states seen since the last counted rep.
   final Set<String> _visited = {};
   final Set<String> _visitedLeft = {};
@@ -755,6 +768,13 @@ class BrainEngine {
     return out;
   }
 
+  /// Adds this frame's delta to the hold clock when the committed state is
+  /// a hold (8.1) — duration exercises (plank, wall-sit…) accumulate time
+  /// credit; repetition work never calls this with true.
+  void _accumulateHold(bool inHold) {
+    if (inHold) _holdSeconds += _frameDt;
+  }
+
   String? _evaluateRaw(Map<String, dynamic> context) {
     for (final stateName in definition.stateOrder) {
       final state = definition.getState(stateName);
@@ -846,6 +866,10 @@ class BrainEngine {
     }
 
     context['state'] = current;
+    // 8.1: duration exercises consume `holdState` here — time in the hold
+    // accumulates as hold credit instead of a meaningless rep tick.
+    _accumulateHold(
+        definition.holdState != null && current == definition.holdState);
     // Evaluate feedback ONCE — the old code built the debug string with a
     // second full rule evaluation on every frame (pure per-frame waste).
     final feedback = _evaluateFeedback(context);
@@ -865,6 +889,7 @@ class BrainEngine {
       repJustCompleted: repCompleted,
       stateJustChanged: changed,
       repRejectedReason: rejection,
+      holdSeconds: _holdSeconds,
     );
   }
 
@@ -876,10 +901,19 @@ class BrainEngine {
     final prevLeft = _stabLeft.state;
     final prevRight = _stabRight.state;
 
+    // 8.1: side angle keys come from the definition's `sides` (hammer-curl
+    // `['left', 'right']` → `left_angle`/`right_angle`) instead of hardcoded
+    // names — a future bilateral definition with different side names keeps
+    // working instead of silently evaluating both sides on the primary.
+    final sides = definition.sides;
+    final leftKey =
+        '${sides.isNotEmpty ? sides[0] : 'left'}_angle';
+    final rightKey =
+        '${sides.length > 1 ? sides[1] : 'right'}_angle';
     final leftCtx = Map<String, dynamic>.from(context)
-      ..['angle'] = context['left_angle'] ?? context['angle'] ?? 0.0;
+      ..['angle'] = context[leftKey] ?? context['angle'] ?? 0.0;
     final rightCtx = Map<String, dynamic>.from(context)
-      ..['angle'] = context['right_angle'] ?? context['angle'] ?? 0.0;
+      ..['angle'] = context[rightKey] ?? context['angle'] ?? 0.0;
 
     final String rawLeft = _evaluateRaw(leftCtx) ?? 'unknown';
     final String rawRight = _evaluateRaw(rightCtx) ?? 'unknown';
@@ -966,6 +1000,9 @@ class BrainEngine {
     }
 
     context['state'] = _stabLeft.state;
+    final holdState = definition.holdState;
+    _accumulateHold(holdState != null &&
+        (_stabLeft.state == holdState || _stabRight.state == holdState));
     return BrainResult(
       exerciseId: definition.id,
       currentState: _stabLeft.state,
@@ -986,6 +1023,7 @@ class BrainEngine {
         leftRepJustCompleted: leftRep,
         rightRepJustCompleted: rightRep,
       ),
+      holdSeconds: _holdSeconds,
     );
   }
 

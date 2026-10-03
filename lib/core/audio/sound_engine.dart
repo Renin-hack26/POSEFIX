@@ -22,6 +22,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'cue_vocabulary.dart';
 import 'tone_synth.dart';
 
 /// Sound effect types for distinct workout events.
@@ -76,16 +77,10 @@ enum SessionMood {
   energetic,
 }
 
-/// Spoken line paired with each completion mood.
-String completionLine(SessionMood mood) => switch (mood) {
-      SessionMood.triumphant => 'Workout complete. Outstanding work today.',
-      SessionMood.encouraging =>
-        'Workout complete. You showed up and finished — that counts.',
-      SessionMood.gentle =>
-        'Session saved. Every bit of movement matters — see you next time.',
-      SessionMood.energetic =>
-        'Workout complete. High intensity, well earned. Recover well.',
-    };
+/// Spoken line paired with each completion mood (single source:
+/// [CueVocabulary]).
+String completionLine(SessionMood mood) =>
+    CueVocabulary.lineForMood(mood).spoken;
 
 class SoundEngine {
   SoundEngine();

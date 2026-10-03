@@ -1,23 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../core/audio/cue_vocabulary.dart';
 import '../../core/pose/pose_analyzer.dart';
 import '../../core/theme/app_theme.dart';
 
 /// Banner copy per person-lock reason. Empty for [LockReason.ok]
 /// (the banner is hidden while counting is live).
-String lockReasonLine(LockReason reason) => switch (reason) {
-      LockReason.ok => '',
-      LockReason.noPerson => 'No person detected. Step into frame to begin.',
-      LockReason.multiPerson =>
-        'More than one person visible. Train solo so reps stay accurate.',
-      LockReason.lostTracking =>
-        'Tracking lost. Hold still so the coach can lock on again.',
-      LockReason.occluded =>
-        'Body partly hidden. Adjust so your key joints stay visible.',
-      LockReason.videoPlayback =>
-        'Looks like a video is playing — do the exercise yourself so your '
-            'reps count.',
-    };
+String lockReasonLine(LockReason reason) =>
+    CueVocabulary.lineForLock(reason)?.display ?? '';
 
 /// Human-readable FSM state label (`bottom` → `Bottom`).
 String prettifyExerciseState(String state) {

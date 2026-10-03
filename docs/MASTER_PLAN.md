@@ -69,7 +69,26 @@ Implemented against the spec tests committed in `39a9f82`:
   `calibrationGoodSpanDeg` 60°, `calibrationCompleteLine`) + 10 tests;
   screen-phase wiring stays in Batch 4.
 
-## Batch 3 — WS8
+## Batch 3 — WS8 (DONE — 2026-10-03)
+
+- 8.1 audit: states/order/counter/feedback/primary/formScore/landmarks/
+  angles already consumed. Wired: smoothing window → EMA base alpha
+  (`2/(window+1)`); `holdState` → `holdSeconds` clock on `BrainResult`;
+  `sides` → bilateral side-context keys. Reported: `visualization` → the
+  Batch 5 overlay upgrade; calibration phase → Batch 4 screen wiring.
+- 8.2 bilateral one-count-per-cycle already DONE via WS9.2 (contract
+  re-pinned by the WS8 sides test).
+- 8.3 `cue_vocabulary.dart`: 51 tagged lines, all situations covered;
+  lock/framing/mood/rejection mappings; feedback funnel; milestones cycle.
+  Scattered `lockReasonLine`/`framingCueLine`/`completionLine`/rejection
+  strings delegate byte-identically.
+- 8.4 `angle_readouts.dart` + bottom-corner translucent pills fed from
+  engine angles (+ `HOLD xs / Ys` chip for duration work); generic top
+  chips removed.
+- 8.5 `ws8_engine_rules_test.dart` (17 tests). Gates: analyze 0; test
+  220/221 (sole failure = the known Smart-App-Control sqlite env issue).
+- Drive-by: removed 5 dead asset-dir entries from pubspec (the dirs were
+  never bundled — same dead-ref class as B1's mp4 cleanup).
 
 ## Batch 4 — WS2 HUD + WS6.2 + auto-pause
 
