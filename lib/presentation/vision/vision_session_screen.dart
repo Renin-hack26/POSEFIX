@@ -162,6 +162,10 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   /// 'tooFast' | 'range' while the 0.8 s wrong-pose flash is up.
   String? _rejectFlash;
 
+  /// True while swapping analyzers between chain blocks — frames in flight
+  /// from the outgoing analyzer are dropped, never applied.
+  bool _switchingBlocks = false;
+
   /// True while the round-complete tick is up (auto-dismiss).
   bool _tickFlash = false;
 
@@ -474,6 +478,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     final block = _chain[index];
     final blockDef = ExerciseRegistry.instance.resolve(block.exerciseId);
     if (blockDef == null) {
+      _switchingBlocks = false;
       if (!mounted) return;
       setState(() {
         _initializing = false;
@@ -494,6 +499,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       _analyzer = analyzer;
       await analyzer.start();
     } catch (_) {
+      _switchingBlocks = false;
       if (!mounted) return;
       setState(() {
         _initializing = false;
@@ -574,6 +580,8 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       unawaited(_audioCues?.announce(line.spoken));
       _publishHud();
     }
+    // Swap window over — frames flow to the new analyzer from here.
+    _switchingBlocks = false;
   }
 
   /// Pre-session target editor (WS2.4): plan route values win, definition
@@ -875,6 +883,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   void _onImage(CameraImage image) {
     if (!_ready || _paused || _disposed) return;
     if (_inFlight) return;
+    // Drop frames during an exercise swap — the outgoing analyzer is
+    // being disposed and its one stale result must never land.
+    if (_switchingBlocks) return;
     final PoseAnalyzer? analyzer = _analyzer;
     if (analyzer == null) return;
     _inFlight = true;
@@ -917,6 +928,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
           rotation: _rotation,
         );
       }
+      // Analyzer swapped mid-flight (chain Next) — the stale result
+      // belongs to the previous exercise; drop it, don't apply.
+      if (!identical(analyzer, _analyzer)) return;
       if (!mounted || _disposed) return;
       // Always refresh telemetry so the HUD proves the pipeline is alive
       // even when ML Kit returns zero poses — but only notify when the
@@ -1566,13 +1580,20 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
                       unawaited(_endSession());
                     },
                     onNext: () {
-                      setState(() => _showCongrats = false);
+                      setState(() {
+                        _showCongrats = false;
+                        // Freeze the feed across the analyzer swap so no
+                        // stale frame lands on the next exercise.
+                        _switchingBlocks = true;
+                        _coachCue = 'Get ready — next exercise…';
+                      });
                       if (_blockIdx + 1 < _chain.length) {
                         // Next exercise in the chain (targets from its
                         // block; no editor mid-flow).
                         unawaited(_beginBlock(_blockIdx + 1));
                       } else {
                         // Bonus rounds past the target — still credited.
+                        _switchingBlocks = false;
                         _publishHud();
                       }
                     },
