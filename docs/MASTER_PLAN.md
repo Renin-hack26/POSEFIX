@@ -165,7 +165,7 @@ official tiers, correctly wired with runtime fallbacks. No third model
 referenced anywhere; custom training needs a dataset/pipeline that does
 not exist here.
 
-## Batch 7 — P1 auth E2E + P3 + P8 (IN PROGRESS)
+## Batch 7 — P1 auth E2E + P3 + P8 (DONE — v1.1.12+13)
 
 - P1: sign-in gates on the `check-user` existence check first (same as the
   forgot flow) — unknown emails get `UserNotFoundException` ("User doesn't
@@ -176,8 +176,20 @@ not exist here.
 - P3: chain verified end to end (video → vision → summary → home →
   report, all links carry ids); `PostureAvatar` phase-syncs to the live
   FSM state. Open item: multi-exercise sessions (see below).
-- P8: analyze 0, suite 273/274 (sole failure = the sqlite env issue);
-  docs current. FPS validation needs on-device runs (B8/field testing).
+- P8: analyze 0, suite 282/282; docs current. FPS validation needs
+  on-device runs (field testing).
+- Audit batch 2 (read-only second agent, all verified before applying):
+  sync pulls uid-scoped; empty upserts skipped; all 8 watermarks
+  conditional (mid-sync edits survive); tolerant decoders everywhere
+  (session/plan/chat/progress/nutrition + num-safe JSON codecs);
+  download loops skip poison rows; plan dirty newest-first; sign-out
+  uploads best-effort before the privacy wipe; reminder intent persists
+  before the permission gate; last-known timezone fallback; OTP/reset
+  query-param fallback; VEDA contract errors labeled correctly;
+  onboarding plan-check guarded. Declined with rationale: router redirect
+  guard (lockout risk, unverifiable here), wipe-skip (privacy violation),
+  unbounded-pull rework (needs server index verification).
+- Version bumped to 1.1.12+13 (pubspec, in-app string, site).
 
 ### Open item — multi-exercise sessions (P3 remainder) (DONE — user chose
 "build the chain", 2026-10-03)
@@ -194,10 +206,10 @@ display totals are offset-based so a fresh engine never loses history
 
 ## Batch 8 — KGP + R8 + P10 release APK (PREP DONE; release parked)
 
-- R8: `isMinifyEnabled` + `isShrinkResources` on + `proguard-rules.pro`
+- R8: `isMinifyEnabled` + `isShrinkResources` + `proguard-rules.pro`
   (Play Core split-install dontwarn — Flutter engine references it
   without the dependency; no deferred components shipped). Release
-  smoke build validates.
+  smoke build validates (200.3 MB).
 - KGP warning (`flutter_timezone`, `flutter_tts`, `workmanager_android`
   apply the Kotlin Gradle Plugin): plugin-side, nothing to change
   in-repo — resolves via future plugin upgrades.
@@ -207,7 +219,27 @@ display totals are offset-based so a fresh engine never loses history
   APKs deliver under `releases/`, never committed. Same for
   `website/downloads/` (250 MB).
 
-Blocked on user: **P9 custom model**, **release signing key**.
+Blocked on user: **release signing key**. (P9 resolved above — no model
+or key outstanding on that item.)
+
+## v1.1.12 field-fix round (2026-10-03/04, commits f75ab7d + 7613b25)
+
+User-reported, fixed against the current tree:
+
+- **Body not detected (total kill)**: camera runs single-plane NV21 but
+  the landmarker path bailed on `< 3` planes — every frame discarded,
+  silently, with the backend latched on. Fixed: NV21 accepted natively,
+  sustained-failure auto-degrade to ML Kit + telemetry error.
+- **White stamps**: painter index numbers on all 33 joints removed (kept
+  angle arcs); halo-bed rendering kept.
+- **Strike zero**: home reloaded once and never refreshed (plus a latent
+  `late final` reassignment crash in Retry) — reloads on return now;
+  60 s credit rule surfaced honestly (summary note + aligned streak bar).
+- **Meals missing**: save/query/refresh verified correct in code; hardened
+  per-row DAO tolerance, plan + meal-list error states with Retry
+  (failures no longer masquerade as "no meals").
+- **Chain swap races**: feed frozen across analyzer swaps; stale
+  in-flight results dropped via analyzer identity guard.
 
 ## Notes
 
