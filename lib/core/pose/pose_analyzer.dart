@@ -179,6 +179,14 @@ class PoseAnalyzer {
   int _lastVerifyMs = 0;
   static const int _verifyIntervalMs = 250;
 
+  /// True while a background MoveNet pass is running (single in-flight —
+  /// the TFLite interpreter is not reentrant).
+  bool _verifying = false;
+
+  /// Bumped on [reset] so a stale in-flight pass can never land its
+  /// result on a fresh exercise.
+  int _verifyGen = 0;
+
   /// World landmarks of the frame being analyzed (landmarker source only;
   /// null on the ML Kit path, which has no metric world space).
   List<List<double>>? _pendingWorld;
@@ -362,7 +370,24 @@ class PoseAnalyzer {
         visible[name] = lm;
       }
     }
-    if (visible.length < _requiredCount) {
+    // Count what the exercise actually measures: the primary angle's
+    // vertices. A frame missing any of them cannot produce the counting
+    // angle — everything else may come and go, so partially-visible
+    // bodies keep counting while the measuring joints stay solid.
+    final reqNames = _requiredNames;
+    if (reqNames.isNotEmpty) {
+      var have = 0;
+      for (final n in reqNames) {
+        if (visible.containsKey(n)) have++;
+      }
+      if (have < reqNames.length) {
+        return base(
+          reason: LockReason.occluded,
+          locked: locked,
+          visible: visible.length,
+        );
+      }
+    } else if (visible.length < _requiredCount) {
       return base(
         reason: LockReason.occluded,
         locked: locked,
@@ -512,10 +537,22 @@ class PoseAnalyzer {
       agreement = r.score;
       available = r.perJoint.isNotEmpty;
     }
+    // Visibility is scored on the joints this exercise measures (primary
+    // angle vertices) — an occluded face or cut-off feet must not veto a
+    // squat whose knees are solid. Unknown index space falls back to the
+    // reference core blend.
+    final relevant = <int>[];
+    if (definition.angles.isNotEmpty) {
+      for (final i in definition.primaryAngle.points) {
+        if (i >= 0 && i < vis.length) relevant.add(i);
+      }
+    }
     return TrustBreakdown(
-      visibility: visibilityScore(vis),
+      visibility: visibilityScore(vis,
+          relevant: relevant.isEmpty ? null : relevant),
       agreement: agreement,
       temporal: temporalScore(_trustAngleHistory),
+      temporalKnown: _trustAngleHistory.length >= 4,
       geometry: geometryScore(mpXY, _pendingWorld),
       agreementAvailable: available,
     );
@@ -534,10 +571,22 @@ class PoseAnalyzer {
     required int nowMs,
   }) async {
     framesSeen++;
-    // Throttled second opinion (agreement is a slow signal).
-    if (nowMs - _lastVerifyMs >= _verifyIntervalMs) {
+    // Throttled second opinion (agreement is a slow signal). Fire-and-
+    // forget: awaiting TFLite inline hitched the frame pipeline every
+    // 250 ms. The cached result lands when ready; frames never wait.
+    // Guarded to one in-flight pass (the interpreter is not reentrant).
+    if (nowMs - _lastVerifyMs >= _verifyIntervalMs && !_verifying) {
       _lastVerifyMs = nowMs;
-      _lastMoveNet = await _verifier.verify(frame.thumb);
+      _verifying = true;
+      final gen = _verifyGen;
+      unawaited(() async {
+        try {
+          final r = await _verifier.verify(frame.thumb);
+          if (r != null && gen == _verifyGen) _lastMoveNet = r;
+        } finally {
+          if (gen == _verifyGen) _verifying = false;
+        }
+      }());
     }
     _pendingWorld = frame.world;
     try {
@@ -650,6 +699,26 @@ class PoseAnalyzer {
     return guess;
   }
 
+  /// Landmark names the exercise actually measures: the primary angle's
+  /// vertices that exist in the tracked set. Frames missing any of these
+  /// cannot produce the counting angle — everything else may come and go,
+  /// so partially-visible bodies keep counting while the measuring joints
+  /// stay solid. Empty when the definition carries no usable primary
+  /// (the legacy count path applies instead).
+  Set<String> get _requiredNames {
+    final out = <String>{};
+    if (definition.angles.isEmpty) return out;
+    final byIndex = <int, String>{};
+    for (final entry in definition.landmarks.entries) {
+      byIndex[entry.value] = entry.key;
+    }
+    for (final i in definition.primaryAngle.points) {
+      final name = byIndex[i];
+      if (name != null) out.add(name);
+    }
+    return out;
+  }
+
   int get _requiredCount {
     const keyById = {
       'squat': 'squat',
@@ -737,6 +806,10 @@ class PoseAnalyzer {
 
   void reset() {
     _brain.reset();
+    _lastMoveNet = null;
+    _lastVerifyMs = 0;
+    _verifying = false;
+    _verifyGen++;
     _smoothX.clear();
     _smoothY.clear();
     _ovX.clear();

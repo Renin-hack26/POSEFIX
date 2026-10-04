@@ -78,8 +78,9 @@ void main() {
       );
     }
     expect(last, isNotNull);
-    // Early frames are trust-held (cold temporal signal); the settled
-    // frame feeds the brain with its breakdown attached.
+    // Cold temporal history redistributes (unknown, not mediocre), so
+    // settled high-vis frames feed the FSM from the start — no startup
+    // freeze while the history warms up.
     expect(last!.brain, isNotNull,
         reason: 'smooth high-vis frames must feed the FSM');
     expect(last.brain!.currentState, 'standing');
@@ -109,8 +110,7 @@ void main() {
     expect(weak.trust!.reason, HoldReason.lowVisibility);
   });
 
-  test('malformed frames never throw', () async {
-    final broken = LandmarkerFrame33(
+  test('malformed frames never throw', () async {    final broken = LandmarkerFrame33(
       imageXY: const [
         [0.5, 0.5]
       ],
@@ -135,5 +135,47 @@ void main() {
         await analyzer.processLandmarkerFrame(broken,
             inferenceMs: 1, nowMs: 2000),
         isNull);
+  });
+
+  test('partial visibility still counts while measuring joints are solid',
+      () async {
+    // Face, arms, hands and feet gone — squat only measures the legs.
+    PoseFrameResult? last;
+    for (var i = 0; i < 8; i++) {
+      final frame = _standingFrame();
+      for (var j = 0; j <= 22; j++) {
+        frame.vis[j] = 0.0;
+      }
+      for (var j = 29; j <= 32; j++) {
+        frame.vis[j] = 0.0;
+      }
+      last = await analyzer.processLandmarkerFrame(
+        frame,
+        inferenceMs: 25,
+        nowMs: 1000 + i * 100,
+      );
+    }
+    expect(last, isNotNull);
+    expect(last!.brain, isNotNull,
+        reason: 'legs solid ⇒ squat keeps counting without face/arms');
+    expect(last.brain!.currentState, 'standing');
+  });
+
+  test('occluded measuring joint holds as occluded, never miscounts',
+      () async {
+    PoseFrameResult? last;
+    for (var i = 0; i < 8; i++) {
+      final frame = _standingFrame();
+      if (i >= 4) frame.vis[25] = 0.1; // left knee (primary vertex) lost
+      last = await analyzer.processLandmarkerFrame(
+        frame,
+        inferenceMs: 25,
+        nowMs: 1000 + i * 100,
+      );
+    }
+    expect(last, isNotNull);
+    expect(last!.brain, isNull,
+        reason: 'primary vertex gone ⇒ hold, never a guessed rep');
+    expect(last.lockReason, LockReason.occluded);
   });
 }

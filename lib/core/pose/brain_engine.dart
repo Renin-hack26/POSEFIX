@@ -787,20 +787,28 @@ class BrainEngine {
     Map<String, double> vels,
   ) {
     final ctx = <String, dynamic>{};
-    for (final entry in angles.entries) {
-      ctx['${entry.key}_angle'] = entry.value;
-    }
-    for (final entry in vels.entries) {
-      ctx['${entry.key}_vel'] = entry.value;
+    // Every declared angle always resolves — NaN when unmeasurable this
+    // frame. Comparisons fail closed to 'unknown' instead of faking a 0°
+    // joint (which used to read as fact, e.g. phantom 'bottom' states on
+    // occluded knees, or a missing secondary satisfying `< 45` cues).
+    for (final a in definition.angles) {
+      ctx['${a.name}_angle'] = angles[a.name] ?? double.nan;
+      ctx['${a.name}_vel'] = vels[a.name] ?? 0.0;
     }
     // Bare `angle` = primary angle (matches the YAML convention).
-    if (angles.containsKey(definition.primaryAngle.name)) {
-      ctx['angle'] = angles[definition.primaryAngle.name];
-      ctx['angle_vel'] = vels[definition.primaryAngle.name] ?? 0.0;
-    }
+    ctx['angle'] = angles[definition.primaryAngle.name] ?? double.nan;
+    ctx['angle_vel'] = vels[definition.primaryAngle.name] ?? 0.0;
     for (final entry in landmarkCoords.entries) {
       ctx['${entry.key}_x'] = entry.value.x;
       ctx['${entry.key}_y'] = entry.value.y;
+    }
+    // Landmark coords absent from this frame are unknown, not origin:
+    // a missing wrist at x=0 would otherwise satisfy `< 0.05` edge rules.
+    for (final name in definition.landmarks.keys) {
+      if (!landmarkCoords.containsKey(name)) {
+        ctx['${name}_x'] = double.nan;
+        ctx['${name}_y'] = double.nan;
+      }
     }
     ctx['state'] = _stab.state;
     final primaryName = definition.primaryAngle.name;
@@ -1004,9 +1012,9 @@ class BrainEngine {
     final rightKey =
         '${sides.length > 1 ? sides[1] : 'right'}_angle';
     final leftCtx = Map<String, dynamic>.from(context)
-      ..['angle'] = context[leftKey] ?? context['angle'] ?? 0.0;
+      ..['angle'] = context[leftKey] ?? context['angle'] ?? double.nan;
     final rightCtx = Map<String, dynamic>.from(context)
-      ..['angle'] = context[rightKey] ?? context['angle'] ?? 0.0;
+      ..['angle'] = context[rightKey] ?? context['angle'] ?? double.nan;
 
     final String rawLeft = _evaluateRaw(leftCtx) ?? 'unknown';
     final String rawRight = _evaluateRaw(rightCtx) ?? 'unknown';

@@ -21,6 +21,12 @@
 
 ## Log
 
+### 2026-10-04 — v1.1.12: camera smoothness + partial-visibility counting
+- **Lag**: MoveNet Thunder verify ran inline in the frame pipeline (a TFLite pass blocking every 250 ms). Now fire-and-forget with a single-in-flight guard, generation fencing across resets, and cached results — frames never wait on the verifier.
+- **Partial visibility**: the visibility gate counted all tracked landmarks (any occlusion = dead); it now requires only the primary angle's vertices. Trust visibility scores the measured joints (optional relevance set; legacy blend unchanged). Geometry judges measurable parts only instead of nuking on any missing joint. Temporal cold start redistributes (unknown, not mediocre) instead of freezing session starts.
+- **Fail-closed numerics**: missing angles/coords resolve as NaN, so comparisons fail to 'unknown' — previously a missing knee read as 0° and faked a `bottom` state (and a missing secondary satisfied `< 45` cues). Bilateral sides evaluate only their own measurement; the occluded side holds while the visible side counts (pinned: one-sided hammer-curl test).
+- Gates: analyze 0 issues, full suite green (294/294).
+
 ### 2026-10-01 — v1.1.11: WS1–WS7 + WS9 count consistency & anti-fake responses 🔧
 - **WS9.1 count consistency (user: push-up/squat counts "not consistent and not proper")**: squat + push-up FSMs got boundary hysteresis — standing enters >156° (the old 160° bar silently dropped every soft-lockout rep) and holds to >146° once committed; `bottom` stays strict at ≤90° for entry but holds to ≤97° across a depth wobble, evaluated **before** `ascending` so rising wobble frames can't reset the 3-frame ROM visit; session-start guard: the first FSM commit of a session never produces a phantom "not counted". Rest-jitter / 2-frame-dip / spike guardrails re-verified untouched (false_count_guard 4/4, fast_rep 8/8).
 - **WS9.2 hammer curl**: count = `max(left, right)` (per-arm reps) instead of `left+right` — simultaneous curls fired both sides on the same frame and +2'd every rep; 3 curls now count 3, and block targets ("12 reps") mean 12 in both simultaneous and alternating styles.

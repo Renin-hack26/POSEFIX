@@ -130,8 +130,7 @@ void main() {
           reason: 'a hold is not a ROM rejection');
     });
 
-    test('transient low visibility alone does not veto', () {
-      final engine = BrainEngine(squatDefinition);
+    test('transient low visibility alone does not veto', () {      final engine = BrainEngine(squatDefinition);
       var t = 0.0;
       BrainResult? r;
       var i = 0;
@@ -161,6 +160,49 @@ void main() {
       expect(r!.repCount, 1,
           reason: 'reference rule: LOW_VISIBILITY never vetoes alone');
       expect(r.repHoldReason, HoldReason.none);
+    });
+  });
+
+  group('fail-closed numerics', () {
+    test('missing primary angle holds at unknown without counting', () {
+      // Regression: the old 0.0 fallback read a missing knee as
+      // `angle <= 90` — a phantom bottom state on an occluded leg.
+      final engine = BrainEngine(squatDefinition);
+      BrainResult? r;
+      var t = 0.0;
+      for (var i = 0; i < 8; i++) {
+        r = _feed(engine, {'secondary': 100.0}, t, trust: _good());
+        t += 0.1;
+      }
+      expect(r!.currentState, 'unknown');
+      expect(r.repCount, 0);
+      expect(r.repJustCompleted, isFalse);
+      expect(r.repRejectedReason, isNull);
+    });
+
+    test('one-sided occlusion counts the visible side only', () {
+      final engine = BrainEngine(hammerCurlDefinition);
+      Map<String, double> leftOnly(double elbow) => {'left': elbow};
+      BrainResult? r;
+      var t = 0.0;
+      var sawCompletion = false;
+      // Settle in flex, work through up, commit at down (trigger).
+      for (final a in [
+        170.0, 170.0, 170.0,
+        100.0, 100.0, 100.0,
+        40.0, 40.0, 40.0,
+      ]) {
+        r = _feed(engine, leftOnly(a), t, trust: _good());
+        sawCompletion = sawCompletion || r.repJustCompleted;
+        t += 0.5;
+      }
+      expect(sawCompletion, isTrue, reason: 'visible left side commits');
+      expect(r!.repCount, 1);
+      expect(r.bilateral, isNotNull);
+      expect(r.bilateral!.leftCount, 1);
+      expect(r.bilateral!.rightCount, 0,
+          reason: 'occluded side holds unknown, never fakes');
+      expect(r.repRejectedReason, isNull);
     });
   });
 }

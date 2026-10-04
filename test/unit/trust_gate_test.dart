@@ -77,8 +77,7 @@ void main() {
       expect(b.reason, HoldReason.multiplePeople);
     });
 
-    test('reason priority: visibility, then agreement, then stability', () {
-      TrustBreakdown lowVis() => TrustBreakdown(
+    test('reason priority: visibility, then agreement, then stability', () {      TrustBreakdown lowVis() => TrustBreakdown(
           visibility: 0.5,
           agreement: 0.5,
           temporal: 0.5,
@@ -94,6 +93,32 @@ void main() {
       expect(disagree.score, lessThan(trustThreshold));
       expect(disagree.reason, HoldReason.modelDisagreement);
     });
+
+    test('unknown temporal redistributes instead of freezing cold starts', () {
+      // Same good frame, temporal not yet measurable: the 0.5 placeholder
+      // must not drag it under the bar at session start.
+      final cold = TrustBreakdown(
+        visibility: 0.9,
+        temporal: 0.5,
+        geometry: 1.0,
+        temporalKnown: false,
+      );
+      // (0.35*0.9 + 0.15*1.0) / 0.5 == 0.93 — feeds immediately.
+      expect(cold.score, closeTo(0.93, 1e-9));
+      expect(cold.held, isFalse);
+      expect(cold.reason, HoldReason.none);
+      // Dual-source redistributes the same way.
+      final coldDual = TrustBreakdown(
+        visibility: 0.9,
+        agreement: 0.9,
+        temporal: 0.5,
+        geometry: 1.0,
+        agreementAvailable: true,
+        temporalKnown: false,
+      );
+      expect(coldDual.score, closeTo(0.91875, 1e-9));
+      expect(coldDual.held, isFalse);
+    });
   });
 
   group('visibilityScore', () {
@@ -107,6 +132,22 @@ void main() {
       expect(visibilityScore(_vis(0.0)), 0.0);
       expect(visibilityScore([0.5, 0.5]), 0.0,
           reason: 'wrong length is unusable, not half');
+    });
+
+    test('relevant subset scores only what an exercise measures', () {
+      // Legs solid, everything else gone: full marks when only the
+      // legs matter, failure when the measured set itself is blind.
+      final legsOnly = _vis(0.0);
+      for (final i in [23, 24, 25, 26, 27, 28]) {
+        legsOnly[i] = 0.9;
+      }
+      expect(visibilityScore(legsOnly, relevant: [23, 25, 27]),
+          closeTo(0.9, 1e-9));
+      expect(visibilityScore(legsOnly, relevant: [11, 12]), 0.0);
+      expect(visibilityScore(legsOnly, relevant: const []), 0.0,
+          reason: 'empty set measures nothing; pass null for legacy');
+      expect(visibilityScore(legsOnly, relevant: const [-1, 99]), 0.0,
+          reason: 'out-of-range indices are ignored, never counted');
     });
   });
 
@@ -153,6 +194,24 @@ void main() {
         out[i][0] = 2.5;
       }
       expect(geometryScore(out, null), lessThan(good));
+    });
+
+    test('geometry ignores unmeasurable joints instead of nuking', () {
+      // Legs fully unknown (NaN), arms sane: the frame is judged on what
+      // exists — not punished for what's absent.
+      final partial = _grid((_) => double.nan);
+      const arms = {
+        11: [0.40, 0.20],
+        12: [0.60, 0.20],
+        13: [0.36, 0.35],
+        14: [0.64, 0.35],
+        15: [0.30, 0.50],
+        16: [0.70, 0.50],
+      };
+      arms.forEach((i, p) => partial[i] = p);
+      expect(geometryScore(partial, null), greaterThan(0.85));
+      // Nothing measurable at all stays a hard fail.
+      expect(geometryScore(_grid((_) => double.nan), null), lessThan(0.5));
     });
   });
 

@@ -95,6 +95,7 @@ class TrustBreakdown {
     this.temporal = 0.0,
     this.geometry = 0.0,
     this.agreementAvailable = false,
+    this.temporalKnown = true,
     List<HoldReason>? blocking,
   }) : blocking = blocking ?? [];
 
@@ -104,28 +105,36 @@ class TrustBreakdown {
   final double geometry;
   final bool agreementAvailable;
 
+  /// False while the temporal history is still cold (< 4 samples): the
+  /// signal is *unknown*, not mediocre — its weight redistributes instead
+  /// of dragging good frames under the bar at session start.
+  final bool temporalKnown;
+
   /// Hard gates — any of these forces the hold regardless of score.
   final List<HoldReason> blocking;
 
-  /// Weighted score in [0, 1]. With no usable verifier opinion
-  /// (single-source mode) its weight redistributes proportionally over the
-  /// remaining signals rather than scoring as full agreement — otherwise
-  /// single-source runs would silently look more trustworthy than dual.
+  /// Weighted score in [0, 1]. Unavailable signals redistribute
+  /// proportionally over the remaining ones rather than scoring as full
+  /// agreement — otherwise single-source runs would silently look more
+  /// trustworthy than dual, and cold starts would freeze on a neutral
+  /// temporal placeholder.
   double get score {
-    double raw;
-    if (agreementAvailable) {
-      raw = wVisibility * visibility +
-          wAgreement * agreement +
-          wTemporal * temporal +
-          wGeometry * geometry;
-    } else {
-      const w = wVisibility + wTemporal + wGeometry;
-      raw = (wVisibility * visibility +
-              wTemporal * temporal +
-              wGeometry * geometry) /
-          w;
+    var wSum =
+        wVisibility + wAgreement + wTemporal + wGeometry;
+    var raw = wVisibility * visibility +
+        wAgreement * agreement +
+        wTemporal * temporal +
+        wGeometry * geometry;
+    if (!agreementAvailable) {
+      wSum -= wAgreement;
+      raw -= wAgreement * agreement;
     }
-    return raw.clamp(0.0, 1.0);
+    if (!temporalKnown) {
+      wSum -= wTemporal;
+      raw -= wTemporal * temporal;
+    }
+    if (wSum <= 0) return 0.0;
+    return (raw / wSum).clamp(0.0, 1.0);
   }
 
   /// A hard gate does not erase the score (it stays visible for
@@ -139,16 +148,28 @@ class TrustBreakdown {
     if (agreementAvailable && agreement < 0.6) {
       return HoldReason.modelDisagreement;
     }
-    if (temporal < 0.6) return HoldReason.unstable;
+    // Unknown temporal history reads as unstable only when it was actually
+    // measured weak — a cold start must not wear the blame for bad geometry.
+    if (temporalKnown && temporal < 0.6) return HoldReason.unstable;
     return HoldReason.implausibleGeometry;
   }
 }
 
-/// Confidence the joints we actually measure are visible.
-double visibilityScore(List<double> vis) {
+/// Confidence in the joints that actually matter for the decision.
+///
+/// By default the core + arm blend from the reference (faces must not sink
+/// a squat). Pass `relevant` (BlazePose indices) to score only the joints
+/// an exercise measures — partial visibility elsewhere then stops vetoing
+/// reps it cannot judge.
+double visibilityScore(List<double> vis, {List<int>? relevant}) {
   if (vis.length != 33) return 0.0;
   double mean(Iterable<int> idx) =>
       idx.map((i) => vis[i]).reduce((a, b) => a + b) / idx.length;
+  if (relevant != null) {
+    final use = relevant.where((i) => i >= 0 && i < vis.length).toList();
+    if (use.isEmpty) return 0.0;
+    return mean(use).clamp(0.0, 1.0);
+  }
   final core = mean(coreLandmarks);
   final arm = mean(armLandmarks);
   return (0.75 * core + 0.25 * arm).clamp(0.0, 1.0);
@@ -195,55 +216,62 @@ double _angleAt(
 /// world triples, or null when the source has no world space.
 double geometryScore(List<List<double>> imageXY, List<List<double>>? worldXYZ) {
   if (imageXY.length != 33) return 0.0;
-  final penalties = <double>[];
+  var performed = 0;
+  var penaltySum = 0.0;
+  void add(double p) {
+    performed++;
+    penaltySum += p;
+  }
 
+  bool finitePair(List<double> p) =>
+      p.length >= 2 && !p[0].isNaN && !p[1].isNaN;
+
+  // In-frameness, over measurable joints only — unmeasured joints are
+  // skipped, never punished (partial visibility is the visibility term's
+  // job, not geometry's).
+  var finite = 0;
   var outside = 0;
-  var bad = 0;
   for (final p in imageXY) {
-    if (p.length < 2 || p[0].isNaN || p[1].isNaN) {
-      bad++;
-      continue;
-    }
+    if (!finitePair(p)) continue;
+    finite++;
     if (p[0] < -0.35 || p[0] > 1.35 || p[1] < -0.35 || p[1] > 1.35) {
       outside++;
     }
   }
-  if (bad > 0) {
-    penalties.add(1.0);
-  } else {
-    penalties.add(((outside / 33) * 2.0).clamp(0.0, 1.0));
-  }
+  if (finite == 0) return 0.0;
+  add(((outside / finite) * 2.0).clamp(0.0, 1.0));
+
+  bool finiteTriple(List<double> p) =>
+      p.length >= 3 && !p.any((v) => v.isNaN);
 
   if (worldXYZ != null && worldXYZ.length == 33) {
-    if (worldXYZ.any((p) => p.length < 3 || p.any((v) => v.isNaN))) {
-      penalties.add(1.0);
-    } else {
-      const pairs = [
-        [23, 25],
-        [25, 27],
-        [24, 26],
-        [26, 28],
-        [11, 13],
-        [12, 14],
-      ];
-      final lens = <double>[];
-      for (final pr in pairs) {
-        final a = worldXYZ[pr[0]], b = worldXYZ[pr[1]];
-        final dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
-        final len = math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (len > 1e-4) lens.add(len);
-      }
-      if (lens.length >= 4) {
-        final med = _median(lens);
-        final mean =
-            lens.reduce((x, y) => x + y) / lens.length;
-        final variance = lens
-                .map((l) => (l - mean) * (l - mean))
-                .reduce((x, y) => x + y) /
-            lens.length;
-        final spread = math.sqrt(variance) / (med < 1e-6 ? 1e-6 : med);
-        penalties.add(((spread - 0.9) / 0.9).clamp(0.0, 1.0));
-      }
+    bool ok(int i) => finiteTriple(worldXYZ[i]);
+    const pairs = [
+      [23, 25],
+      [25, 27],
+      [24, 26],
+      [26, 28],
+      [11, 13],
+      [12, 14],
+    ];
+    final lens = <double>[];
+    for (final pr in pairs) {
+      if (!ok(pr[0]) || !ok(pr[1])) continue;
+      final a = worldXYZ[pr[0]], b = worldXYZ[pr[1]];
+      final dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+      final len = math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (len > 1e-4) lens.add(len);
+    }
+    if (lens.length >= 4) {
+      final med = _median(lens);
+      final mean =
+          lens.reduce((x, y) => x + y) / lens.length;
+      final variance = lens
+              .map((l) => (l - mean) * (l - mean))
+              .reduce((x, y) => x + y) /
+          lens.length;
+      final spread = math.sqrt(variance) / (med < 1e-6 ? 1e-6 : med);
+      add(((spread - 0.9) / 0.9).clamp(0.0, 1.0));
     }
   }
 
@@ -261,14 +289,19 @@ double geometryScore(List<List<double>> imageXY, List<List<double>>? worldXYZ) {
     [11, 13, 15],
     [12, 14, 16],
   ]) {
+    // Unmeasurable triplets are skipped — a missing limb must not read
+    // as a degenerate one.
+    if (!finitePair(imageXY[t[0]]) ||
+        !finitePair(imageXY[t[1]]) ||
+        !finitePair(imageXY[t[2]])) {
+      continue;
+    }
     final a = at(t[0], t[1], t[2]);
-    if (a.isNaN || a <= 1.0 || a >= 179.5) penalties.add(0.5);
+    if (a.isNaN || a <= 1.0 || a >= 179.5) add(0.5);
   }
 
-  if (penalties.isEmpty) return 1.0;
-  return (1.0 -
-          penalties.reduce((x, y) => x + y) / penalties.length)
-      .clamp(0.0, 1.0);
+  if (performed == 0) return 0.0;
+  return (1.0 - penaltySum / performed).clamp(0.0, 1.0);
 }
 
 double _median(List<double> v) {
