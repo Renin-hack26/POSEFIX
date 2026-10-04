@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.os.Handler
+import android.os.Looper
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import com.google.mediapipe.tasks.core.BaseOptions
@@ -15,6 +17,7 @@ import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /// Host side of the `fixpose/pose_landmarker` channel (Batch 5).
@@ -29,6 +32,17 @@ import java.util.concurrent.atomic.AtomicBoolean
 /// (aspect-preserving + symmetric pad), and its pad parameters ride along
 /// so Dart can map MoveNet outputs back into frame coordinates.
 ///
+/// **Threading:** the heavy path (YUV→RGB conversion, rotation, MediaPipe
+/// inference, thumbnail) runs on a dedicated background executor — it used
+/// to run synchronously on the Android main thread, which froze the camera
+/// preview and the whole UI for the duration of every inference (the
+/// "laggy camera"). The result is posted back to the main thread, which is
+/// where MethodChannel.Result must be invoked.
+///
+/// **Resolution:** frames are converted at half resolution (`SCALE`). The
+/// model consumes 256×256 internally, so a 360×640 input loses no pose
+/// accuracy while cutting conversion, bitmap churn and resize cost ~4×.
+///
 /// Never throws across the channel: every failure is a result map with
 /// `ok: false`, so the Dart side can fall back to ML Kit and the camera
 /// never dies because of this bridge.
@@ -41,19 +55,48 @@ class PoseLandmarkerBridge(
     private val busy = AtomicBoolean(false)
     private var modelPath: String? = null
 
+    /// Background worker: conversions + inference never touch the UI
+    /// thread. Single-threaded, so detections are naturally serialised.
+    private val executor = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "pose-landmarker").apply {
+            priority = Thread.NORM_PRIORITY - 1
+        }
+    }
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /// Guards `landmarker` between the worker and `close()` (both can now
+    /// run on different threads).
+    private val lock = Any()
+
     companion object {
         const val MODEL_ASSET = "flutter_assets/assets/models/pose_landmarker_heavy.task"
         const val THUMB_SIZE = 256
+
+        /// Luma/chroma subsample factor for the YUV→RGB conversion.
+        /// Camera frames arrive 720p (1280×720 = 921k px); at SCALE 2 the
+        /// conversion touches 230k px — well above the model's 256×256
+        /// input, so accuracy is unchanged while per-frame cost drops
+        /// sharply (less CPU, far fewer GC pauses from bitmap churn).
+        const val SCALE = 2
     }
 
     init {
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
-                "init" -> result.success(init())
-                "detect" -> result.success(detect(call))
+                // Model copy + MediaPipe creation are heavy too — off the
+                // main thread as well (Dart awaits `init` before use).
+                "init" -> {
+                    executor.execute {
+                        val out = init()
+                        mainHandler.post { result.success(out) }
+                    }
+                }
+                "detect" -> detect(call, result)
                 "close" -> {
-                    close()
-                    result.success(mapOf("ok" to true))
+                    executor.execute {
+                        close()
+                        mainHandler.post { result.success(mapOf("ok" to true)) }
+                    }
                 }
                 else -> result.notImplemented()
             }
@@ -77,34 +120,63 @@ class PoseLandmarkerBridge(
     }
 
     private fun init(): Map<String, Any?> {
-        if (landmarker != null) return mapOf("ok" to true)
-        return try {
-            val file = modelFile()
-            val options = PoseLandmarker.PoseLandmarkerOptions.builder()
-                .setBaseOptions(
-                    BaseOptions.builder().setModelAssetPath(file.absolutePath).build(),
-                )
-                .setRunningMode(RunningMode.VIDEO)
-                .setNumPoses(1)
-                .setMinPoseDetectionConfidence(0.5f)
-                .setMinPosePresenceConfidence(0.5f)
-                .setMinTrackingConfidence(0.5f)
-                .build()
-            landmarker = PoseLandmarker.createFromOptions(appContext, options)
-            mapOf("ok" to true)
-        } catch (e: Exception) {
-            mapOf("ok" to false, "error" to (e.message ?: "init failed"))
+        synchronized(lock) {
+            if (landmarker != null) return mapOf("ok" to true)
+            return try {
+                val file = modelFile()
+                val options = PoseLandmarker.PoseLandmarkerOptions.builder()
+                    .setBaseOptions(
+                        BaseOptions.builder().setModelAssetPath(file.absolutePath).build(),
+                    )
+                    .setRunningMode(RunningMode.VIDEO)
+                    .setNumPoses(1)
+                    .setMinPoseDetectionConfidence(0.5f)
+                    .setMinPosePresenceConfidence(0.5f)
+                    .setMinTrackingConfidence(0.5f)
+                    .build()
+                landmarker = PoseLandmarker.createFromOptions(appContext, options)
+                mapOf("ok" to true)
+            } catch (e: Exception) {
+                mapOf("ok" to false, "error" to (e.message ?: "init failed"))
+            }
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun detect(call: io.flutter.plugin.common.MethodCall): Map<String, Any?> {
-        val lm = landmarker ?: return mapOf("ok" to false, "error" to "not initialised")
-        if (!busy.compareAndSet(false, true)) {
-            return mapOf("ok" to true, "dropped" to true)
+    /// Handles one `detect` call. Replies synchronously for the fast
+    /// paths (not initialised / already busy) and hops to the background
+    /// executor for the heavy path, posting the result back to the main
+    /// thread when done. `busy` stays claimed until the background work
+    /// finishes, so while a frame is being processed further frames get
+    /// the immediate `{dropped: true}` reply — same one-in-flight contract
+    /// as before, but the UI thread is free throughout.
+    private fun detect(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
+        if (landmarker == null) {
+            result.success(mapOf("ok" to false, "error" to "not initialised"))
+            return
         }
+        if (!busy.compareAndSet(false, true)) {
+            result.success(mapOf("ok" to true, "dropped" to true))
+            return
+        }
+        executor.execute {
+            val out = try {
+                runDetect(call)
+            } catch (e: Exception) {
+                mapOf("ok" to false, "error" to (e.message ?: "detect failed"))
+            } finally {
+                busy.set(false)
+            }
+            mainHandler.post { result.success(out) }
+        }
+    }
+
+    /// The heavy path — runs on [executor], never the main thread.
+    /// Conversion at SCALE, rotation, inference, thumbnail, packing.
+    @Suppress("UNCHECKED_CAST")
+    private fun runDetect(call: io.flutter.plugin.common.MethodCall): Map<String, Any?> {
         val t0 = System.nanoTime()
-        try {
+        synchronized(lock) {
+            val lm = landmarker ?: return mapOf("ok" to false, "error" to "not initialised")
             val y = call.argument<ByteArray>("y") ?: return err("missing y")
             val u = call.argument<ByteArray>("u") ?: return err("missing u")
             val v = call.argument<ByteArray>("v") ?: return err("missing v")
@@ -125,10 +197,11 @@ class PoseLandmarkerBridge(
             } else {
                 yuv420ToArgb(y, u, v, width, height, yRowStride, uvRowStride, uvPixelStride)
             }
-            var bitmap = Bitmap.createBitmap(argb, width, height, Bitmap.Config.ARGB_8888)
+            var bitmap = Bitmap.createBitmap(argb, width / SCALE, height / SCALE, Bitmap.Config.ARGB_8888)
             // Pre-rotate to upright: landmarks, thumbnail and frame dims all
             // refer to this upright space (MPImage itself gets rotation 0).
             // `rotation` is sensor-degrees, same convention as the ML Kit path.
+            // Cheap now: the bitmap is already downsampled.
             if (rotation != 0) {
                 val matrix = android.graphics.Matrix()
                 matrix.postRotate(rotation.toFloat())
@@ -147,6 +220,7 @@ class PoseLandmarkerBridge(
 
             val image = res.landmarks().firstOrNull()
             if (image == null || image.size < 33) {
+                bitmap.recycle()
                 return mapOf("ok" to true, "found" to false)
             }
             val world = res.worldLandmarks().firstOrNull()
@@ -200,19 +274,21 @@ class PoseLandmarkerBridge(
                 "scaledH" to sh.toDouble(),
                 "inferenceMs" to ms,
             )
-        } catch (e: Exception) {
-            return mapOf("ok" to false, "error" to (e.message ?: "detect failed"))
-        } finally {
-            busy.set(false)
         }
     }
 
     private fun err(msg: String): Map<String, Any?> =
         mapOf("ok" to false, "error" to msg)
 
-    /// Single-plane NV21 (Y + interleaved VU) → ARGB. This is what the
-    /// app's camera controller delivers; the chroma plane starts right
-    /// after `yRowStride * height` bytes, V before U in each pair.
+    /// Single-plane NV21 (Y + interleaved VU) → ARGB at [SCALE]
+    /// subsampling. This is what the app's camera controller delivers;
+    /// the chroma plane starts right after `yRowStride * height` bytes,
+    /// V before U in each pair.
+    ///
+    /// Fixed-point math (coefficients ×1024) instead of Double — the old
+    /// per-pixel `Double` conversions were the slowest part of the path.
+    /// Output is `width/SCALE × height/SCALE`; luma samples (2i, 2j),
+    /// chroma from the co-located 2×2 block.
     private fun nv21ToArgb(
         yuv: ByteArray,
         width: Int,
@@ -220,20 +296,23 @@ class PoseLandmarkerBridge(
         yRowStride: Int,
         uvRowStride: Int,
     ): IntArray {
-        val out = IntArray(width * height)
+        val outW = width / SCALE
+        val outH = height / SCALE
+        val out = IntArray(outW * outH)
         val ySize = yRowStride * height
         var o = 0
-        for (j in 0 until height) {
-            val yRow = j * yRowStride
-            val uvRow = ySize + (j shr 1) * uvRowStride
-            for (i in 0 until width) {
-                val yv = (yuv[yRow + i].toInt() and 0xFF)
-                val vu = uvRow + ((i shr 1) * 2)
+        for (j in 0 until outH) {
+            val yRow = (j * SCALE) * yRowStride
+            // Source row j*SCALE → chroma row (j*SCALE)/2.
+            val uvRow = ySize + (((j * SCALE) shr 1) * uvRowStride)
+            for (i in 0 until outW) {
+                val yv = yuv[yRow + i * SCALE].toInt() and 0xFF
+                val vu = uvRow + i * 2
                 val vv = ((yuv[vu].toInt() and 0xFF) - 128)
                 val uv = ((yuv[vu + 1].toInt() and 0xFF) - 128)
-                var r = (yv + 1.402 * vv).toInt()
-                var g = (yv - 0.344136 * uv - 0.714136 * vv).toInt()
-                var b = (yv + 1.772 * uv).toInt()
+                var r = yv + (vv * 1436 shr 10)
+                var g = yv - (uv * 352 shr 10) - (vv * 731 shr 10)
+                var b = yv + (uv * 1815 shr 10)
                 r = r.coerceIn(0, 255)
                 g = g.coerceIn(0, 255)
                 b = b.coerceIn(0, 255)
@@ -248,19 +327,21 @@ class PoseLandmarkerBridge(
         width: Int, height: Int,
         yRowStride: Int, uvRowStride: Int, uvPixelStride: Int,
     ): IntArray {
-        val out = IntArray(width * height)
+        val outW = width / SCALE
+        val outH = height / SCALE
+        val out = IntArray(outW * outH)
         var o = 0
-        for (j in 0 until height) {
-            val yRow = j * yRowStride
-            val uvRow = (j shr 1) * uvRowStride
-            for (i in 0 until width) {
-                val yv = (y[yRow + i].toInt() and 0xFF)
-                val uvOffset = uvRow + ((i shr 1) * uvPixelStride)
+        for (j in 0 until outH) {
+            val yRow = (j * SCALE) * yRowStride
+            val uvRow = (j * SCALE shr 1) * uvRowStride
+            for (i in 0 until outW) {
+                val yv = y[yRow + i * SCALE].toInt() and 0xFF
+                val uvOffset = uvRow + ((i * SCALE) shr 1) * uvPixelStride
                 val uv = (u[uvOffset].toInt() and 0xFF) - 128
                 val vv = (v[uvOffset].toInt() and 0xFF) - 128
-                var r = (yv + 1.402 * vv).toInt()
-                var g = (yv - 0.344136 * uv - 0.714136 * vv).toInt()
-                var b = (yv + 1.772 * uv).toInt()
+                var r = yv + (vv * 1436 shr 10)
+                var g = yv - (uv * 352 shr 10) - (vv * 731 shr 10)
+                var b = yv + (uv * 1815 shr 10)
                 r = r.coerceIn(0, 255)
                 g = g.coerceIn(0, 255)
                 b = b.coerceIn(0, 255)
@@ -271,10 +352,12 @@ class PoseLandmarkerBridge(
     }
 
     fun close() {
-        try {
-            landmarker?.close()
-        } catch (_: Exception) {
+        synchronized(lock) {
+            try {
+                landmarker?.close()
+            } catch (_: Exception) {
+            }
+            landmarker = null
         }
-        landmarker = null
     }
 }

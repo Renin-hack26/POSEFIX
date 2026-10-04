@@ -12,8 +12,10 @@ library;
 
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:tflite_flutter/tflite_flutter.dart' as tfl;
 
+import 'movenet_worker.dart';
 import 'trust_gate.dart';
 
 /// Letterboxed RGB thumbnail + the pad math to map model outputs back into
@@ -141,28 +143,60 @@ class MoveNetVerifier {
   MoveNetInterpreter? _interp;
   bool _closed = false;
 
-  bool get ready => _interp != null && !_closed;
+  /// Process-wide worker: the interpreter is expensive to build (12.6 MB
+  /// model) and must not live on the UI isolate. Every verifier instance
+  /// (one per exercise/chain block) shares the same background worker, so
+  /// swapping blocks costs nothing and the UI never runs TFLite.
+  static MoveNetWorker? _worker;
+  static Future<void>? _workerBoot;
 
-  /// Loads the bundled Thunder model (no-op when a fake was injected).
-  /// Never throws — a missing/unusable model means single-source mode.
+  bool get ready => (_interp != null || _worker != null) && !_closed;
+
+  /// Boots the shared background worker (no-op when a fake interpreter
+  /// was injected, or when it is already up). Never throws — a
+  /// missing/unusable model means single-source mode (the trust gate
+  /// redistributes the agreement weight, so counting keeps working).
   Future<void> load() async {
-    if (_interp != null || _closed) return;
-    try {
-      _interp = await TfliteMoveNetInterpreter.load(thunderAsset);
-    } catch (_) {
-      _interp = null;
-    }
+    if (_closed || _interp != null) return; // injected fake: nothing to load
+    _workerBoot ??= () async {
+      try {
+        final bytes = await rootBundle.load(thunderAsset);
+        _worker = await MoveNetWorker.spawn(bytes.buffer.asUint8List());
+      } catch (_) {
+        _worker = null;
+      }
+    }();
+    await _workerBoot;
   }
 
   /// Runs one verification pass. Null when the verifier is unavailable;
   /// never throws (a failed pass is single-source, not a crash).
+  ///
+  /// Production runs the inference on the shared background worker — a
+  /// synchronous TFLite call here would freeze the UI isolate for the
+  /// whole pass. Injected fakes (tests) keep the direct sync path.
   Future<MoveNetResult?> verify(MoveNetThumb thumb) async {
-    final interp = _interp;
-    if (interp == null || _closed) return null;
+    if (_closed) return null;
+    List<double>? kp;
+    double ms;
+    final worker = _worker;
+    if (worker != null && !worker.closed) {
+      final res = await worker.run(thumb.rgb, thumb.size);
+      if (res == null) return null;
+      (kp, ms) = res;
+    } else {
+      final interp = _interp;
+      if (interp == null) return null;
+      try {
+        final sw = Stopwatch()..start();
+        kp = interp.run(thumb.rgb, thumb.size);
+        sw.stop();
+        ms = sw.elapsedMicroseconds / 1000.0;
+      } catch (_) {
+        return null;
+      }
+    }
     try {
-      final sw = Stopwatch()..start();
-      final kp = interp.run(thumb.rgb, thumb.size);
-      sw.stop();
       final xy = List<List<double>>.generate(
           33, (_) => [double.nan, double.nan]);
       final vis = List<double>.filled(33, 0.0);
@@ -178,13 +212,16 @@ class MoveNetVerifier {
       return MoveNetResult(
         imageXY: xy,
         vis: vis,
-        inferenceMs: sw.elapsedMicroseconds / 1000.0,
+        inferenceMs: ms,
       );
     } catch (_) {
       return null;
     }
   }
 
+  /// Releases this verifier's resources. The background worker is
+  /// process-wide (shared by every exercise/chain block) and stays up —
+  /// only an injected test interpreter is closed here.
   void close() {
     _closed = true;
     _interp?.close();
