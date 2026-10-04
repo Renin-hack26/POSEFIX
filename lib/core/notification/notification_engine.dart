@@ -192,13 +192,36 @@ class NotificationEngine {
   }
 
   /// Resolve the device's IANA timezone so schedules fire at local wall-clock
-  /// time (a fixed UTC location fires at the wrong hour). On failure the
-  /// location stays UTC — scheduling must never block on the platform channel.
+  /// time (a fixed UTC location fires at the wrong hour). The resolved zone
+  /// persists in Hive; on detection failure the last-known zone wins over
+  /// UTC (a stale zone is closer to right than a guaranteed-wrong UTC),
+  /// and scheduling never blocks on the platform channel.
   Future<void> _setLocalTimezone() async {
     try {
       final name = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(name));
+      try {
+        await HiveService.setString(HiveService.kTimezoneName, name);
+      } catch (_) {
+        // Best effort — detection already succeeded.
+      }
     } catch (e) {
+      String? known;
+      try {
+        known = HiveService.getString(HiveService.kTimezoneName);
+      } catch (_) {
+        known = null;
+      }
+      if (known != null) {
+        try {
+          tz.setLocalLocation(tz.getLocation(known));
+          debugPrint(
+              'NotificationEngine: timezone detection failed ($e) — using last-known $known');
+          return;
+        } catch (_) {
+          // Unknown/stale zone string — fall through to UTC.
+        }
+      }
       debugPrint(
           'NotificationEngine: timezone detection failed ($e) — keeping UTC');
       tz.setLocalLocation(tz.getLocation('UTC'));
@@ -278,6 +301,19 @@ class NotificationEngine {
     int? notificationId,
   }) async {
     if (!_initialized) await initialize();
+
+    // Persist the intent FIRST (before the permission gate below): if the
+    // user denied the OS prompt, nothing schedules today — but the config
+    // survives, so granting permission later (or the hourly worker) can
+    // re-arm it instead of silently agreeing to nothing.
+    await _persistReminderConfig(ReminderConfig(
+      enabled: true,
+      hour: hour,
+      minute: minute,
+      workoutName: workoutName,
+      workoutId: workoutId,
+    ));
+
     if (!_permissionsGranted) return;
 
     // Shared id: Settings + Plan are entry points to ONE stored config, so
@@ -320,16 +356,6 @@ class NotificationEngine {
       payload: 'workout:$workoutId',
       matchDateTimeComponents: DateTimeComponents.time, // daily
     );
-
-    // Hand the config to the background re-arm worker (idempotent: the same
-    // notification id replaces the previous schedule).
-    await _persistReminderConfig(ReminderConfig(
-      enabled: true,
-      hour: hour,
-      minute: minute,
-      workoutName: workoutName,
-      workoutId: workoutId,
-    ));
   }
 
   /// Cancel a specific workout reminder.

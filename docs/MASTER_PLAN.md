@@ -1,4 +1,4 @@
-# MASTER PLAN — FixPose v1.1.11+12 (8 batches)
+# MASTER PLAN — FixPose v1.1.12+13 (8 batches)
 
 Approved by user. Execution order B1 → B8, with Batch 0 (demo) in progress.
 Commit style `vX.Y.Z: …`; gates before every build/commit: `flutter analyze`
@@ -154,7 +154,16 @@ Gated on the Batch 0 demo verdict.
 Reference (read-only): `C:\Users\imu\Desktop\New folder\openvission\`
 (`trust.py`, `skeleton.py`, `exercises/base.py`, `constants.py`, `geometry.py`).
 
-## Batch 6 — WS6.3
+## Batch 6 — WS6.3 (DONE — 2026-10-03)
+
+Thresholds/normalization shipped via WS2/WS9/B5. P9 "custom model"
+resolved without user delivery: both required models verified already
+bundled and valid — `pose_landmarker_heavy.task` (30.6 MB: detector +
+27.7 MB landmarks bundle) and `movenet_thunder_fp16.tflite` (12.6 MB:
+UINT8 [1,256,256,3] → [1,1,17,3], parsed from the flatbuffer) — top
+official tiers, correctly wired with runtime fallbacks. No third model
+referenced anywhere; custom training needs a dataset/pipeline that does
+not exist here.
 
 ## Batch 7 — P1 auth E2E + P3 + P8 (IN PROGRESS)
 

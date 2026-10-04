@@ -23,8 +23,12 @@ PausedState? decodePaused(String? source) => source == null
 
 String encodeDoubles(List<double> values) => jsonEncode(values);
 
+/// Server JSON numbers arrive as int when whole — `cast<double>()` would
+/// throw, so every element goes through num.
 List<double> decodeDoubles(String source) =>
-    (jsonDecode(source) as List<dynamic>).cast<double>();
+    (jsonDecode(source) as List<dynamic>)
+        .map((v) => (v as num).toDouble())
+        .toList();
 
 Map<String, dynamic> exerciseToMap(SessionExercise e) => {
       'exerciseId': e.exerciseId,
@@ -41,11 +45,15 @@ SessionExercise exerciseFromMap(Map<String, dynamic> m) => SessionExercise(
       roundsCompleted: (m['roundsCompleted'] as num?)?.toInt() ?? 0,
       totalReps: (m['totalReps'] as num?)?.toInt() ?? 0,
       formAccuracyPct: (m['formAccuracyPct'] as num?)?.toDouble() ?? 0,
-      perRepTimesSec:
-          ((m['perRepTimesSec'] as List?) ?? const []).cast<double>(),
-      roundTimesSec: ((m['roundTimesSec'] as List?) ?? const []).cast<double>(),
-      repsPerRound:
-          ((m['repsPerRound'] as List?) ?? const []).cast<int>(),
+      perRepTimesSec: ((m['perRepTimesSec'] as List?) ?? const [])
+          .map((v) => (v as num).toDouble())
+          .toList(),
+      roundTimesSec: ((m['roundTimesSec'] as List?) ?? const [])
+          .map((v) => (v as num).toDouble())
+          .toList(),
+      repsPerRound: ((m['repsPerRound'] as List?) ?? const [])
+          .map((v) => (v as num).toInt())
+          .toList(),
     );
 
 Map<String, dynamic> pausedToMap(PausedState p) => {

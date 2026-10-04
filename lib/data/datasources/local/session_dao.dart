@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/storage/app_database.dart';
 import '../../../domain/entities/workout_session.dart';
@@ -13,6 +14,18 @@ class SessionDao extends DatabaseAccessor<AppDatabase>
   SessionDao(super.db);
 
   // --- row <-> entity -----------------------------------------------------
+
+  /// One corrupt row (bad status string, malformed JSON) skips loudly
+  /// instead of sinking the query — and single-row lookups degrade to
+  /// null (self-healing: the next save overwrites the bad row).
+  WorkoutSession? _fromRowOrNull(WorkoutSessionRow row) {
+    try {
+      return _fromRow(row);
+    } catch (e) {
+      debugPrint('sessions: skipping unreadable row ${row.id} ($e)');
+      return null;
+    }
+  }
 
   WorkoutSession _fromRow(WorkoutSessionRow row) => WorkoutSession(
         id: row.id,
@@ -60,7 +73,7 @@ class SessionDao extends DatabaseAccessor<AppDatabase>
           ..orderBy([(t) => OrderingTerm.desc(t.startedAt)])
           ..limit(1))
         .getSingleOrNull());
-    return row == null ? null : _fromRow(row);
+    return row == null ? null : _fromRowOrNull(row);
   }
 
   Future<void> upsert(WorkoutSession session) =>
@@ -71,7 +84,7 @@ class SessionDao extends DatabaseAccessor<AppDatabase>
     final row = await (select(workoutSessions)
           ..where((t) => t.id.equals(id)))
         .getSingleOrNull();
-    return row == null ? null : _fromRow(row);
+    return row == null ? null : _fromRowOrNull(row);
   }
 
   Future<void> remove(String id) =>
@@ -85,7 +98,7 @@ class SessionDao extends DatabaseAccessor<AppDatabase>
           ..orderBy([(t) => OrderingTerm.desc(t.startedAt)])
           ..limit(limit))
         .get();
-    return rows.map(_fromRow).toList();
+    return rows.map(_fromRowOrNull).whereType<WorkoutSession>().toList();
   }
 
   Future<List<WorkoutSession>> between(DateTime from, DateTime to) async {
@@ -97,7 +110,7 @@ class SessionDao extends DatabaseAccessor<AppDatabase>
                   t.status.equals(SessionStatus.abandoned.name)))
           ..orderBy([(t) => OrderingTerm.asc(t.startedAt)]))
         .get();
-    return rows.map(_fromRow).toList();
+    return rows.map(_fromRowOrNull).whereType<WorkoutSession>().toList();
   }
 
   // --- sync -------------------------------------------------------------
@@ -113,11 +126,12 @@ class SessionDao extends DatabaseAccessor<AppDatabase>
                   t.status.equals(SessionStatus.abandoned.name)))
           ..orderBy([(t) => OrderingTerm.asc(t.startedAt)]))
         .get();
-    return rows.map(_fromRow).toList();
+    return rows.map(_fromRowOrNull).whereType<WorkoutSession>().toList();
   }
 
   /// Applies the sync watermark after a successful upload.
   Future<void> markSynced(String id, DateTime at) =>
-      (update(workoutSessions)..where((t) => t.id.equals(id)))
+      (update(workoutSessions)
+            ..where((t) => t.id.equals(id) & t.syncedAt.isNull()))
           .write(WorkoutSessionsCompanion(syncedAt: Value(at)));
 }

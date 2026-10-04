@@ -62,7 +62,7 @@
 |---|---|---|
 | 6.1 | FSM coverage: **`chair-dip` had no engine → camera dead-end in 3 workouts** → alias to `tricep_dip` + `test/unit/exercise_registry_test.dart` (all 40 exercises + 236 block refs resolve) | ✅ |
 | 6.2 | Skeleton overlay refinement: form-based green/red coloring (FR-5), wire quality display (folded into WS2 scope) | ✅ (Batch 4: painter `formSignal` — warnings red, praise full chartreuse, neutral standard; confidence tiers kept for shaky segments; driven per frame from feedback severities) |
-| 6.3 | Any-angle pose robustness: thresholds/normalization pass (folded into WS2 scope; full model training = P9 user-delivered model — ⏸) | ⬜ WS2 |
+| 6.3 | Any-angle pose robustness: thresholds/normalization pass (folded into WS2 scope; full model training = P9 user-delivered model — ⏸) | ✅ (thresholds/normalization shipped via WS2/WS9/B5; P9 model verified already bundled+valid — heavy landmarker + Thunder, top tiers, no custom training needed) |
 
 ## WS7 — Smart library search (user request 2026-10-01) ✅ (agent complete: 24 tests, analyze clean; plan-screen search box deferred to integration)
 | # | Item | Status |

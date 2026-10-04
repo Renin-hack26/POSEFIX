@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/storage/app_database.dart';
 import '../../../domain/entities/training_plan.dart';
@@ -10,6 +11,16 @@ part 'plan_dao.g.dart';
 @DriftAccessor(tables: [TrainingPlans])
 class PlanDao extends DatabaseAccessor<AppDatabase> with _$PlanDaoMixin {
   PlanDao(super.db);
+
+  /// One corrupt row skips loudly instead of sinking the caller.
+  TrainingPlan? _fromRowOrNull(TrainingPlanRow row) {
+    try {
+      return _fromRow(row);
+    } catch (e) {
+      debugPrint('plans: skipping unreadable row ${row.id} ($e)');
+      return null;
+    }
+  }
 
   TrainingPlan _fromRow(TrainingPlanRow row) => TrainingPlan(
         id: row.id,
@@ -35,7 +46,7 @@ class PlanDao extends DatabaseAccessor<AppDatabase> with _$PlanDaoMixin {
           ..orderBy([(t) => OrderingTerm.desc(t.lastUpdated)])
           ..limit(1))
         .getSingleOrNull();
-    return row == null ? null : _fromRow(row);
+    return row == null ? null : _fromRowOrNull(row);
   }
 
   /// Upsert; clears `syncedAt` implicitly (dirty) via the entity value.
@@ -47,20 +58,24 @@ class PlanDao extends DatabaseAccessor<AppDatabase> with _$PlanDaoMixin {
     final row = await (select(trainingPlans)
           ..where((t) => t.id.equals(id)))
         .getSingleOrNull();
-    return row == null ? null : _fromRow(row);
+    return row == null ? null : _fromRowOrNull(row);
   }
 
   // --- sync -------------------------------------------------------------
 
   Future<TrainingPlan?> dirty() async {
+    // Newest first: matches latest() semantics so a superseded plan can
+    // never starve the current one.
     final row = await (select(trainingPlans)
           ..where((t) => t.syncedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.lastUpdated)])
           ..limit(1))
         .getSingleOrNull();
-    return row == null ? null : _fromRow(row);
+    return row == null ? null : _fromRowOrNull(row);
   }
 
   Future<void> markSynced(String id, DateTime at) =>
-      (update(trainingPlans)..where((t) => t.id.equals(id)))
+      (update(trainingPlans)
+            ..where((t) => t.id.equals(id) & t.syncedAt.isNull()))
           .write(TrainingPlansCompanion(syncedAt: Value(at)));
 }

@@ -73,9 +73,22 @@ class VedaRepositoryImpl implements VedaRepository {
       }
       final decoded = jsonDecode(utf8.decode(response.bodyBytes))
           as Map<String, dynamic>;
-      final choices = decoded['choices'] as List<dynamic>;
-      final content = ((choices.first as Map<String, dynamic>)['message']
-          as Map<String, dynamic>)['content'] as String?;
+      // Malformed success shapes (empty choices, unexpected types) are a
+      // server-contract failure, not a connectivity problem — label them
+      // so the UI takes the assistant-down path instead of retry-as-offline.
+      final choices = decoded['choices'];
+      if (choices is! List<dynamic> || choices.isEmpty) {
+        throw const VedaUnavailableException();
+      }
+      final first = choices.first;
+      if (first is! Map<String, dynamic>) {
+        throw const VedaUnavailableException();
+      }
+      final message = first['message'];
+      if (message is! Map<String, dynamic>) {
+        throw const VedaUnavailableException();
+      }
+      final content = message['content'] as String?;
       if (content == null || content.trim().isEmpty) {
         throw const VedaUnavailableException();
       }

@@ -58,8 +58,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _checkExistingPlan() async {
-    final plan = await ref.read(planRepositoryProvider).currentPlan();
-    if (plan != null && mounted) context.go('/home');
+    try {
+      final plan = await ref.read(planRepositoryProvider).currentPlan();
+      if (plan != null && mounted) context.go('/home');
+    } catch (_) {
+      // A plan read failure must never strand the user here — they can
+      // generate a fresh plan below.
+    }
   }
 
   Future<void> _onSynced() => _checkExistingPlan();

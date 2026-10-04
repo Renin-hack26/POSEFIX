@@ -125,10 +125,12 @@ class NutritionDao extends DatabaseAccessor<AppDatabase>
   }
 
   Future<void> markEntrySynced(String id, DateTime at) =>
-      (update(mealEntries)..where((t) => t.id.equals(id)))
+      (update(mealEntries)
+            ..where((t) => t.id.equals(id) & t.syncedAt.isNull()))
           .write(MealEntriesCompanion(syncedAt: Value(at)));
 
   Future<void> markTargetSynced(DateTime at) =>
-      (update(mealTargets)..where((t) => t.id.equals(_targetRowId)))
+      (update(mealTargets)
+            ..where((t) => t.id.equals(_targetRowId) & t.syncedAt.isNull()))
           .write(MealTargetsCompanion(syncedAt: Value(at)));
 }

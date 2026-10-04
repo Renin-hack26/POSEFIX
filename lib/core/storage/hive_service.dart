@@ -16,6 +16,7 @@ class HiveService {
   static const String kPermissionsAsked = 'permissionsAsked';
   static const String kCoachMarksSeen = 'coachMarksSeen';
   static const String kNotificationsEnabled = 'notificationsEnabled';
+  static const String kTimezoneName = 'timezoneName'; // IANA zone for alarms
 
   static late Box _settings;
 

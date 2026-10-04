@@ -150,6 +150,9 @@ class SyncEngine {
     Iterable<Map<String, dynamic>> rows,
   ) async {
     final all = rows.toList(growable: false);
+    // No dirty rows → no POST. An empty upsert is wasted network at best
+    // and a backend rejection that wedges the whole pass at worst.
+    if (all.isEmpty) return;
     for (var i = 0; i < all.length; i += _batchSize) {
       final chunk = all.sublist(i, min(i + _batchSize, all.length));
       await _supabase.from(table).upsert(chunk).timeout(_ioTimeout);
@@ -160,74 +163,113 @@ class SyncEngine {
 
   Future<void> _download(String uid) async {
     // Completed/abandoned sessions: append-only → insert when missing.
-    for (final r in await _select('workout_sessions')) {
-      final server = sessionFromServer(r);
-      final local = await _db.sessionDao.byId(server.id);
-      if (local == null || local.syncedAt != null) {
-        await _db.sessionDao.upsert(server);
+    // Every row merges independently: one poison server row skips loudly
+    // instead of aborting the pass and wedging every later sweep on it.
+    for (final r in await _select('workout_sessions', uid)) {
+      try {
+        final server = sessionFromServer(r);
+        final local = await _db.sessionDao.byId(server.id);
+        if (local == null || local.syncedAt != null) {
+          await _db.sessionDao.upsert(server);
+        }
+      } catch (e) {
+        debugPrint('sync: skipping unreadable workout_sessions row ($e)');
       }
     }
 
-    for (final r in await _select('training_plans')) {
-      final server = planFromServer(r);
-      final local = await _db.planDao.byId(server.id);
-      if (local == null || local.syncedAt != null) {
-        await _db.planDao.upsert(server);
+    for (final r in await _select('training_plans', uid)) {
+      try {
+        final server = planFromServer(r);
+        final local = await _db.planDao.byId(server.id);
+        if (local == null || local.syncedAt != null) {
+          await _db.planDao.upsert(server);
+        }
+      } catch (e) {
+        debugPrint('sync: skipping unreadable training_plans row ($e)');
       }
     }
 
-    for (final r in await _select('meal_entries')) {
-      var server = mealEntryFromServer(r);
-      final local = await _db.nutritionDao.entryById(server.id);
-      // The meal clock time is device-local (never uploaded) — keep the
-      // local value when the mirror row lands.
-      if (local != null &&
-          local.timeMillis != null &&
-          server.timeMillis == null) {
-        server = server.copyWith(timeMillis: local.timeMillis);
-      }
-      if (local == null || local.syncedAt != null) {
-        await _db.nutritionDao.upsertEntry(server);
+    for (final r in await _select('meal_entries', uid)) {
+      try {
+        var server = mealEntryFromServer(r);
+        final local = await _db.nutritionDao.entryById(server.id);
+        // The meal clock time is device-local (never uploaded) — keep the
+        // local value when the mirror row lands.
+        if (local != null &&
+            local.timeMillis != null &&
+            server.timeMillis == null) {
+          server = server.copyWith(timeMillis: local.timeMillis);
+        }
+        if (local == null || local.syncedAt != null) {
+          await _db.nutritionDao.upsertEntry(server);
+        }
+      } catch (e) {
+        debugPrint('sync: skipping unreadable meal_entries row ($e)');
       }
     }
 
-    final targets = await _select('meal_targets');
+    final targets = await _select('meal_targets', uid);
     if (targets.isNotEmpty) {
-      final server = mealTargetFromServer(targets.first);
-      final local = await _db.nutritionDao.target();
-      if (local == null || local.syncedAt != null) {
-        await _db.nutritionDao.saveTarget(server);
+      try {
+        final server = mealTargetFromServer(targets.first);
+        final local = await _db.nutritionDao.target();
+        if (local == null || local.syncedAt != null) {
+          await _db.nutritionDao.saveTarget(server);
+        }
+      } catch (e) {
+        debugPrint('sync: skipping unreadable meal_targets row ($e)');
       }
     }
 
-    for (final r in await _select('body_metrics')) {
-      final server = metricFromServer(r);
-      final local = await _db.progressDao.metricById(server.dateKey);
-      if (local == null || local.syncedAt != null) {
-        await _db.progressDao.upsertMetric(server);
+    for (final r in await _select('body_metrics', uid)) {
+      try {
+        final server = metricFromServer(r);
+        final local = await _db.progressDao.metricById(server.dateKey);
+        if (local == null || local.syncedAt != null) {
+          await _db.progressDao.upsertMetric(server);
+        }
+      } catch (e) {
+        debugPrint('sync: skipping unreadable body_metrics row ($e)');
       }
     }
 
-    final strikes = await _select('strike_states');
+    final strikes = await _select('strike_states', uid);
     if (strikes.isNotEmpty) {
-      final server = strikeFromServer(strikes.first);
-      final local = await _db.progressDao.strike();
-      if (local == null || local.syncedAt != null) {
-        await _db.progressDao.saveStrike(server);
+      try {
+        final server = strikeFromServer(strikes.first);
+        final local = await _db.progressDao.strike();
+        if (local == null || local.syncedAt != null) {
+          await _db.progressDao.saveStrike(server);
+        }
+      } catch (e) {
+        debugPrint('sync: skipping unreadable strike_states row ($e)');
       }
     }
 
-    for (final r in await _select('chat_messages')) {
-      final server = chatFromServer(r);
-      final local = await _db.chatDao.byId(server.id);
-      if (local == null || local.syncedAt != null) {
-        await _db.chatDao.upsert(server);
+    for (final r in await _select('chat_messages', uid)) {
+      try {
+        final server = chatFromServer(r);
+        final local = await _db.chatDao.byId(server.id);
+        if (local == null || local.syncedAt != null) {
+          await _db.chatDao.upsert(server);
+        }
+      } catch (e) {
+        debugPrint('sync: skipping unreadable chat_messages row ($e)');
       }
     }
   }
 
-  Future<List<Map<String, dynamic>>> _select(String table) async {
-    final rows = await _supabase.from(table).select().timeout(_ioTimeout);
+  Future<List<Map<String, dynamic>>> _select(
+      String table, String uid) async {
+    // Scope every pull to the signed-in account: without the filter a
+    // multi-user backend (or missing RLS) leaks other users' rows into
+    // this device's tables — and `targets.first`/`strikes.first` would
+    // let an arbitrary stranger's row overwrite ours.
+    final rows = await _supabase
+        .from(table)
+        .select()
+        .eq('user_id', uid)
+        .timeout(_ioTimeout);
     return [
       for (final r in rows) Map<String, dynamic>.from(r as Map),
     ];

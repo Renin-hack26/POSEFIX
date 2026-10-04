@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/storage/app_database.dart';
 import '../../../domain/entities/body_metric.dart';
@@ -23,15 +24,38 @@ class ProgressDao extends DatabaseAccessor<AppDatabase>
           ..where((t) => t.id.equals(_strikeRowId)))
         .getSingleOrNull();
     if (row == null) return null;
+    try {
+      return _strikeFromRow(
+        row.currentStrike,
+        row.longestStrike,
+        row.lastActiveDateKey,
+        row.unlockedTiersJson,
+        row.syncedAt,
+      );
+    } catch (e) {
+      // A corrupt tiers payload must not kill the strike badge — degrade
+      // to "no strike" (self-heals on the next saveStrike).
+      debugPrint('progress: unreadable strike row ($e)');
+      return null;
+    }
+  }
+
+  StrikeState _strikeFromRow(
+    int currentStrike,
+    int longestStrike,
+    String lastActiveDateKey,
+    String unlockedTiersJson,
+    DateTime? syncedAt,
+  ) {
+    final tiers = ((jsonDecode(unlockedTiersJson) as List<dynamic>)
+            .map((v) => (v as num).toInt()))
+        .toList();
     return StrikeState(
-      currentStrike: row.currentStrike,
-      longestStrike: row.longestStrike,
-      lastActiveDateKey: row.lastActiveDateKey,
-      unlockedTiers:
-          ((jsonDecode(row.unlockedTiersJson) as List<dynamic>).cast<num>())
-              .map((v) => v.toInt())
-              .toList(),
-      syncedAt: row.syncedAt,
+      currentStrike: currentStrike,
+      longestStrike: longestStrike,
+      lastActiveDateKey: lastActiveDateKey,
+      unlockedTiers: tiers,
+      syncedAt: syncedAt,
     );
   }
 
@@ -106,7 +130,8 @@ class ProgressDao extends DatabaseAccessor<AppDatabase>
   }
 
   Future<void> markMetricSynced(String dateKey, DateTime at) =>
-      (update(bodyMetrics)..where((t) => t.dateKey.equals(dateKey)))
+      (update(bodyMetrics)
+            ..where((t) => t.dateKey.equals(dateKey) & t.syncedAt.isNull()))
           .write(BodyMetricsCompanion(syncedAt: Value(at)));
 
   Future<StrikeState?> dirtyStrike() async {
@@ -114,19 +139,24 @@ class ProgressDao extends DatabaseAccessor<AppDatabase>
           ..where((t) => t.syncedAt.isNull() & t.id.equals(_strikeRowId)))
         .getSingleOrNull();
     if (row == null) return null;
-    return StrikeState(
-      currentStrike: row.currentStrike,
-      longestStrike: row.longestStrike,
-      lastActiveDateKey: row.lastActiveDateKey,
-      unlockedTiers:
-          ((jsonDecode(row.unlockedTiersJson) as List<dynamic>).cast<num>())
-              .map((v) => v.toInt())
-              .toList(),
-      syncedAt: row.syncedAt,
-    );
+    try {
+      return _strikeFromRow(
+        row.currentStrike,
+        row.longestStrike,
+        row.lastActiveDateKey,
+        row.unlockedTiersJson,
+        row.syncedAt,
+      );
+    } catch (e) {
+      // Skips this sweep's strike upload; retries (or self-heals via
+      // saveStrike) instead of wedging the pass.
+      debugPrint('progress: unreadable dirty strike row ($e)');
+      return null;
+    }
   }
 
   Future<void> markStrikeSynced(DateTime at) =>
-      (update(strikeStates)..where((t) => t.id.equals(_strikeRowId)))
+      (update(strikeStates)
+            ..where((t) => t.id.equals(_strikeRowId) & t.syncedAt.isNull()))
           .write(StrikeStatesCompanion(syncedAt: Value(at)));
 }

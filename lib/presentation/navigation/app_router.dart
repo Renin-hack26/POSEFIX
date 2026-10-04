@@ -30,6 +30,19 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 /// App router — 4-tab shell (HOME | WORKOUT | PLAN | SETTINGS) + auth stack.
 ///
 /// Adding a reserved page (PLANNING §10.2) = 1 route + 1 slot.
+///
+/// OTP/reset args: `extra` first (in-app navigation), query params as
+/// fallback (process-restart restoration, external links) — without either
+/// the screens would verify against an empty email.
+OtpArgs? _otpArgs(GoRouterState state) {
+  if (state.extra is OtpArgs) return state.extra as OtpArgs;
+  final email = state.uri.queryParameters['email']?.trim() ?? '';
+  if (email.isEmpty) return null;
+  final purpose = state.uri.queryParameters['purpose'] == 'reset'
+      ? OtpPurpose.reset
+      : OtpPurpose.signup;
+  return OtpArgs(email: email, purpose: purpose);
+}
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -42,14 +55,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/otp',
         builder: (context, state) => OtpScreen(
-          args: state.extra is OtpArgs ? state.extra as OtpArgs : null,
+          args: _otpArgs(state),
         ),
       ),
       GoRoute(path: '/forgot', builder: (context, state) => const ForgotPasswordScreen()),
       GoRoute(
         path: '/reset-password',
         builder: (context, state) => ResetPasswordScreen(
-          args: state.extra is OtpArgs ? state.extra as OtpArgs : null,
+          args: _otpArgs(state),
         ),
       ),
 

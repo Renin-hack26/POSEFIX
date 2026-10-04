@@ -1,4 +1,5 @@
-﻿import 'dart:convert';
+﻿import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -166,7 +167,7 @@ class _SettingsBodyState extends ConsumerState<_SettingsBody> {
           const SizedBox(height: 20),
           Center(
             child: Text(
-              'FixPose 1.1.11', // keep in sync with pubspec.yaml version
+              'FixPose 1.1.12', // keep in sync with pubspec.yaml version
               style: TextStyle(fontSize: 11.5, color: p.ink3),
             ),
           ),
@@ -315,6 +316,17 @@ class _SettingsBodyState extends ConsumerState<_SettingsBody> {
   }
 
   Future<void> _signOut() async {
+    // Best-effort upload first: dirty rows that never reached the server
+    // would otherwise die with the sign-out wipe below. Bounded, and the
+    // wipe still always runs (privacy boundary holds offline too).
+    try {
+      await ref
+          .read(syncEngineProvider)
+          .syncNow()
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Offline or slow — local data still wipes below by design.
+    }
     try {
       await ref.read(signOutProvider)();
     } catch (_) {
