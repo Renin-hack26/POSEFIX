@@ -19,6 +19,18 @@
    - Spam-folder safety: multipart plain+HTML, No-Reply sender, SPF-aligned (implemented in email_service)
 5. **GROQ API key** (VEDA chat + plan generation) → GitHub Secrets / secure config — **never commit**
 
+## Backend apply (Supabase project — NOT from CI)
+6. **Account schema** (idempotent — safe to re-run): `tools/sync_schema.ps1`
+   applies `supabase/schema_account_sync.sql` via the Management API
+   (needs `SUPABASE_ACCESS_TOKEN` + `SUPABASE_URL` in the environment).
+   This creates the `public.profiles` account directory consumed by the
+   `check-user` edge action.
+7. **Edge function**: `supabase functions deploy send-otp` (Supabase CLI,
+   linked project). Redeploy after any change under
+   `supabase/functions/send-otp/` — the app cannot function without the
+   matching server actions (`check-user` reads `profiles` with a GoTrue
+   fallback, so either deploy order is safe).
+
 ## Asset pipeline (FFmpeg, before bundling)
 ```
 ffmpeg -i input.mp4 -vf "scale=-2:720" -c:v libx264 -crf 28 -an -movflags +faststart assets/videos/<exercise>.mp4

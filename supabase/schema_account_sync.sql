@@ -102,6 +102,19 @@ create table if not exists public.chat_messages (
 );
 create index if not exists chat_messages_user_idx on public.chat_messages (user_id);
 
+-- --- account directory (who exists) --------------------------------------
+-- Canonical email→user registry for check-user: one indexed exact lookup
+-- instead of paging the GoTrue admin list (capped at 20 pages × 100 rows).
+-- Written by the create-user edge action (and self-healed by check-user);
+-- read service-role by check-user. Email is stored lowercased, matching
+-- the edge function's normalization.
+create table if not exists public.profiles (
+  user_id uuid not null primary key references auth.users (id) on delete cascade,
+  email text not null,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists profiles_email_idx on public.profiles (lower(email));
+
 -- --- updated_at triggers --------------------------------------------------
 drop trigger if exists workout_sessions_updated_at on public.workout_sessions;
 create trigger workout_sessions_updated_at before update on public.workout_sessions
@@ -161,6 +174,11 @@ drop policy if exists own_rows on public.chat_messages;
 create policy own_rows on public.chat_messages for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+alter table public.profiles enable row level security;
+drop policy if exists own_rows on public.profiles;
+create policy own_rows on public.profiles for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- --- explicit grants (defense in depth over default privileges) -----------
 grant select, insert, update, delete on public.workout_sessions to authenticated;
 grant select, insert, update, delete on public.training_plans to authenticated;
@@ -169,3 +187,4 @@ grant select, insert, update, delete on public.meal_targets to authenticated;
 grant select, insert, update, delete on public.body_metrics to authenticated;
 grant select, insert, update, delete on public.strike_states to authenticated;
 grant select, insert, update, delete on public.chat_messages to authenticated;
+grant select, insert, update, delete on public.profiles to authenticated;

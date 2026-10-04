@@ -7,7 +7,15 @@
 // Actions (POST JSON, requires the project anon/publishable key as Bearer):
 //   send          { email, purpose: 'signup' | 'reset' }
 //   verify        { email, code }
-//   check-user    { email }                    forgot-password "User doesn't exist"
+//   check-user    { email }                    forgot-password + sign-in
+//                                              "User doesn't exist" gate.
+//                                              Reads public.profiles first
+//                                              (written by create-user,
+//                                              self-healed on fallback
+//                                              hits); falls back to the
+//                                              GoTrue admin scan when the
+//                                              table is missing or the
+//                                              account predates it.
 //   create-user   { email, password, metadata } after a verified signup OTP
 //   reset-password{ email, password }          after a verified reset OTP
 
@@ -235,8 +243,31 @@ Deno.serve(async (req) => {
       }
 
       case "check-user": {
+        // Canonical registry first: one indexed exact lookup (email is
+        // already lowercased above, matching the stored form).
+        try {
+          const prof = await db
+            .from("profiles")
+            .select("user_id")
+            .eq("email", email)
+            .maybeSingle();
+          if (!prof.error && prof.data) {
+            return json({ ok: true, exists: true });
+          }
+        } catch {
+          // profiles table missing (schema not applied yet) — fall through
+          // to the GoTrue scan below (previous behavior preserved).
+        }
+        // Fallback: page GoTrue (covers accounts created before the
+        // registry existed; a hit self-heals the registry row).
         const user = await findUser(email);
-        return json({ ok: true, exists: user !== null });
+        if (!user) return json({ ok: true, exists: false });
+        try {
+          await db.from("profiles").upsert({ user_id: user.id, email });
+        } catch {
+          // Best effort — the answer is already known.
+        }
+        return json({ ok: true, exists: true });
       }
 
       case "create-user": {
@@ -246,7 +277,7 @@ Deno.serve(async (req) => {
         if (password.length < 8) {
           return json({ ok: false, error: "bad_password" }, 400);
         }
-        const { error } = await db.auth.admin.createUser({
+        const { data: created, error } = await db.auth.admin.createUser({
           email,
           password,
           email_confirm: true,
@@ -256,6 +287,16 @@ Deno.serve(async (req) => {
           console.error("create user", error);
           const exists = error.message.toLowerCase().includes("already");
           return json({ ok: false, error: exists ? "exists" : "create_failed" }, 400);
+        }
+        // Register the canonical email→user row (check-user reads this;
+        // failure here must not fail the signup — the fallback scan covers it).
+        try {
+          const newId = (created as { user?: { id?: string } } | null)?.user?.id;
+          if (newId) {
+            await db.from("profiles").upsert({ user_id: newId, email });
+          }
+        } catch (err) {
+          console.error("profiles upsert", err);
         }
         await db.from("otp_codes").delete().eq("email", email);
         return json({ ok: true });

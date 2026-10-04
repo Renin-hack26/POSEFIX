@@ -30,12 +30,19 @@ class AuthRemoteDataSource {
   Future<void> verifyOtp({required String email, required String code}) =>
       _invoke({'action': 'verify', 'email': email, 'code': code});
 
-  /// Whether an account exists — forgot-password's "User doesn't exist" gate.
+  /// Whether an account exists — the "User doesn't exist" gate for
+  /// sign-in and forgot-password.
+  ///
+  /// NOTE: `functions.invoke` resolves to [FunctionResponse], not the raw
+  /// JSON — reading `.data` is load-bearing. A bare `is Map` check on the
+  /// response object is always false and reports every account as missing
+  /// (registered users locked out with "User doesn't exist").
   Future<bool> userExists({required String email}) async {
     final res = await _invokeResult(
       {'action': 'check-user', 'email': email},
     );
-    return res is Map && res['exists'] == true;
+    final Object? data = res is FunctionResponse ? res.data : res;
+    return data is Map && data['exists'] == true;
   }
 
   /// Creates the account after a verified signup OTP (email pre-confirmed).
