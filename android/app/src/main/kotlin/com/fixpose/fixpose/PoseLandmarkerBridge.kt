@@ -108,6 +108,9 @@ class PoseLandmarkerBridge(
             val y = call.argument<ByteArray>("y") ?: return err("missing y")
             val u = call.argument<ByteArray>("u") ?: return err("missing u")
             val v = call.argument<ByteArray>("v") ?: return err("missing v")
+            // "nv21" = single-plane buffer (Y + interleaved VU) as delivered
+            // by the app's camera controller; "yuv420" = 3 separate planes.
+            val format = call.argument<String>("format") ?: "yuv420"
             val width = call.argument<Int>("width") ?: return err("missing width")
             val height = call.argument<Int>("height") ?: return err("missing height")
             val yRowStride = call.argument<Int>("yRowStride") ?: width
@@ -117,7 +120,11 @@ class PoseLandmarkerBridge(
             val timestampMs = call.argument<Long>("timestampMs")
                 ?: System.currentTimeMillis()
 
-            val argb = yuv420ToArgb(y, u, v, width, height, yRowStride, uvRowStride, uvPixelStride)
+            val argb = if (format == "nv21") {
+                nv21ToArgb(y, width, height, yRowStride, uvRowStride)
+            } else {
+                yuv420ToArgb(y, u, v, width, height, yRowStride, uvRowStride, uvPixelStride)
+            }
             var bitmap = Bitmap.createBitmap(argb, width, height, Bitmap.Config.ARGB_8888)
             // Pre-rotate to upright: landmarks, thumbnail and frame dims all
             // refer to this upright space (MPImage itself gets rotation 0).
@@ -202,6 +209,39 @@ class PoseLandmarkerBridge(
 
     private fun err(msg: String): Map<String, Any?> =
         mapOf("ok" to false, "error" to msg)
+
+    /// Single-plane NV21 (Y + interleaved VU) → ARGB. This is what the
+    /// app's camera controller delivers; the chroma plane starts right
+    /// after `yRowStride * height` bytes, V before U in each pair.
+    private fun nv21ToArgb(
+        yuv: ByteArray,
+        width: Int,
+        height: Int,
+        yRowStride: Int,
+        uvRowStride: Int,
+    ): IntArray {
+        val out = IntArray(width * height)
+        val ySize = yRowStride * height
+        var o = 0
+        for (j in 0 until height) {
+            val yRow = j * yRowStride
+            val uvRow = ySize + (j shr 1) * uvRowStride
+            for (i in 0 until width) {
+                val yv = (yuv[yRow + i].toInt() and 0xFF)
+                val vu = uvRow + ((i shr 1) * 2)
+                val vv = ((yuv[vu].toInt() and 0xFF) - 128)
+                val uv = ((yuv[vu + 1].toInt() and 0xFF) - 128)
+                var r = (yv + 1.402 * vv).toInt()
+                var g = (yv - 0.344136 * uv - 0.714136 * vv).toInt()
+                var b = (yv + 1.772 * uv).toInt()
+                r = r.coerceIn(0, 255)
+                g = g.coerceIn(0, 255)
+                b = b.coerceIn(0, 255)
+                out[o++] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            }
+        }
+        return out
+    }
 
     private fun yuv420ToArgb(
         y: ByteArray, u: ByteArray, v: ByteArray,

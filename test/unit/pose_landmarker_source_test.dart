@@ -99,8 +99,7 @@ void main() {
     expect(frame.inferenceMs, closeTo(31.5, 1e-9));
   });
 
-  test('dropped / not-found / malformed all degrade to null', () async {
-    handler = (call) {
+  test('dropped / not-found / malformed all degrade to null', () async {    handler = (call) {
       if (call.method == 'init') return {'ok': true};
       return {'ok': true, 'dropped': true};
     };
@@ -123,5 +122,48 @@ void main() {
       return bad;
     };
     expect(await _detect(source), isNull);
+  });
+
+  test('nv21 contract carries format + single plane to native', () async {
+    Map<String, dynamic>? seenArgs;
+    handler = (call) {
+      if (call.method == 'init') return {'ok': true};
+      seenArgs =
+          Map<String, dynamic>.from(call.arguments as Map<dynamic, dynamic>);
+      return _detectOk();
+    };
+    final source = PoseLandmarkerSource();
+    await source.init();
+    // True NV21 layout: Y (w*h) + interleaved VU (w*h/2) in ONE buffer.
+    final nv21 = Uint8List(720 * 1280 + 720 * 1280 ~/ 2);
+    final frame = await source.detectRaw(
+      y: nv21,
+      u: Uint8List(0),
+      v: Uint8List(0),
+      width: 720,
+      height: 1280,
+      yRowStride: 720,
+      uvRowStride: 720,
+      uvPixelStride: 2,
+      rotationDeg: 270,
+      format: 'nv21',
+    );
+    expect(frame, isNotNull);
+    expect(seenArgs!['format'], 'nv21');
+    expect((seenArgs!['y'] as Uint8List).length, nv21.length);
+  });
+
+  test('yuv420 stays the default contract', () async {
+    Map<String, dynamic>? seenArgs;
+    handler = (call) {
+      if (call.method == 'init') return {'ok': true};
+      seenArgs =
+          Map<String, dynamic>.from(call.arguments as Map<dynamic, dynamic>);
+      return _detectOk();
+    };
+    final source = PoseLandmarkerSource();
+    await source.init();
+    expect(await _detect(source), isNotNull);
+    expect(seenArgs!['format'], 'yuv420');
   });
 }

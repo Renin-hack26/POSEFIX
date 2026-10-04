@@ -81,21 +81,30 @@ class PoseLandmarkerSource {
     return _ready;
   }
 
-  /// Sends one YUV420 frame; null when busy (dropped), unusable, or the
+  /// Sends one camera frame; null when busy (dropped), unusable, or the
   /// source is down. Never throws. At most one frame is ever in flight.
+  ///
+  /// Accepts single-plane NV21 (what the app's camera controller delivers)
+  /// as well as 3-plane YUV420 — the `format` travels with the planes so
+  /// the native side converts correctly. (A previous revision required 3
+  /// planes unconditionally, which silently discarded every NV21 frame and
+  /// killed detection entirely on-device.)
   Future<LandmarkerFrame33?> detect(CameraImage image, int rotationDeg) async {
     if (!_ready || _inFlight) return null;
-    if (image.planes.length < 3) return null;
+    final planes = image.planes;
+    if (planes.isEmpty) return null;
+    final nv21 = planes.length == 1;
     return detectRaw(
-      y: image.planes[0].bytes,
-      u: image.planes[1].bytes,
-      v: image.planes[2].bytes,
+      y: planes[0].bytes,
+      u: nv21 ? Uint8List(0) : planes[1].bytes,
+      v: nv21 ? Uint8List(0) : planes[2].bytes,
       width: image.width,
       height: image.height,
-      yRowStride: image.planes[0].bytesPerRow,
-      uvRowStride: image.planes[1].bytesPerRow,
-      uvPixelStride: image.planes[1].bytesPerPixel ?? 1,
+      yRowStride: planes[0].bytesPerRow,
+      uvRowStride: nv21 ? image.width : planes[1].bytesPerRow,
+      uvPixelStride: nv21 ? 2 : (planes[1].bytesPerPixel ?? 1),
       rotationDeg: rotationDeg,
+      format: nv21 ? 'nv21' : 'yuv420',
     );
   }
 
@@ -110,6 +119,7 @@ class PoseLandmarkerSource {
     required int uvRowStride,
     required int uvPixelStride,
     required int rotationDeg,
+    String format = 'yuv420',
   }) async {
     if (!_ready || _inFlight) return null;
     _inFlight = true;
@@ -120,6 +130,7 @@ class PoseLandmarkerSource {
           'y': y,
           'u': u,
           'v': v,
+          'format': format,
           'width': width,
           'height': height,
           'yRowStride': yRowStride,

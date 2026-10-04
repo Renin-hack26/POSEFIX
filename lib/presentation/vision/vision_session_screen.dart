@@ -131,6 +131,13 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   /// MediaPipe PoseLandmarker (heavy) source; ML Kit stays the fallback.
   final PoseLandmarkerSource _landmarkerSource = PoseLandmarkerSource();
 
+  /// Consecutive landmarker frames yielding nothing. The heavy model
+  /// legitimately drops frames while busy (successes interleave and reset
+  /// this counter), but a long dead run means the native path is broken on
+  /// this device — latch to ML Kit rather than stare at a dead camera.
+  int _landmarkerFails = 0;
+  static const int _landmarkerFailLimit = 30;
+
   /// True once the landmarker backend is up for this session.
   bool _useLandmarker = false;
 
@@ -906,11 +913,26 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       PoseFrameResult? result;
       if (_useLandmarker) {
         // Batch 5 primary path: heavy landmarker natively, ML Kit types
-        // downstream (adapter), same pipeline either way. A dropped frame
-        // just yields to the next one.
+        // downstream (adapter), same pipeline either way.
         final frame =
             await _landmarkerSource.detect(image, _rotationDegrees);
-        if (frame == null) return;
+        if (frame == null) {
+          // Dropped/busy frames happen under load and recover on the next
+          // success — but a long dead run means the native path is broken
+          // (wrong format, bad rotation, dead model), so latch to ML Kit
+          // for the rest of the session instead of a frozen camera.
+          _landmarkerFails++;
+          if (_landmarkerFails >= _landmarkerFailLimit) {
+            _useLandmarker = false;
+            _landmarkerFails = 0;
+            debugPrint(
+                'VisionSession: landmarker dead for $_landmarkerFailLimit frames — ML Kit fallback');
+            _pipelineError = 'Landmarker unavailable — using ML Kit';
+            _publishHud();
+          }
+          return;
+        }
+        _landmarkerFails = 0;
         _imageWidth = frame.frameW;
         _imageHeight = frame.frameH;
         _overlayRotation = InputImageRotation.rotation0deg;
