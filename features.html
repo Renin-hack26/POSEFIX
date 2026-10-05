@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Features — FixPose</title>
+<meta name="description" content="Live camera sessions with a 33-point skeleton overlay, anti-false-count rep gating, spoken form coaching, training plans, strike streaks, meal logging, the VEDA AI coach and exportable progress reports.">
+<meta name="theme-color" content="#0A0D08">
+<meta name="robots" content="index, follow">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FixPose">
+<meta property="og:title" content="Features — FixPose">
+<meta property="og:description" content="Live skeleton overlay, honest rep counting, spoken form coaching, training plans, strike streaks, meals, VEDA AI chat and progress reports.">
+<meta property="og:image" content="assets/img/logo.svg">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Features — FixPose">
+<meta name="twitter:description" content="Live skeleton overlay, honest rep counting, spoken form coaching, training plans and the VEDA AI coach.">
+
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/css/styles.css">
+<script>document.documentElement.className = "js";</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="container nav">
+    <a class="brand" href="index.html" aria-label="FixPose — home">
+      <img class="brand__mark" src="assets/img/logo.svg" alt="" width="34" height="34">
+      <span class="brand__name">Fix<span>Pose</span></span>
+    </a>
+
+    <button class="nav__toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" aria-label="Open menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16"/>
+      </svg>
+    </button>
+
+    <ul class="nav__links" id="primary-navigation">
+      <li><a data-nav href="index.html">Home</a></li>
+      <li><a data-nav href="features.html">Features</a></li>
+      <li><a data-nav href="download.html">Download</a></li>
+      <li><a data-nav href="about.html">About</a></li>
+      <li><a class="nav__cta--mobile" href="https://github.com/Renin-hack26/POSEFIX/releases/download/v1.1.12/FixPose-latest.apk" download>Download APK</a></li>
+    </ul>
+
+    <a class="btn btn--primary btn--sm nav__cta" href="https://github.com/Renin-hack26/POSEFIX/releases/download/v1.1.12/FixPose-latest.apk" download>Download APK</a>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="dl-hero">
+    <div class="container">
+      <p class="kicker">Feature tour</p>
+      <h1>The whole coaching loop, in one app</h1>
+      <p>Sensing, counting, correcting, planning, eating and reviewing — here is what each part actually does in FixPose v1.1.12.</p>
+    </div>
+  </section>
+
+  <!-- ============ LIGHT: VISION + COUNTING + COACHING + PLANS ============ -->
+  <section class="section section--light section--grid" aria-labelledby="f-vision">
+    <div class="container">
+
+      <!-- 1. Live camera session -->
+      <article class="feature-row">
+        <div>
+          <p class="card__tag">Live session</p>
+          <h3 id="f-vision">Camera view with a real skeleton drawn on top</h3>
+          <p>
+            Start a session and FixPose shows the back-camera preview with the ML Kit pose overlaid on it —
+            every point the model detected, redrawn on each frame, plus live joint angles for the joints that matter
+            to the exercise.
+          </p>
+          <ul class="tick-list">
+            <li><strong>Person lock:</strong> the app picks one subject and asks others to step out of frame, so a passing friend does not steal your rep count.</li>
+            <li><strong>Framing guide:</strong> a shaded region plus “step back / step closer / move left / move right” cues get your whole body in view.</li>
+            <li><strong>Confidence colours:</strong> joints are drawn by how sure the model is; weak frames are dropped instead of guessed at.</li>
+            <li><strong>Backgrounded sessions pause</strong> and keep their state — come back and you resume where you stopped.</li>
+          </ul>
+        </div>
+        <div class="feature-row__media reveal">
+          <img src="assets/img/skeleton-overlay.svg" width="480" height="360"
+               alt="Illustration of the FixPose skeleton overlay: joint dots and connecting lines over a stylized figure, with landmark, person-lock and knee-angle readouts.">
+          <p class="phone__caption" style="color:var(--light-ink-2)">Stylized illustration of the session overlay.</p>
+        </div>
+      </article>
+
+      <!-- 2. Rep counting -->
+      <article class="feature-row feature-row--flip">
+        <div>
+          <p class="card__tag">Rep counting</p>
+          <h3>Counting that refuses to cheat</h3>
+          <p>
+            Each exercise has its own state machine with depth and lockout thresholds (a squat must pass the bottom
+            position before it comes back up). A rep is committed only after several confirming frames — so a bounce,
+            a jittery landmark or a two-frame glitch never reaches your total.
+          </p>
+          <ul class="tick-list">
+            <li><strong>Full range of motion</strong> is required: partial reps are logged as “not counted”, not quietly added.</li>
+            <li><strong>Video guard:</strong> point the camera at a phone playing an exercise video and counting pauses with a spoken warning.</li>
+            <li><strong>Too fast / occluded / multi-person</strong> states pause counting and tell you why, on screen and out loud.</li>
+            <li><strong>Rejections are spoken</strong> with a cooldown — “Too fast — rep not counted”, “Not counted — go through your full range”.</li>
+          </ul>
+        </div>
+        <div class="feature-row__media reveal">
+          <div class="panel">
+            <p class="panel__title">Counting states</p>
+            <div style="display:flex;align-items:center;gap:1.1rem;margin-bottom:1.2rem">
+              <div class="hud" style="position:static">
+                <span class="hud__label">Reps</span>
+                <span class="hud__value">12</span>
+              </div>
+              <div>
+                <p style="margin:0;font-size:.9rem;color:var(--light-ink-2)">State machine: <strong style="color:var(--light-ink)">up → down → up</strong></p>
+                <p style="margin:.25rem 0 0;font-size:.9rem;color:var(--light-ink-2)">Status: <strong style="color:var(--accent-deep)">committing rep</strong></p>
+              </div>
+            </div>
+            <ul class="tick-list" style="gap:.55rem">
+              <li>Video detected — counting paused</li>
+              <li>More than one person visible</li>
+              <li>Body partly hidden — joints unreadable</li>
+              <li>Tracking lost — hold still</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- 3. Form score + voice -->
+      <article class="feature-row">
+        <div>
+          <p class="card__tag">Form score &amp; voice</p>
+          <h3>A score you can hear improving</h3>
+          <p>
+            While you move, the HUD shows a live form score; when the set ends, your sessions store a form accuracy
+            percentage that rolls up into history, home stats and reports. The coach reads the important parts aloud
+            through text-to-speech.
+          </p>
+          <ul class="tick-list">
+            <li><strong>Real cue text</strong> from the exercise rules: “Go deeper!”, “Keep your chest up!”, “Back knee nearly touching!”.</li>
+            <li><strong>Live angles</strong> for the measured joints appear as chips next to the rep counter.</li>
+            <li><strong>Session summary</strong> lists total reps, average cadence and form accuracy for the workout.</li>
+            <li><strong>Settings → Spoken cues</strong> turns the coaching voice off whenever you want to train in silence.</li>
+          </ul>
+        </div>
+        <div class="feature-row__media reveal">
+          <div class="panel">
+            <p class="panel__title">Coaching cues on screen</p>
+            <div style="display:grid;gap:.7rem">
+              <p class="hud" style="position:static;border-color:rgba(169,233,44,.4);font-family:var(--font-body);font-size:.9rem;font-weight:600;color:var(--ink)">Go deeper!</p>
+              <p class="hud" style="position:static;border-color:rgba(169,233,44,.4);font-family:var(--font-body);font-size:.9rem;font-weight:600;color:var(--ink)">Keep your chest up!</p>
+              <p class="hud" style="position:static;border-color:rgba(239,68,68,.45);font-family:var(--font-body);font-size:.9rem;font-weight:600;color:#ffd9d9">Too fast — rep not counted</p>
+            </div>
+            <dl class="spec-list" style="margin-top:1.3rem">
+              <div><dt>Form score (live)</dt><dd>in-session HUD</dd></div>
+              <div><dt>Form accuracy</dt><dd>stored per session</dd></div>
+              <div><dt>Voice</dt><dd>text-to-speech, mutable</dd></div>
+            </dl>
+          </div>
+        </div>
+      </article>
+
+      <!-- 4. Training plans -->
+      <article class="feature-row feature-row--flip">
+        <div>
+          <p class="card__tag">Training plans</p>
+          <h3>A week you can edit, not just obey</h3>
+          <p>
+            Onboarding asks your level and goal once, then builds a seven-day plan. When the build has an AI key the
+            schedule is generated by the model from the bundled workout library; when it does not — offline, timeout,
+            or a reply that does not follow the contract — a set of local templates is used instead and the plan is
+            honestly labelled as such.
+          </p>
+          <ul class="tick-list">
+            <li><strong>Sessions are editable:</strong> change the time, status and rounds straight from the Plan tab.</li>
+            <li><strong>Reminders</strong> fire daily at the time you pick, and Settings has an on/off switch for them.</li>
+            <li><strong>Next-up slots</strong> on Home let you start the scheduled session in one tap.</li>
+            <li><strong>History</strong> keeps every session with its form score, duration and reps.</li>
+          </ul>
+        </div>
+        <div class="feature-row__media reveal">
+          <div class="panel">
+            <p class="panel__title">Your week</p>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:.4rem;text-align:center;font-size:.75rem;font-weight:700;color:var(--light-ink-2)">
+              <span style="background:var(--accent-soft);color:var(--accent-deep);border-radius:10px;padding:.6rem 0">M</span>
+              <span style="background:rgba(15,23,42,.06);border-radius:10px;padding:.6rem 0">T</span>
+              <span style="background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:.6rem 0">W</span>
+              <span style="background:rgba(15,23,42,.06);border-radius:10px;padding:.6rem 0">T</span>
+              <span style="background:var(--accent-soft);color:var(--accent-deep);border-radius:10px;padding:.6rem 0">F</span>
+              <span style="background:rgba(15,23,42,.06);border-radius:10px;padding:.6rem 0">S</span>
+              <span style="background:rgba(15,23,42,.06);border-radius:10px;padding:.6rem 0">S</span>
+            </div>
+            <div style="margin-top:1.2rem;padding:1rem;border-radius:14px;background:rgba(15,23,42,.05);border:1px solid rgba(15,23,42,.1)">
+              <p style="margin:0;font-family:var(--font-display);font-weight:800;color:var(--light-ink)">Next session · Lower body</p>
+              <p style="margin:.3rem 0 .8rem;font-size:.88rem;color:var(--light-ink-2)">3 rounds · 12 reps · starts 18:30</p>
+              <span class="btn btn--primary btn--sm" aria-hidden="true">Start</span>
+            </div>
+            <p class="phone__caption" style="color:var(--light-ink-2)">UI concept — simplified.</p>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ============ DARK: STRIKE + MEALS + VEDA + REPORTS ============ -->
+  <section class="section section--dark section--grid" aria-labelledby="f-strike">
+    <div class="container">
+
+      <!-- 5. Strike -->
+      <article class="feature-row">
+        <div>
+          <p class="card__tag" style="color:var(--accent)">Progress &amp; streaks</p>
+          <h3 id="f-strike">The strike: proof you showed up</h3>
+          <p>
+            Finish a session with at least a minute of work and the day is credited. Consecutive days grow the strike,
+            a gap of two days or more resets it — and badges unlock at fixed tiers and are never revoked.
+          </p>
+          <ul class="tick-list">
+            <li><strong>Tiers:</strong> 3, 7, 14, 30 and 100 days, unlocked once and kept for good.</li>
+            <li><strong>Form-mastery badge:</strong> earned by a session at 90% form accuracy or better.</li>
+            <li><strong>Home shows the streak</strong> next to a seven-day activity graph and your weekly stats.</li>
+            <li><strong>Longest strike</strong> is tracked alongside the current one.</li>
+          </ul>
+        </div>
+        <div class="feature-row__media reveal">
+          <div class="panel">
+            <p class="panel__title">Badge tiers</p>
+            <ul class="hero__meta" style="margin-bottom:1.2rem">
+              <li><b>3</b>&nbsp;days</li>
+              <li><b>7</b>&nbsp;days</li>
+              <li><b>14</b>&nbsp;days</li>
+              <li><b>30</b>&nbsp;days</li>
+              <li><b>100</b>&nbsp;days</li>
+            </ul>
+            <dl class="spec-list">
+              <div><dt>Current strike</dt><dd>consecutive training days</dd></div>
+              <div><dt>Longest strike</dt><dd>kept forever</dd></div>
+              <div><dt>Form mastery</dt><dd>≥ 90% form session</dd></div>
+            </dl>
+          </div>
+        </div>
+      </article>
+
+      <!-- 6. Meals -->
+      <article class="feature-row feature-row--flip">
+        <div>
+          <p class="card__tag" style="color:var(--accent)">Meal tracking</p>
+          <h3>Calories logged in a couple of taps</h3>
+          <p>
+            Set the daily calorie target you want to hit, then log meals per eating occasion. The Plan tab shows how
+            the day is going against that target without leaving the screen.
+          </p>
+          <ul class="tick-list">
+            <li><strong>100 bundled foods</strong> with calories and serving size, plus custom foods you add yourself.</li>
+            <li><strong>Per meal type:</strong> breakfast, lunch, dinner and snacks are tracked separately.</li>
+            <li><strong>Progress bar</strong> on the Plan tab compares today’s intake with your target.</li>
+            <li><strong>VEDA answers calorie questions</strong> — “How many calories in 2 eggs + toast?” — with a structured reply.</li>
+          </ul>
+        </div>
+        <div class="feature-row__media reveal">
+          <div class="panel">
+            <p class="panel__title">Today · meals</p>
+            <p style="display:flex;justify-content:space-between;font-size:.9rem;color:var(--ink-2);margin-bottom:.5rem">
+              <span>1 420 kcal logged</span><span>target 2 200</span>
+            </p>
+            <div style="height:12px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden">
+              <div style="width:64%;height:100%;background:var(--grad-accent)"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem;margin-top:1.2rem">
+              <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:.8rem">
+                <p style="margin:0;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)">Breakfast</p>
+                <p style="margin:.2rem 0 0;font-weight:700;color:var(--ink)">420 kcal</p>
+              </div>
+              <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:.8rem">
+                <p style="margin:0;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)">Lunch</p>
+                <p style="margin:.2rem 0 0;font-weight:700;color:var(--ink)">680 kcal</p>
+              </div>
+            </div>
+            <p class="phone__caption">UI concept — simplified.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- 7. VEDA -->
+      <article class="feature-row">
+        <div>
+          <p class="card__tag" style="color:var(--accent)">VEDA AI coach</p>
+          <h3>A chat that knows what you did last</h3>
+          <p>
+            VEDA is the in-app assistant. Every reply is a live model completion grounded in your context — your last
+            sessions, your plan and your numbers — with a firm boundary around medical advice.
+          </p>
+          <ul class="tick-list">
+            <li><strong>Context-aware:</strong> your five most recent sessions (date, reps, form accuracy) inform the answer.</li>
+            <li><strong>Honest failures:</strong> no connection or no key means an explicit “VEDA needs a connection” message — never a faked reply.</li>
+            <li><strong>Offline fallback:</strong> AskVEDA can still answer from your own stored data and says so up front.</li>
+            <li><strong>Clear chat</strong> is available from the Privacy section in Settings.</li>
+          </ul>
+        </div>
+        <div class="feature-row__media reveal">
+          <div class="panel">
+            <p class="panel__title">Ask VEDA</p>
+            <div style="display:grid;gap:.7rem">
+              <p style="justify-self:end;max-width:80%;margin:0;background:var(--accent);color:var(--accent-ink);padding:.7rem 1rem;border-radius:16px 16px 4px 16px;font-size:.9rem;font-weight:600">How did my form trend this week?</p>
+              <p style="justify-self:start;max-width:88%;margin:0;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:var(--ink);padding:.7rem 1rem;border-radius:16px 16px 16px 4px;font-size:.9rem">Here is what I can see from your last sessions — reps, form % and the days you trained…</p>
+              <p style="justify-self:start;max-width:88%;margin:0;background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.45);color:#f6d199;padding:.7rem 1rem;border-radius:16px;font-size:.85rem">Offline right now — answering from your stored data.</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- 8. Reports -->
+      <article class="feature-row feature-row--flip">
+        <div>
+          <p class="card__tag" style="color:var(--accent)">Progress reports</p>
+          <h3>Written up, charted and exported as PDF</h3>
+          <p>
+            The Progress report screen assembles your trailing 30 days of training (full history for brand-new
+            accounts) into a readable document, then hands it to the system share sheet as a PDF.
+          </p>
+          <ul class="tick-list">
+            <li><strong>Sections:</strong> personal details, training summary, body metrics, nutrition summary, recent sessions, analysis &amp; recommendations.</li>
+            <li><strong>Home graph</strong> keeps a rolling seven-day view of workout minutes, weekly reps and best form.</li>
+            <li><strong>Suggestions</strong> come from the AI when it is reachable, otherwise from deterministic local rules — and the report still generates.</li>
+            <li><strong>Export:</strong> PDF with the FixPose header, shared through the Android share sheet.</li>
+          </ul>
+        </div>
+        <div class="feature-row__media reveal">
+          <div class="panel">
+            <p class="panel__title">Report contents</p>
+            <dl class="spec-list">
+              <div><dt>Window</dt><dd>trailing 30 days</dd></div>
+              <div><dt>Sessions</dt><dd>reps · minutes · form %</dd></div>
+              <div><dt>Nutrition</dt><dd>meals logged · avg kcal/day</dd></div>
+              <div><dt>Body metrics</dt><dd>height · weight · entries</dd></div>
+              <div><dt>Output</dt><dd>PDF via share sheet</dd></div>
+            </dl>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ============ EXERCISE LIBRARY ============ -->
+  <section class="section section--light" aria-labelledby="f-library">
+    <div class="container">
+      <div class="section-head">
+        <p class="kicker">Exercise library</p>
+        <h2 id="f-library">Movements you can search, filter and follow</h2>
+        <p>
+          FixPose ships a searchable catalogue with difficulty levels, muscles worked, coaching cues and default sets
+          and reps — plus an animated demonstration for the exercise you are about to do.
+        </p>
+      </div>
+
+      <div class="spec-grid" style="margin-bottom:2rem">
+        <div class="spec reveal" style="background:rgba(255,255,255,.7);border:var(--border-light)">
+          <p class="spec__num">46</p>
+          <h3>Coached movements</h3>
+          <p style="color:var(--light-ink-2)">Exercise state machines bundled with the app — squats, push-up variants, curls, planks, mobility flows and more.</p>
+        </div>
+        <div class="spec reveal" style="background:rgba(255,255,255,.7);border:var(--border-light)">
+          <p class="spec__num">36</p>
+          <h3>Demo animations</h3>
+          <p style="color:var(--light-ink-2)">Exercise GIFs bundled in the APK so you can check the movement before you start.</p>
+        </div>
+        <div class="spec reveal" style="background:rgba(255,255,255,.7);border:var(--border-light)">
+          <p class="spec__num">3</p>
+          <h3>Difficulty levels</h3>
+          <p style="color:var(--light-ink-2)">Beginner, intermediate and advanced entries, filterable alongside the muscle groups you want to hit.</p>
+        </div>
+      </div>
+
+      <div class="demo-grid">
+        <figure class="demo-card reveal">
+          <img src="assets/img/demo/squat.gif" alt="Animated demonstration of a barbell back squat." loading="lazy" width="340" height="340">
+          <figcaption><b>Bodyweight Squat</b>Example of the bundled exercise demonstration animation.</figcaption>
+        </figure>
+        <figure class="demo-card reveal">
+          <img src="assets/img/demo/pushup.gif" alt="Animated demonstration of a push-up." loading="lazy" width="340" height="340">
+          <figcaption><b>Push-up</b>Depth and lockout thresholds drive the rep state machine.</figcaption>
+        </figure>
+        <figure class="demo-card reveal">
+          <img src="assets/img/demo/jumpingJack.gif" alt="Animated demonstration of a jumping jack." loading="lazy" width="340" height="340">
+          <figcaption><b>Jumping Jack</b>One of the movements with its own counting rules.</figcaption>
+        </figure>
+      </div>
+
+      <p style="margin-top:1.4rem;font-size:.82rem;color:var(--light-ink-2)">
+        Demo animations come from the “Fitness Exercises with Animations” dataset, mirrored by the MIT-licensed
+        <a href="https://github.com/omercotkd/exercises-gifs" rel="noopener">exercises-gifs</a> repository; rights remain
+        with the original creators. See <code>assets/demo/ATTRIBUTION.md</code> in the repository.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ CTA ============ -->
+  <section class="section section--tight section--dark" aria-labelledby="cta-title">
+    <div class="container">
+      <div class="cta-band reveal">
+        <h2 id="cta-title">Try it on your own form</h2>
+        <p>Download the current build, prop your phone up and run one set — the skeleton overlay will show you exactly what the coach sees.</p>
+        <a class="btn btn--dark" href="https://github.com/Renin-hack26/POSEFIX/releases/download/v1.1.12/FixPose-latest.apk" download>Download FixPose APK</a>
+        <a class="btn btn--ghost" href="download.html" style="background:rgba(28,42,6,.1);border-color:rgba(28,42,6,.35);color:var(--accent-ink)">Install instructions</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer__grid">
+      <div class="footer__about">
+        <a class="brand" href="index.html">
+          <img class="brand__mark" src="assets/img/logo.svg" alt="" width="34" height="34">
+          <span class="brand__name">Fix<span>Pose</span></span>
+        </a>
+        <p>On-device AI pose detection fitness coach and rep counter for Android. Video stays on your phone.</p>
+      </div>
+
+      <nav class="footer__col" aria-label="Footer">
+        <h4>Site</h4>
+        <ul>
+          <li><a data-nav href="index.html">Home</a></li>
+          <li><a data-nav href="features.html">Features</a></li>
+          <li><a data-nav href="download.html">Download</a></li>
+          <li><a data-nav href="about.html">About</a></li>
+        </ul>
+      </nav>
+
+      <div class="footer__col">
+        <h4>Get the app</h4>
+        <ul>
+          <li><a href="https://github.com/Renin-hack26/POSEFIX/releases/download/v1.1.12/FixPose-latest.apk" download>Download APK (v1.1.12)</a></li>
+          <li><a href="download.html#sideload">How to install</a></li>
+          <li><a href="download.html#checksum">SHA-256 checksum</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer__bottom">
+      <p>&copy; <span data-year>2026</span> FixPose. Built with Flutter for Android.</p>
+      <p>Debug build, distributed for direct install and testing. Not affiliated with Google or ML Kit.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/main.js" defer></script>
+</body>
+</html>

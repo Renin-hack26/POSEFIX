@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img" aria-label="Illustration of a FixPose skeleton overlay: a stylized standing figure with tracked joint dots and connecting lines, one knee marked red as a form warning.">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#182211"/>
+      <stop offset="1" stop-color="#080c05"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="480" height="360" fill="url(#bg)"/>
+
+  <!-- analysis grid -->
+  <g stroke="#FFFFFF" stroke-opacity=".05">
+    <path d="M0 60h480M0 120h480M0 180h480M0 240h480M0 300h480"/>
+    <path d="M60 0v360M120 0v360M180 0v360M240 0v360M300 0v360M360 0v360M420 0v360"/>
+  </g>
+
+  <!-- framing guide -->
+  <rect x="140" y="24" width="200" height="320" rx="24" fill="none"
+        stroke="#A9E92C" stroke-opacity=".35" stroke-width="2" stroke-dasharray="11 13"/>
+
+  <!-- stylized silhouette -->
+  <g stroke="#0F172A" stroke-opacity=".72" stroke-linecap="round" fill="none">
+    <path d="M240 96v112" stroke-width="54"/>
+    <circle cx="240" cy="70" r="24" fill="#0F172A" fill-opacity=".78" stroke="none"/>
+    <path d="M222 112 196 152 176 194" stroke-width="22"/>
+    <path d="M258 112 284 152 304 194" stroke-width="22"/>
+    <path d="M224 206 206 274 196 336" stroke-width="28"/>
+    <path d="M256 206 274 274 284 336" stroke-width="28"/>
+    <path d="M196 340 176 348" stroke-width="15"/>
+    <path d="M284 340 304 348" stroke-width="15"/>
+  </g>
+
+  <!-- skeleton connections -->
+  <g stroke="#A9E92C" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M240 70v26"/>
+    <path d="M222 110h36"/>
+    <path d="M222 110 258 110"/>
+    <path d="M222 110 196 152 176 194"/>
+    <path d="M258 110 284 152 304 194"/>
+    <path d="M222 110 222 205M258 110 258 205"/>
+    <path d="M222 205h36"/>
+    <path d="M222 205 206 272 196 336 176 348"/>
+    <path d="M258 205 274 272 284 336 304 348"/>
+  </g>
+
+  <!-- torso cross for depth -->
+  <g stroke="#7CC414" stroke-opacity=".7" stroke-width="3" stroke-linecap="round" fill="none">
+    <path d="M222 110 258 205M258 110 222 205"/>
+  </g>
+
+  <!-- joints -->
+  <g fill="#D9FF57" stroke="#0A0D08" stroke-width="2.4">
+    <circle cx="240" cy="70" r="8"/>
+    <circle cx="222" cy="110" r="6.5"/>
+    <circle cx="258" cy="110" r="6.5"/>
+    <circle cx="196" cy="152" r="6"/>
+    <circle cx="284" cy="152" r="6"/>
+    <circle cx="176" cy="194" r="6"/>
+    <circle cx="304" cy="194" r="6"/>
+    <circle cx="222" cy="205" r="6.5"/>
+    <circle cx="258" cy="205" r="6.5"/>
+    <circle cx="196" cy="336" r="6"/>
+    <circle cx="284" cy="336" r="6"/>
+    <circle cx="176" cy="348" r="5"/>
+    <circle cx="304" cy="348" r="5"/>
+  </g>
+
+  <!-- flagged knee -->
+  <circle cx="274" cy="272" r="14" fill="none" stroke="#EF4444" stroke-opacity=".55" stroke-width="2.5"/>
+  <circle cx="274" cy="272" r="7.5" fill="#EF4444" stroke="#0A0D08" stroke-width="2.4"/>
+
+  <!-- readout chips -->
+  <g font-family="Sora, Segoe UI, sans-serif" font-weight="700">
+    <rect x="24" y="24" width="96" height="52" rx="14" fill="#0A0D08" fill-opacity=".8" stroke="#A9E92C" stroke-opacity=".4"/>
+    <text x="40" y="46" font-size="11" fill="#77826E" letter-spacing="2">LANDMARKS</text>
+    <text x="40" y="68" font-size="20" fill="#EDF2E4">33 / 33</text>
+
+    <rect x="344" y="24" width="112" height="52" rx="14" fill="#0A0D08" fill-opacity=".8" stroke="#A9E92C" stroke-opacity=".4"/>
+    <text x="360" y="46" font-size="11" fill="#77826E" letter-spacing="2">LOCKED ON</text>
+    <text x="360" y="68" font-size="20" fill="#D9FF57">1 person</text>
+
+    <rect x="300" y="248" width="140" height="46" rx="12" fill="#0A0D08" fill-opacity=".85" stroke="#EF4444" stroke-opacity=".5"/>
+    <text x="316" y="268" font-size="11" fill="#77826E" letter-spacing="2">KNEE ANGLE</text>
+    <text x="316" y="286" font-size="17" fill="#FFD9D9">78° — go deeper</text>
+  </g>
+</svg>

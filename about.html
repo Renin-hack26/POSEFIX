@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About — FixPose</title>
+<meta name="description" content="Why FixPose exists: a privacy-first, on-device fitness coach that checks your exercise form with the phone you already own. Mission, principles and contact.">
+<meta name="theme-color" content="#0A0D08">
+<meta name="robots" content="index, follow">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FixPose">
+<meta property="og:title" content="About FixPose">
+<meta property="og:description" content="A privacy-first, on-device fitness coach that checks your exercise form with the phone you already own.">
+<meta property="og:image" content="assets/img/logo.svg">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="About FixPose">
+<meta name="twitter:description" content="A privacy-first, on-device fitness coach that checks your exercise form with the phone you already own.">
+
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/css/styles.css">
+<script>document.documentElement.className = "js";</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="container nav">
+    <a class="brand" href="index.html" aria-label="FixPose — home">
+      <img class="brand__mark" src="assets/img/logo.svg" alt="" width="34" height="34">
+      <span class="brand__name">Fix<span>Pose</span></span>
+    </a>
+
+    <button class="nav__toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" aria-label="Open menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16"/>
+      </svg>
+    </button>
+
+    <ul class="nav__links" id="primary-navigation">
+      <li><a data-nav href="index.html">Home</a></li>
+      <li><a data-nav href="features.html">Features</a></li>
+      <li><a data-nav href="download.html">Download</a></li>
+      <li><a data-nav href="about.html">About</a></li>
+      <li><a class="nav__cta--mobile" href="https://github.com/Renin-hack26/POSEFIX/releases/download/v1.1.12/FixPose-latest.apk" download>Download APK</a></li>
+    </ul>
+
+    <a class="btn btn--primary btn--sm nav__cta" href="https://github.com/Renin-hack26/POSEFIX/releases/download/v1.1.12/FixPose-latest.apk" download>Download APK</a>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="dl-hero">
+    <div class="container">
+      <p class="kicker">About</p>
+      <h1>Form first. Phone only.</h1>
+      <p>FixPose exists because the feedback that keeps people safe while training — “drop lower”, “chest up”, “that rep didn’t count” — should not require a trainer standing next to you, or a camera feed leaving your bedroom.</p>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="mission-title">
+    <div class="container prose">
+      <p class="kicker">Mission</p>
+      <h2 id="mission-title" style="margin-top:0">Why we built it</h2>
+      <p>
+        Most home workouts go wrong in small, invisible ways: a squat that never reaches depth, a push-up with half a
+        range of motion, knees caving in while nobody is watching. Those are exactly the mistakes that a coach corrects
+        in a second — and exactly the ones you cannot see yourself.
+      </p>
+      <p>
+        FixPose turns the phone you already own into that observer. The camera reads your joints, the state machines
+        decide whether a rep was honest, and a voice tells you what to fix while there is still time to fix it. After
+        the set, everything is written down: reps, cadence, form accuracy, streaks and a report you can export.
+      </p>
+
+      <h2>What we refuse to do</h2>
+      <ul class="tick-list">
+        <li><strong>No video uploads.</strong> Pose detection runs through Google ML Kit on the handset; camera frames are analysed locally and never sent anywhere.</li>
+        <li><strong>No invented numbers.</strong> The features, thresholds and specifications described on this site come from the app itself — we do not publish fake ratings, quotes or statistics.</li>
+        <li><strong>No silent counting.</strong> If a rep is dropped or a session is paused, the app says so out loud and on screen instead of quietly adjusting your total.</li>
+        <li><strong>No mystery AI.</strong> When the assistant or the planner cannot reach its model, it reports that plainly and falls back to local logic.</li>
+      </ul>
+
+      <h2>How it is built</h2>
+      <p>
+        FixPose is a Flutter application for Android, built around two cooperating engines: a vision side that owns
+        the camera, person lock and landmark smoothing, and a reasoning side that owns the exercise state machines,
+        scores and feedback. Local storage is on-device, statistics can sync to your account, and the AI features are
+        the only parts that talk to the network.
+      </p>
+
+      <div class="panel" style="margin-top:1.8rem">
+        <p class="panel__title">At a glance</p>
+        <dl class="spec-list">
+          <div><dt>App</dt><dd>FixPose — Flutter, Android only</dd></div>
+          <div><dt>Current version</dt><dd>1.1.11 (build 13)</dd></div>
+          <div><dt>Minimum Android</dt><dd>7.0 (API 24)</dd></div>
+          <div><dt>Pose detection</dt><dd>Google ML Kit, 33 landmarks, on-device</dd></div>
+          <div><dt>Distribution</dt><dd>Direct APK install (debug build)</dd></div>
+        </dl>
+      </div>
+
+      <div class="note" style="margin-top:1.6rem">
+        <strong>Not medical advice.</strong> FixPose measures movement angles from a camera to give general workout
+        feedback. It is not a medical device and does not diagnose, treat or rehabilitate injuries — see a qualified
+        professional for that.
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--light section--grid" aria-labelledby="contact-title">
+    <div class="container">
+      <div class="section-head">
+        <p class="kicker">Contact</p>
+        <h2 id="contact-title">Get in touch</h2>
+        <p>Questions, bugs, press — send a message below or use the direct channels. Every submission is read and answered by email, usually within a day.</p>
+      </div>
+
+      <div class="contact-card">
+        <div>
+          <h3>General enquiries</h3>
+          <p>Product questions, feedback and support: use the form below — you'll get a reply straight to your inbox.</p>
+        </div>
+        <div>
+          <h3>Bugs &amp; feature requests</h3>
+          <p>Found a problem or want something new? Our tracker is public — <a href="https://github.com/Renin-hack26/POSEFIX/issues" target="_blank" rel="noopener">open an issue on GitHub</a> and it gets triaged with the app itself.</p>
+        </div>
+        <div>
+          <h3>Press &amp; partnerships</h3>
+          <p>Collaborations, media and licensing — pick <strong>Press &amp; partnerships</strong> in the form below and mention your deadline.</p>
+        </div>
+      </div>
+
+      <form class="contact-form" id="contact-form" novalidate
+            data-fn="https://tobxphhtgytovohuhjvn.supabase.co/functions/v1/contact-messages"
+            data-key="sb_publishable_yGjfrfkio0GRE5f-Pa8nLQ_bnEibv7w">
+        <div class="contact-form__grid">
+          <label for="cf-name"><span>Your name</span>
+            <input id="cf-name" name="name" type="text" maxlength="120" autocomplete="name" required placeholder="Alex Rao">
+          </label>
+          <label for="cf-email"><span>Email — for the reply</span>
+            <input id="cf-email" name="email" type="email" maxlength="254" autocomplete="email" required placeholder="you@example.com">
+          </label>
+          <label for="cf-topic"><span>What's it about?</span>
+            <select id="cf-topic" name="topic">
+              <option>General enquiry</option>
+              <option>Bug report</option>
+              <option>Feature request</option>
+              <option>Press &amp; partnerships</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label class="contact-form__full" for="cf-message"><span>Message</span>
+            <textarea id="cf-message" name="message" rows="6" maxlength="5000" required placeholder="Tell us what's up — include enough detail that we can act on it."></textarea>
+          </label>
+          <div class="cf-honeypot" aria-hidden="true">
+            <label for="cf-website">Website</label>
+            <input id="cf-website" name="website" type="text" tabindex="-1" autocomplete="off">
+          </div>
+        </div>
+        <div class="contact-form__foot">
+          <button class="btn btn--primary" type="submit">Send message</button>
+          <p class="contact-form__status" id="cf-status" role="status" aria-live="polite"></p>
+        </div>
+        <p class="contact-form__note">Stored securely and used only to reply to you — no lists, no spam. Prefer a thread? The GitHub tracker above is fully public.</p>
+      </form>
+    </div>
+  </section>
+
+  <section class="section section--tight section--dark" aria-labelledby="cta-title">
+    <div class="container">
+      <div class="cta-band reveal">
+        <h2 id="cta-title">See what it actually does</h2>
+        <p>Read the feature tour, or go straight to the APK — either way, every claim on this site is one you can check in the app.</p>
+        <a class="btn btn--dark" href="https://github.com/Renin-hack26/POSEFIX/releases/download/v1.1.12/FixPose-latest.apk" download>Download FixPose APK</a>
+        <a class="btn btn--ghost" href="features.html" style="background:rgba(28,42,6,.1);border-color:rgba(28,42,6,.35);color:var(--accent-ink)">Browse features</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer__grid">
+      <div class="footer__about">
+        <a class="brand" href="index.html">
+          <img class="brand__mark" src="assets/img/logo.svg" alt="" width="34" height="34">
+          <span class="brand__name">Fix<span>Pose</span></span>
+        </a>
+        <p>On-device AI pose detection fitness coach and rep counter for Android. Video stays on your phone.</p>
+      </div>
+
+      <nav class="footer__col" aria-label="Footer">
+        <h4>Site</h4>
+        <ul>
+          <li><a data-nav href="index.html">Home</a></li>
+          <li><a data-nav href="features.html">Features</a></li>
+          <li><a data-nav href="download.html">Download</a></li>
+          <li><a data-nav href="about.html">About</a></li>
+        </ul>
+      </nav>
+
+      <div class="footer__col">
+        <h4>Get the app</h4>
+        <ul>
+          <li><a href="https://github.com/Renin-hack26/POSEFIX/releases/download/v1.1.12/FixPose-latest.apk" download>Download APK (v1.1.12)</a></li>
+          <li><a href="download.html#sideload">How to install</a></li>
+          <li><a href="download.html#checksum">SHA-256 checksum</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer__bottom">
+      <p>&copy; <span data-year>2026</span> FixPose. Built with Flutter for Android.</p>
+      <p>Debug build, distributed for direct install and testing. Not affiliated with Google or ML Kit.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/main.js" defer></script>
+</body>
+</html>

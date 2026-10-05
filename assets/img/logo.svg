@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="FixPose logo mark">
+  <defs>
+    <linearGradient id="fixpose-accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#D9FF57"/>
+      <stop offset=".5" stop-color="#A9E92C"/>
+      <stop offset="1" stop-color="#7CC414"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="15" fill="url(#fixpose-accent)"/>
+  <g fill="none" stroke="#1C2A06" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="24" cy="13.6" r="4.3" fill="#1C2A06" stroke="none"/>
+    <path d="M24 20.6v9.6"/>
+    <path d="M14.4 23.6 24 20.4l9.6 3.2"/>
+    <path d="M24 30.2l-5.4 8.4"/>
+    <path d="M24 30.2l5.4 8.4"/>
+  </g>
+</svg>
