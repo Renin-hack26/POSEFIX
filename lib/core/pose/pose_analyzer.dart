@@ -602,6 +602,13 @@ class PoseAnalyzer {
     final int w = image.width;
     final int h = image.height;
     if (w <= 0 || h <= 0) return null;
+    // Only groups that can be byte-mapped to NV21; jpeg/unknown frames
+    // (whatever their byte count) must never reach the detector.
+    if (group != ImageFormatGroup.nv21 &&
+        group != ImageFormatGroup.yuv420 &&
+        group != ImageFormatGroup.bgra8888) {
+      return null;
+    }
 
     Uint8List? nv21;
     if (planes.length == 3) {

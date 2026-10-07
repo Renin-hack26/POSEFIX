@@ -133,16 +133,17 @@ CameraImagePlane _plane(Uint8List bytes, int bytesPerRow, [int? bytesPerPixel]) 
       width: _w,
     );
 
-/// Single-plane frames (BGRA8888 is the controller's preferred format).
+/// Single-plane frames with real driver layouts: BGRA8888 is 4 bytes per
+/// pixel (row stride = width*4), NV21 is packed at 1.5 bytes per pixel.
 CameraImage _singlePlane(ImageFormatGroup group) => _image(
       group,
       planes: [
         _plane(
           Uint8List(
-            group == ImageFormatGroup.nv21 ? _w * _h * 3 ~/ 2 : _w * _h,
+            group == ImageFormatGroup.nv21 ? _w * _h * 3 ~/ 2 : _w * _h * 4,
           ),
-          _w,
-          1,
+          group == ImageFormatGroup.nv21 ? _w : _w * 4,
+          group == ImageFormatGroup.nv21 ? 1 : 4,
         ),
       ],
     );
@@ -223,7 +224,7 @@ void main() {
         image: _singlePlane(ImageFormatGroup.jpeg),
       );
       expect(r, isNull);
-      expect(analyzer.lastError, contains('unsupported format group=jpeg'));
+      expect(analyzer.lastError, contains('input-convert failed: group=jpeg'));
       expect(analyzer.framesSeen, 1, reason: 'the frame was seen, then rejected');
     });
 
@@ -240,7 +241,7 @@ void main() {
       );
       var r = await _frame(analyzer, image: nv21);
       expect(r, isNull);
-      expect(analyzer.lastError, contains('unsupported format group=nv21'));
+      expect(analyzer.lastError, contains('input-convert failed: group=nv21'));
 
       // YUV420_888 needs exactly three planes.
       r = await _frame(
@@ -251,7 +252,24 @@ void main() {
         ),
       );
       expect(r, isNull);
-      expect(analyzer.lastError, contains('unsupported format group=yuv420'));
+      expect(analyzer.lastError, contains('input-convert failed: group=yuv420'));
+    });
+
+    test('an undersized single-plane buffer is rejected, not forwarded',
+        () async {
+      final analyzer = await _started();
+      // Declared BGRA (4 bpp) but only luma-sized bytes: a blind passthrough
+      // would feed ML Kit garbage or trip the native size check with a
+      // PlatformException. Must surface as an intake error instead.
+      final bad = _image(
+        ImageFormatGroup.bgra8888,
+        planes: [_plane(Uint8List(_w * _h), _w * 4, 4)],
+      );
+      final r = await _frame(analyzer, image: bad);
+      expect(r, isNull);
+      expect(
+          analyzer.lastError, contains('input-convert failed: group=bgra8888'));
+      expect(analyzer.framesSeen, 1);
     });
 
     test('malformed YUV420 bytes surface an error instead of crashing',
@@ -260,7 +278,8 @@ void main() {
       for (var attempt = 1; attempt <= 3; attempt++) {
         final r = await _frame(analyzer, image: _yuv420(brokenY: true));
         expect(r, isNull, reason: 'attempt $attempt must not crash');
-        expect(analyzer.lastError, contains('unsupported format group=yuv420'));
+        expect(analyzer.lastError,
+            contains('input-convert failed: group=yuv420'));
         expect(analyzer.framesSeen, attempt,
             reason: 'each attempt was counted');
       }
