@@ -14,7 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// TEMPORARY visual probe — renders suspect widgets/cards at 360dp with the
 /// real system font so layout defects are visible in the golden PNGs.
-/// Run: flutter test --update-goldens test/widget/visual_probe_test.dart
+/// Run: flutter test --update-goldens test/features/home/visual_probe_test.dart
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
