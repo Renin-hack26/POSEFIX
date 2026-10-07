@@ -21,6 +21,12 @@
 
 ## Log
 
+### 2026-10-07 — v1.1.14 (round 3): `input-convert failed` root-caused from the device HUD — three converter holes closed
+- On-device diagnosis via the stage-labeled status strip: `error: input-convert failed: group=? planes=? WxH` + no-person banner → frames reach the analyzer but `_toInputImage` refuses every frame, so ML Kit is never invoked (round-5 fixed the native exception; this fixes the local refusals).
+- Fixes: **(a)** NV21 with stride-padded Y rows + width-packed chroma (buffer ends at `stride*h + w*h/2` — the case wrongly skipped as "rare") now repacks instead of being refused; **(b)** the 3-plane converter indexes U and V with *each plane's own* strides plus bounds (a short/mismatched V no longer RangeErrors the whole frame — luma flows, chroma degrades to neutral 0x80); **(c)** a single plane with exactly NV21-shaped bytes is accepted even when the group label is `unknown`/`jpeg` — byte-count evidence beats the label.
+- Diagnostics: each distinct pipeline error is printed once (`VisionSession: pipeline …`) as a logcat backup to the on-screen strip.
+- Gates: analyze 0, **330/330** (+3 pinning tests for each fix). Build bumped to `1.1.14+17`.
+
 ### 2026-10-07 — v1.1.14 (round 2): InputImageConverter PlatformException fixed — packed-NV21 normalization
 - Field report: round-4 build still couldn't detect a human; HUD showed `PlatformException(InputImageConverterError…)`.
 - Traced through the plugin chain: the camera delivers NV21 (packed **or** stride-padded), YUV_420_888 (3 planes), a YUV420 **group carrying one NV21 plane** (camerax reporting quirk), or BGRA8888 — while Android's ML Kit commons converter accepts only an **exactly sized NV21** byte array and throws `InputImageConverterError` for any other format constant or buffer size. The old `_toInputImage` forwarded `bgra8888` blindly (native else-branch throw), forwarded padded NV21 with a mismatched size (native size-check throw), and dead-ended the yuv420+1-plane case.

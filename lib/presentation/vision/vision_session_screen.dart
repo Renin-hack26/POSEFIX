@@ -199,6 +199,10 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   int _lastPosesFound = 0;
   String? _pipelineError;
 
+  /// Last pipeline error already written to logs — distinct messages are
+  /// printed once (logcat backup for the on-screen strip).
+  String? _lastLoggedError;
+
   /// Last inference time (ms) + rolling pipeline throughput for the HUD.
   int _lastInferMs = 0;
   double _pipelineFps = 0;
@@ -938,6 +942,11 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       _framesSeen = analyzer.framesSeen;
       _lastPosesFound = analyzer.lastPosesFound;
       _pipelineError = analyzer.lastError;
+      if (analyzer.lastError != null &&
+          analyzer.lastError != _lastLoggedError) {
+        _lastLoggedError = analyzer.lastError;
+        debugPrint('VisionSession: pipeline ${analyzer.lastError}');
+      }
       if (result != null) {
         _lastInferMs = result.inferenceMs;
         _handleResult(result);

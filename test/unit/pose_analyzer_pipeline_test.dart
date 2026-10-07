@@ -272,6 +272,63 @@ void main() {
       expect(analyzer.framesSeen, 1);
     });
 
+    test('a mislabeled group with NV21-shaped bytes still reaches the detector',
+        () async {
+      final analyzer = await _started();
+      _detected = [_standing()];
+      // Some stacks report an unexpected format group for what is byte for
+      // byte an NV21 frame — the size evidence must win over the label.
+      final r = await _frame(
+        analyzer,
+        image: _image(
+          ImageFormatGroup.unknown,
+          planes: [_plane(Uint8List(_w * _h * 3 ~/ 2), _w, 1)],
+        ),
+      );
+      expect(r, isNotNull, reason: 'exact NV21 payload must be accepted');
+      expect(r!.posesFound, 1);
+      expect(analyzer.lastError, isNull);
+    });
+
+    test('NV21 with padded Y rows and packed chroma is repacked, not rejected',
+        () async {
+      final analyzer = await _started();
+      _detected = [_standing()];
+      // Y rows stride-padded, chroma rows packed at width: buffer ends at
+      // stride*h + w*h/2 — a real driver layout that must not be refused.
+      final stride = _w + 64;
+      final bytes = Uint8List(stride * _h + _w * _h ~/ 2);
+      final r = await _frame(
+        analyzer,
+        image: _image(
+          ImageFormatGroup.nv21,
+          planes: [_plane(bytes, stride, 1)],
+        ),
+      );
+      expect(r, isNotNull, reason: 'padded layout must be repacked');
+      expect(r!.posesFound, 1);
+      expect(analyzer.lastError, isNull);
+    });
+
+    test('a short V plane degrades to neutral chroma instead of rejecting',
+        () async {
+      final analyzer = await _started();
+      _detected = [_standing()];
+      // Y/U intact, V truncated: indexing V with the U layout (the old
+      // converter) threw RangeError and rejected the whole frame. Luma
+      // carries the structure — chroma falls back to neutral (0x80).
+      final y = _plane(Uint8List(_w * _h), _w, 1);
+      final u = _plane(Uint8List((_w ~/ 2) * (_h ~/ 2)), _w ~/ 2, 1);
+      final vShort = _plane(Uint8List(8), _w ~/ 2, 1);
+      final r = await _frame(
+        analyzer,
+        image: _image(ImageFormatGroup.yuv420, planes: [y, u, vShort]),
+      );
+      expect(r, isNotNull, reason: 'frame must still flow to the detector');
+      expect(r!.posesFound, 1);
+      expect(analyzer.lastError, isNull);
+    });
+
     test('malformed YUV420 bytes surface an error instead of crashing',
         () async {
       final analyzer = await _started();

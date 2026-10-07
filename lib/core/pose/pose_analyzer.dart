@@ -602,9 +602,15 @@ class PoseAnalyzer {
     final int w = image.width;
     final int h = image.height;
     if (w <= 0 || h <= 0) return null;
-    // Only groups that can be byte-mapped to NV21; jpeg/unknown frames
-    // (whatever their byte count) must never reach the detector.
-    if (group != ImageFormatGroup.nv21 &&
+    // Only layouts that can be byte-mapped to NV21 may reach the detector.
+    // A single plane that is exactly NV21-shaped is accepted even when the
+    // driver mislabels the format group (unknown/jpeg constants seen on
+    // some camera stacks) — the byte count is stronger evidence than the
+    // label. Everything else outside the known groups is refused loudly.
+    final bool nv21ShapedSinglePlane =
+        planes.length == 1 && planes.first.bytes.length == w * h * 3 ~/ 2;
+    if (!nv21ShapedSinglePlane &&
+        group != ImageFormatGroup.nv21 &&
         group != ImageFormatGroup.yuv420 &&
         group != ImageFormatGroup.bgra8888) {
       return null;
@@ -653,6 +659,25 @@ class PoseAnalyzer {
       final chromaBase = stride * h;
       for (var row = 0; row < h ~/ 2; row++) {
         final p = chromaBase + row * stride;
+        out.setRange(o, o + w, bytes, p);
+        o += w;
+      }
+      return out;
+    }
+    // Y rows padded to `stride` but chroma rows packed at width — a real
+    // driver layout (the buffer ends at stride*h + w*h/2, short of the
+    // fully padded size above).
+    if (stride > w && bytes.length >= stride * h + w * h ~/ 2) {
+      final out = Uint8List(expected);
+      var o = 0;
+      for (var row = 0; row < h; row++) {
+        final p = row * stride;
+        out.setRange(o, o + w, bytes, p);
+        o += w;
+      }
+      final chromaBase = stride * h;
+      for (var row = 0; row < h ~/ 2; row++) {
+        final p = chromaBase + row * w;
         out.setRange(o, o + w, bytes, p);
         o += w;
       }
@@ -716,8 +741,13 @@ class PoseAnalyzer {
       final width = image.width;
       final height = image.height;
       final yRowStride = yPlane.bytesPerRow;
-      final uvRowStride = uPlane.bytesPerRow;
-      final uvPixelStride = uPlane.bytesPerPixel ?? 1;
+      // Chroma planes can differ (strides, buffer sizes, pixel stride) —
+      // index each with ITS OWN layout; out-of-range reads degrade to
+      // neutral chroma instead of rejecting the whole frame.
+      final uvRowStrideU = uPlane.bytesPerRow;
+      final uvPixelStrideU = uPlane.bytesPerPixel ?? 1;
+      final uvRowStrideV = vPlane.bytesPerRow;
+      final uvPixelStrideV = vPlane.bytesPerPixel ?? 1;
 
       final out = Uint8List(width * height * 3 ~/ 2);
       // Y: copy row by row (handles rowStride padding).
@@ -730,9 +760,10 @@ class PoseAnalyzer {
       // VU interleaved, subsampled 2x2.
       for (var row = 0; row < height ~/ 2; row++) {
         for (var col = 0; col < width ~/ 2; col++) {
-          final uvIndex = row * uvRowStride + col * uvPixelStride;
-          out[outPos++] = vBytes[uvIndex];
-          out[outPos++] = uBytes[uvIndex];
+          final vIdx = row * uvRowStrideV + col * uvPixelStrideV;
+          final uIdx = row * uvRowStrideU + col * uvPixelStrideU;
+          out[outPos++] = vIdx < vBytes.length ? vBytes[vIdx] : 0x80;
+          out[outPos++] = uIdx < uBytes.length ? uBytes[uIdx] : 0x80;
         }
       }
       return out;
