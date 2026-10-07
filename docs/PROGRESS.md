@@ -21,6 +21,13 @@
 
 ## Log
 
+### 2026-10-07 — v1.1.14 (round 2): InputImageConverter PlatformException fixed — packed-NV21 normalization
+- Field report: round-4 build still couldn't detect a human; HUD showed `PlatformException(InputImageConverterError…)`.
+- Traced through the plugin chain: the camera delivers NV21 (packed **or** stride-padded), YUV_420_888 (3 planes), a YUV420 **group carrying one NV21 plane** (camerax reporting quirk), or BGRA8888 — while Android's ML Kit commons converter accepts only an **exactly sized NV21** byte array and throws `InputImageConverterError` for any other format constant or buffer size. The old `_toInputImage` forwarded `bgra8888` blindly (native else-branch throw), forwarded padded NV21 with a mismatched size (native size-check throw), and dead-ended the yuv420+1-plane case.
+- Fix: `_toInputImage` normalizes **every** delivery variant to packed `w*h*3/2` NV21 — `_packedNv21` (identity / row repack / prefix slice), `_bgraToNv21` (BT.601 studio-range conversion, V-then-U layout), existing `_yuv420ToNv21` for 3-plane frames; `bytesPerRow: w` always matches the bytes actually sent.
+- Diagnosability: failures now stage-label the HUD — `input-convert failed: group=… planes=… WxH` (mapping) vs `pose-process: …` (native ML Kit call), so any residual issue is readable instead of a bare converter exception.
+- Gates: analyze 0, **303/303**. In parallel: blind-context test-writing agent and codebase-reorganization agent running in isolated worktrees (`agent/tests`, `agent/reorg`) — integration in a later entry.
+
 ### 2026-10-07 — v1.1.14: camera detection backend reverted to v1.1.10 (ML Kit), design untouched
 - **Field report (user)**: round-3 build "unable to detect human by camera, wires not properly figured out" — decision: the camera backend (detecting + monitoring) reverts to v1.1.10's model and system; the current design stays.
 - **`pose_analyzer.dart` restored byte-for-byte to f70c5da (v1.1.10)**: plain ML Kit pipeline — person lock, framing, visibility, EMA smoothing and the original false-count guardrails, **without** the later frame-quality gate, Batch 5 trust gate, MoveNet second-opinion verifier and complete-body structure rebuild that could refuse to draw or hold frames on this device.

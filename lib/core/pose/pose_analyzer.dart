@@ -198,7 +198,8 @@ class PoseAnalyzer {
         rotation,
       );
       if (input == null) {
-        lastError = 'unsupported format group=${image.format.group.name}';
+        lastError =
+            'input-convert failed: group=${image.format.group.name} planes=${image.planes.length} ${image.width}x${image.height}';
         return null;
       }
       final sw = Stopwatch()..start();
@@ -224,7 +225,7 @@ class PoseAnalyzer {
       if (!_controller.isClosed) _controller.add(result);
       return result;
     } catch (e) {
-      lastError = '$e';
+      lastError = 'pose-process: $e';
       return null;
     } finally {
       _busy = false;
@@ -577,54 +578,120 @@ class PoseAnalyzer {
 
   // -- camera → ML Kit -------------------------------------------------------
 
-  /// Builds an [InputImage] from a camera frame. Returns null when the
-  /// format cannot be mapped (caller records [lastError] instead of
-  /// silently feeding garbage bytes that always yield "no person").
+  /// Builds an [InputImage] from a camera frame as PACKED NV21 — the only
+  /// byte format Android ML Kit's `InputImageConverter` accepts (it rejects
+  /// BGRA with a PlatformException and requires an exactly sized NV21
+  /// buffer). Every delivery variant the camera plugin can produce is
+  /// normalized here instead of forwarded blindly:
+  ///
+  ///  * `nv21` single plane (camera_android_camerax `getNv21Buffer`, packed
+  ///    or row-padded) → passthrough / row repack;
+  ///  * `yuv420` group carrying ONE plane whose data is NV21 (camerax keeps
+  ///    reporting YUV_420_888 for NV21 output) → same normalization rather
+  ///    than the old dead end (`planes != 3`);
+  ///  * genuine 3-plane YUV420_888 → chroma-correct conversion;
+  ///  * `bgra8888` (4 bpp frames; native constant is unsupported) → full
+  ///    BGRA→NV21 conversion.
+  ///
+  /// Returns null only when the frame truly cannot be mapped; the caller
+  /// records [lastError] instead of feeding garbage that yields "no person".
   InputImage? _toInputImage(
       CameraImage image, Size size, InputImageRotation rotation) {
-    // Preferred path: controller requests NV21 (single plane) or BGRA8888.
-    // Fallback: genuine YUV420_888 (3 planes) converted to NV21.
     final group = image.format.group;
-    if (group == ImageFormatGroup.bgra8888) {
-      if (image.planes.length != 1) return null;
-      return InputImage.fromBytes(
-        bytes: image.planes.first.bytes,
-        metadata: InputImageMetadata(
-          size: size,
-          rotation: rotation,
-          format: InputImageFormat.bgra8888,
-          bytesPerRow: image.planes.first.bytesPerRow,
-        ),
-      );
+    final planes = image.planes;
+    final int w = image.width;
+    final int h = image.height;
+    if (w <= 0 || h <= 0) return null;
+
+    Uint8List? nv21;
+    if (planes.length == 3) {
+      nv21 = _yuv420ToNv21(image);
+    } else if (planes.length == 1) {
+      final plane = planes.first;
+      if (group == ImageFormatGroup.bgra8888) {
+        nv21 = _bgraToNv21(plane.bytes, plane.bytesPerRow, w, h);
+      } else {
+        nv21 = _packedNv21(plane.bytes, plane.bytesPerRow, w, h);
+      }
     }
-    if (group == ImageFormatGroup.nv21) {
-      if (image.planes.length != 1) return null;
-      return InputImage.fromBytes(
-        bytes: image.planes.first.bytes,
-        metadata: InputImageMetadata(
-          size: size,
-          rotation: rotation,
-          format: InputImageFormat.nv21,
-          bytesPerRow: image.planes.first.bytesPerRow,
-        ),
-      );
+    if (nv21 == null) return null;
+    return InputImage.fromBytes(
+      bytes: nv21,
+      metadata: InputImageMetadata(
+        size: size,
+        rotation: rotation,
+        format: InputImageFormat.nv21,
+        bytesPerRow: w,
+      ),
+    );
+  }
+
+  /// Single-plane NV21 → exactly packed `w*h*3/2` bytes: identity when the
+  /// buffer is already packed, a row-by-row repack when the driver reports
+  /// stride padding, a prefix slice when only trailing slack exists.
+  static Uint8List? _packedNv21(Uint8List bytes, int stride, int w, int h) {
+    final int expected = w * h * 3 ~/ 2;
+    if (bytes.length == expected) return bytes;
+    if (bytes.length < expected) return null;
+    if (stride == w) return Uint8List.sublistView(bytes, 0, expected);
+    // Padded NV21: Y = h rows and VU = h/2 rows, both `stride` wide.
+    if (stride > w && bytes.length >= stride * h * 3 ~/ 2) {
+      final out = Uint8List(expected);
+      var o = 0;
+      for (var row = 0; row < h; row++) {
+        final p = row * stride;
+        out.setRange(o, o + w, bytes, p);
+        o += w;
+      }
+      final chromaBase = stride * h;
+      for (var row = 0; row < h ~/ 2; row++) {
+        final p = chromaBase + row * stride;
+        out.setRange(o, o + w, bytes, p);
+        o += w;
+      }
+      return out;
     }
-    if (group == ImageFormatGroup.yuv420) {
-      if (image.planes.length != 3) return null;
-      final nv21 = _yuv420ToNv21(image);
-      if (nv21 == null) return null;
-      return InputImage.fromBytes(
-        bytes: nv21,
-        metadata: InputImageMetadata(
-          size: size,
-          rotation: rotation,
-          format: InputImageFormat.nv21,
-          bytesPerRow: image.planes.first.bytesPerRow,
-        ),
-      );
-    }
-    // Unknown group (e.g. jpeg on some devices) — do not guess.
     return null;
+  }
+
+  /// BGRA8888 (4 bpp, row-padded) → packed NV21 with BT.601 studio-range
+  /// luma/chroma, chroma averaged over each 2x2 block. NV21 layout writes
+  /// V first, then U, per interleaved pair.
+  static Uint8List? _bgraToNv21(Uint8List src, int stride, int w, int h) {
+    if (w <= 0 || h <= 0 || w % 2 != 0 || h % 2 != 0) return null;
+    if (stride < w * 4 || src.length < stride * h) return null;
+    final out = Uint8List(w * h * 3 ~/ 2);
+    var o = 0;
+    for (var row = 0; row < h; row++) {
+      var p = row * stride;
+      for (var col = 0; col < w; col++) {
+        final b = src[p];
+        final g = src[p + 1];
+        final r = src[p + 2];
+        out[o++] = ((66 * r + 129 * g + 25 * b + 128) >> 8) + 16;
+        p += 4;
+      }
+    }
+    for (var row = 0; row < h ~/ 2; row++) {
+      for (var col = 0; col < w ~/ 2; col++) {
+        var sr = 0, sg = 0, sb = 0;
+        for (var dy = 0; dy < 2; dy++) {
+          final rowStart = (row * 2 + dy) * stride + col * 8;
+          for (var dx = 0; dx < 2; dx++) {
+            final p = rowStart + dx * 4;
+            sb += src[p];
+            sg += src[p + 1];
+            sr += src[p + 2];
+          }
+        }
+        sr = (sr / 4).round();
+        sg = (sg / 4).round();
+        sb = (sb / 4).round();
+        out[o++] = ((112 * sr - 94 * sg - 18 * sb + 128) >> 8) + 128; // V
+        out[o++] = ((-38 * sr - 74 * sg + 112 * sb + 128) >> 8) + 128; // U
+      }
+    }
+    return out;
   }
 
   /// YUV420_888 (Y + U + V, arbitrary row/pixel strides) → NV21 (Y + VU).
