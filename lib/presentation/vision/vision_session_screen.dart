@@ -17,7 +17,6 @@ import '../../core/pose/body_structure.dart';
 import '../../core/pose/brain_engine.dart';
 import '../../core/pose/exercise_definition.dart';
 import '../../core/pose/pose_analyzer.dart';
-import '../../core/pose/pose_landmarker_source.dart';
 import '../../core/pose/round_tracker.dart';
 import '../../core/pose/trust_gate.dart';
 import '../../core/theme/app_theme.dart';
@@ -83,11 +82,6 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   /// True while the frame drain loop is consuming images (one feed in
   /// flight at a time).
   bool _inFlight = false;
-
-  /// Newest-frame slot (native-camera style): every camera image lands
-  /// here, superseding whatever was waiting — the drain loop always
-  /// processes the freshest frame and stale ones are never touched.
-  CameraImage? _pendingFrame;
   bool _disposed = false;
 
   /// Boot-step label for the loading overlay (WS2.8), null once live.
@@ -136,21 +130,12 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   /// Timed-block completion fired (hold target reached once per block).
   bool _holdDone = false;
 
-  // --- Batch 5 pose stack ------------------------------------------------------
-  /// MediaPipe PoseLandmarker (heavy) source; ML Kit stays the fallback.
-  final PoseLandmarkerSource _landmarkerSource = PoseLandmarkerSource();
+  // --- Pose stack (v1.1.10 system restored, v1.1.14) -------------------------
+  /// ML Kit pose detection is the single camera backend — the MediaPipe
+  /// landmarker chain is no longer initialized or consulted.
 
-  /// Consecutive landmarker frames yielding nothing. The heavy model
-  /// legitimately drops frames while busy (successes interleave and reset
-  /// this counter), but a long dead run means the native path is broken on
-  /// this device — latch to ML Kit rather than stare at a dead camera.
-  int _landmarkerFails = 0;
-  static const int _landmarkerFailLimit = 30;
-
-  /// True once the landmarker backend is up for this session.
-  bool _useLandmarker = false;
-
-  /// Overlay rotation: the landmarker pre-rotates to upright natively.
+  /// Overlay rotation: image space → preview space (ML Kit frames keep the
+  /// sensor rotation; the landmarker path pre-rotated natively).
   InputImageRotation _overlayRotation =
       InputImageRotation.rotation270deg;
 
@@ -239,13 +224,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     repaint: _overlayTick,
   );
 
-  /// Active backend tag — the landmarker plus its native delegate
-  /// (`landmarker·gpu` / `landmarker·cpu`), or the ML Kit fallback.
-  String get _backendTag {
-    if (!_useLandmarker) return 'mlkit';
-    final d = _landmarkerSource.delegate;
-    return d == null ? 'landmarker' : 'landmarker·$d';
-  }
+  /// Active backend tag — the restored v1.1.10 detection system runs the
+  /// ML Kit pose model on-device.
+  String get _backendTag => 'mlkit';
 
   /// Publishes current per-frame fields to the HUD listeners.
   void _publishHud() {
@@ -491,17 +472,10 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       }
     }
 
-    // Batch 5 primary backend: PoseLandmarker (heavy). Any failure here —
-    // missing model, native load error — falls back to ML Kit (step 4
-    // already warmed it), so the camera never dies on the new stack.
+    // v1.1.10 camera backend restored: ML Kit pose detection (warmed with
+    // the analyzer) is the only backend — no landmarker init.
     _setBootStep(5);
-    try {
-      _useLandmarker = await _landmarkerSource.init();
-    } catch (_) {
-      _useLandmarker = false;
-    }
-    debugPrint(
-        'VisionSession: pose backend = ${_useLandmarker ? 'landmarker-heavy' : 'mlkit-fallback'}');
+    debugPrint('VisionSession: pose backend = mlkit (v1.1.10 system)');
 
     _setBootStep(6);
     await _initCamera();
@@ -929,85 +903,28 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     // Drop frames during an exercise swap — the outgoing analyzer is
     // being disposed and its one stale result must never land.
     if (_switchingBlocks) return;
-    if (_analyzer == null) return;
-    // Newest-frame-wins (native-camera style): the slot always holds the
-    // freshest frame — anything captured while the pipeline is busy is
-    // superseded on arrival, so latency never queues behind old frames.
-    _pendingFrame = image;
+    // v1.1.10 intake: one frame in flight; new frames arriving mid-feed
+    // are dropped (the pipeline never queues stale work).
     if (_inFlight) return;
+    final PoseAnalyzer? analyzer = _analyzer;
+    if (analyzer == null) return;
     _inFlight = true;
-    unawaited(_drainFrames());
+    unawaited(_feed(analyzer, image));
   }
-
-  /// Consumes the slot until it runs dry — one feed in flight at a time,
-  /// each iteration picking up whatever is newest when the previous feed
-  /// finished (stale frames were already overwritten while it ran).
-  Future<void> _drainFrames() async {
-    try {
-      while (!_disposed && !_paused && !_switchingBlocks) {
-        final analyzer = _analyzer;
-        final image = _pendingFrame;
-        if (analyzer == null || image == null) break;
-        _pendingFrame = null;
-        await _feed(analyzer, image);
-      }
-    } finally {
-      _pendingFrame = null;
-      _inFlight = false;
-    }
-  }
-
-  int get _rotationDegrees => switch (_rotation) {
-        InputImageRotation.rotation0deg => 0,
-        InputImageRotation.rotation90deg => 90,
-        InputImageRotation.rotation180deg => 180,
-        InputImageRotation.rotation270deg => 270,
-      };
 
   Future<void> _feed(PoseAnalyzer analyzer, CameraImage image) async {
     try {
       _imageWidth = image.width.toDouble();
       _imageHeight = image.height.toDouble();
-      PoseFrameResult? result;
-      if (_useLandmarker) {
-        // Batch 5 primary path: heavy landmarker natively, ML Kit types
-        // downstream (adapter), same pipeline either way.
-        final frame =
-            await _landmarkerSource.detect(image, _rotationDegrees);
-        if (frame == null) {
-          // Dropped/busy frames happen under load and recover on the next
-          // success — but a long dead run means the native path is broken
-          // (wrong format, bad rotation, dead model), so latch to ML Kit
-          // for the rest of the session instead of a frozen camera.
-          _landmarkerFails++;
-          if (_landmarkerFails >= _landmarkerFailLimit) {
-            _useLandmarker = false;
-            _landmarkerFails = 0;
-            debugPrint(
-                'VisionSession: landmarker dead for $_landmarkerFailLimit frames — ML Kit fallback');
-            _pipelineError = 'Landmarker unavailable — using ML Kit';
-            _publishHud();
-          }
-          return;
-        }
-        _landmarkerFails = 0;
-        _imageWidth = frame.frameW;
-        _imageHeight = frame.frameH;
-        _overlayRotation = InputImageRotation.rotation0deg;
-        result = await analyzer.processLandmarkerFrame(
-          frame,
-          inferenceMs: frame.inferenceMs.round(),
-          nowMs: DateTime.now().millisecondsSinceEpoch,
-        );
-      } else {
-        _overlayRotation = _rotation;
-        result = await analyzer.processCameraImage(
-          image,
-          imageWidth: image.width.toDouble(),
-          imageHeight: image.height.toDouble(),
-          rotation: _rotation,
-        );
-      }
+      // ML Kit keeps the sensor rotation (v1.1.10 behavior); only the
+      // landmarker path pre-rotated natively, and it is gone.
+      _overlayRotation = _rotation;
+      final PoseFrameResult? result = await analyzer.processCameraImage(
+        image,
+        imageWidth: image.width.toDouble(),
+        imageHeight: image.height.toDouble(),
+        rotation: _rotation,
+      );
       // Analyzer swapped mid-flight (chain Next) — the stale result
       // belongs to the previous exercise; drop it, don't apply.
       if (!identical(analyzer, _analyzer)) return;
@@ -1021,8 +938,8 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       _framesSeen = analyzer.framesSeen;
       _lastPosesFound = analyzer.lastPosesFound;
       _pipelineError = analyzer.lastError;
-      _lastInferMs = analyzer.lastInferenceMs;
       if (result != null) {
+        _lastInferMs = result.inferenceMs;
         _handleResult(result);
         // Prefer the EMA-smoothed pose for the overlay — stable joints and
         // lines instead of raw per-frame jitter.
@@ -1034,6 +951,8 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       }
     } catch (_) {
       // A bad frame must never break the session.
+    } finally {
+      _inFlight = false;
     }
   }
 
@@ -1139,13 +1058,11 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       _state = brain.currentState;
       _coachCue = cue;
       _cueWarn = cueWarn;
-      // Batch 5 trust surface: a vetoed rep or a held frame explains
-      // itself in the trust banner instead of freezing silently.
+      // Batch 5 trust surface: a vetoed rep explains itself in the trust
+      // banner instead of freezing silently. Frame-level trust is absent
+      // on the v1.1.10 analyzer path (the brain runs trust-blind).
       if (brain.repHoldReason != HoldReason.none) {
         _trustHoldLabel = 'Rep held — ${brain.repHoldReason.label}';
-      } else if (result.trust?.held == true) {
-        _trustHoldLabel =
-            'Counting paused — ${result.trust!.reason.label}';
       } else {
         _trustHoldLabel = null;
       }
@@ -1384,7 +1301,6 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   @override
   void dispose() {
     _disposed = true;
-    _pendingFrame = null;
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     _ticker = null;
@@ -2383,7 +2299,7 @@ class _HudSnapshot {
   final String? error;
   final CameraLensDirection lens;
 
-  /// Active pose backend (`landmarker` heavy or `mlkit` fallback).
+  /// Active pose backend — the restored v1.1.10 ML Kit detection system.
   final String backend;
 
   /// Last inference time (ms) and rolling pipeline throughput (fps).

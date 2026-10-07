@@ -148,18 +148,11 @@ void main() {
           reason: 'angle vertices without a tracked landmark: $missing');
     });
 
-    test('smoothing windows are valid; mapping honors them', () {      for (final def in _allDefs()) {
+    test('smoothing windows are valid', () {
+      for (final def in _allDefs()) {
         expect(def.smoothing.window, greaterThanOrEqualTo(1),
             reason: '${def.id}: smoothing window');
       }
-      // window: 5 ≈ the historic 0.3 base; window: 3 responds faster;
-      // disabled definitions keep the shared constant.
-      expect(smoothingAlphaFor(const SmoothingConfig(enabled: true, window: 5)),
-          closeTo(1 / 3, 1e-9));
-      expect(smoothingAlphaFor(const SmoothingConfig(enabled: true, window: 3)),
-          0.5);
-      expect(
-          smoothingAlphaFor(const SmoothingConfig()), 0.3);
     });
   });
 

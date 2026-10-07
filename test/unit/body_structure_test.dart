@@ -4,14 +4,9 @@
 library;
 
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:fixpose/core/pose/body_structure.dart';
-import 'package:fixpose/core/pose/exercise_catalog.dart';
 import 'package:fixpose/core/pose/exercise_definition.dart';
-import 'package:fixpose/core/pose/movenet_verifier.dart';
-import 'package:fixpose/core/pose/pose_analyzer.dart';
-import 'package:fixpose/core/pose/pose_landmarker_source.dart';
 import 'package:fixpose/core/pose/pose_math.dart' as pm;
 import 'package:fixpose/core/pose/trust_gate.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -285,54 +280,6 @@ void main() {
           reason: 'sane full-body frame must stay plausible');
       // Defaults untouched: no named args ⇒ reference behavior.
       expect(geometryScore(imageXY, world), greaterThan(0.85));
-    });
-  });
-
-  group('analyzer wiring', () {
-    setUpAll(registerExerciseCatalog);
-
-    LandmarkerFrame33 frame({double vis = 0.9}) {
-      final pts = _standingPts();
-      return LandmarkerFrame33(
-        imageXY: [for (var i = 0; i < 33; i++) pts[i]!],
-        z: List<double>.filled(33, 0.0),
-        vis: List<double>.filled(33, vis),
-        world: [
-          for (var i = 0; i < 33; i++) [pts[i]![0], pts[i]![1], 0.0],
-        ],
-        thumb: MoveNetThumb(
-          rgb: Uint8List(256 * 256 * 3),
-          srcWidth: 720,
-          srcHeight: 1280,
-          size: 256,
-          padLeft: 56.0,
-          padTop: 0.0,
-          scaledW: 144.0,
-          scaledH: 256.0,
-        ),
-        inferenceMs: 25.0,
-        frameW: 720.0,
-        frameH: 1280.0,
-      );
-    }
-
-    test('every analyzed frame carries a complete structure', () async {
-      final def = ExerciseRegistry.instance.resolve('squat')!;
-      final analyzer = PoseAnalyzer(def);
-      PoseFrameResult? last;
-      for (var i = 0; i < 3; i++) {
-        last = await analyzer.processLandmarkerFrame(
-          frame(),
-          inferenceMs: 25,
-          nowMs: 1000 + i * 100,
-        );
-      }
-      expect(last, isNotNull);
-      final s = analyzer.lastStructure;
-      expect(s, isNotNull, reason: 'analyzer must build the body structure');
-      expect(s!.segments.length, 41);
-      expect(s.coverage(BodyGroup.torso), 1.0);
-      expect(s.posture().coreUsable, isTrue);
     });
   });
 }

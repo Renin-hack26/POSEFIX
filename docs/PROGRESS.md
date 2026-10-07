@@ -21,6 +21,14 @@
 
 ## Log
 
+### 2026-10-07 — v1.1.14: camera detection backend reverted to v1.1.10 (ML Kit), design untouched
+- **Field report (user)**: round-3 build "unable to detect human by camera, wires not properly figured out" — decision: the camera backend (detecting + monitoring) reverts to v1.1.10's model and system; the current design stays.
+- **`pose_analyzer.dart` restored byte-for-byte to f70c5da (v1.1.10)**: plain ML Kit pipeline — person lock, framing, visibility, EMA smoothing and the original false-count guardrails, **without** the later frame-quality gate, Batch 5 trust gate, MoveNet second-opinion verifier and complete-body structure rebuild that could refuse to draw or hold frames on this device.
+- **Detection path in the session screen**: the MediaPipe landmarker is no longer initialized or consulted (init call, landmarker branch, fail-counter, `_backendTag` → honest `mlkit`); frame intake returned to the v1.1.10 single-in-flight pattern (drop frames while busy — no pending slot/drain loop). Boot sequence, HUD layout, overlay painters, rounds/rest, calibration, cue vocabulary and all screens unchanged.
+- **Rep-count engine (`brain_engine.dart`) kept at current**: it accepts `frameTrust: null` as documented trust-blind mode ("the engine behaves exactly as before"), so WS9 count-quality fixes, rep-rejection UX, hold clock and rounds keep working while the analyzer feeds it v1.1.10-style frames. Frame-level trust is simply absent on this path (trust banner shows rep-level holds only).
+- **Tests**: deleted `pose_landmarker_path_test.dart` (tests the removed analyzer landmarker API — 6 cases); trimmed round-3 analyzer-wiring case from `body_structure_test.dart` and the `smoothingAlphaFor` mapping asserts from `ws8_engine_rules_test.dart` (function lived in the reverted analyzer). Suite **303/303**, analyze **0**.
+- pubspec `1.1.13+14 → 1.1.14+15` (settings string in sync). Dead-but-kept: `pose_landmarker_source.dart`, `PoseLandmarkerBridge.kt`, both model assets (no active caller; cleanup candidate).
+
 ### 2026-10-07 — v1.1.13: round-3 release — site repointed, honest build label refreshed
 - **Clean new release (user's choice over swapping bytes on v1.1.12)**: pubspec `1.1.12+13 → 1.1.13+14` (settings-screen version string in sync), so phones update in place over build 13. Gates re-run after the bump: analyze 0 · suite **309/309**.
 - **Release `v1.1.13`**: new `FixPose-latest.apk` — **210 111 213 bytes**, SHA-256 `86b4ec70f21c445bce8c2d5ed3838efb6169c4dc68f7f1848cadc026c88787ce` (round-3 code: complete-body structure, newest-frame-wins, GPU delegate). The v1.1.12 release and its `FixPose-latest.apk` / `FixPose-round3.apk` assets were left untouched — old links keep working.

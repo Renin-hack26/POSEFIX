@@ -13,13 +13,6 @@
 /// - Per-exercise framing zones: required landmarks clipped by a frame edge
 ///   (or a tiny subject, or a front view on push-ups which need a wide
 ///   side-on view) produce a spoken camera-adjustment cue.
-/// - Any-angle robustness (WS2 6.3, thresholds-only pass — no model change):
-///   joint angles are computed from landmark *deltas*, so they are invariant
-///   to translation, scale and in-plane rotation of the subject; normalized
-///   landmarks are divided by the frame dimensions; confidences are clamped
-///   to 0..1; and frames whose mean required-landmark confidence falls below
-///   [FormRules.minFrameQuality] are dropped (see the frame-quality gate)
-///   instead of feeding the FSM low-fidelity angles from oblique views.
 ///
 /// Accuracy/speed are internal engineering targets — nothing here renders
 /// latency or confidence numbers into UI copy.
@@ -32,15 +25,10 @@ import 'dart:ui' show Size;
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
-import '../audio/cue_vocabulary.dart';
 import '../constants/form_rules.dart';
-import 'body_structure.dart';
 import 'brain_engine.dart';
 import 'exercise_definition.dart';
-import 'movenet_verifier.dart';
-import 'pose_landmarker_source.dart';
 import 'pose_math.dart' as pm;
-import 'trust_gate.dart';
 
 /// Why rep counting is currently paused.
 enum LockReason {
@@ -74,18 +62,16 @@ enum FramingCue {
   turnSideways,
 }
 
-/// Spoken copy per framing cue (single source: [CueVocabulary]).
-String framingCueLine(FramingCue cue) =>
-    CueVocabulary.lineForFraming(cue)?.display ?? '';
-
-/// EMA base alpha honoring the exercise's [SmoothingConfig] (8.1): the
-/// classic `alpha = 2 / (window + 1)` mapping, so a `window: 3` definition
-/// responds faster than the `window: 5` default. Definitions without
-/// smoothing keep the shared [FormRules.emaSmoothingAlpha] behavior.
-double smoothingAlphaFor(SmoothingConfig config) {
-  if (!config.enabled) return FormRules.emaSmoothingAlpha;
-  return (2.0 / (config.window + 1)).clamp(0.05, 0.9);
-}
+/// Spoken copy per framing cue.
+String framingCueLine(FramingCue cue) => switch (cue) {
+      FramingCue.ok => '',
+      FramingCue.stepBack => 'Step back so I can see your full body.',
+      FramingCue.stepCloser => 'Move a little closer to the camera.',
+      FramingCue.moveLeft => 'Move left to stay in frame.',
+      FramingCue.moveRight => 'Move right to stay in frame.',
+      FramingCue.turnSideways =>
+        'Turn sideways to the camera for this exercise.',
+    };
 
 /// One analyzed frame.
 class PoseFrameResult {
@@ -99,7 +85,6 @@ class PoseFrameResult {
     required this.visibleCount,
     required this.requiredCount,
     this.brain,
-    this.trust,
   });
 
   final int timestampMs;
@@ -111,10 +96,6 @@ class PoseFrameResult {
   final int visibleCount;
   final int requiredCount;
   final BrainResult? brain;
-
-  /// Batch 5 frame trust (null when no pose was found or trust is blind).
-  /// The session screen surfaces [TrustBreakdown.reason] while held.
-  final TrustBreakdown? trust;
 }
 
 class PoseAnalyzer {
@@ -149,12 +130,6 @@ class PoseAnalyzer {
   Pose? _smoothedPose;
   Pose? get smoothedPose => _smoothedPose;
 
-  /// Complete-body structure of the latest frame (all 33 joints, raw
-  /// coordinates + confidence) — the canonical bone model rebuilt every
-  /// analyzed frame. Null while no single pose is tracked.
-  BodyStructure? _lastStructure;
-  BodyStructure? get lastStructure => _lastStructure;
-
   /// Debug telemetry — read by the session screen to show pipeline health.
   /// These never affect counting; they only explain "no person" states.
   int framesSeen = 0;
@@ -164,10 +139,6 @@ class PoseAnalyzer {
 
   final Map<int, pm.EmaFilter> _smoothX = {};
   final Map<int, pm.EmaFilter> _smoothY = {};
-
-  /// Consecutive frames below [FormRules.minFrameQuality] (WS2 6.3) — the
-  /// second one in a row is dropped as occluded instead of reaching the FSM.
-  int _weakQualityFrames = 0;
 
   /// Per-landmark EMA filters for the overlay copy (separate from the FSM
   /// smoothing so overlay responsiveness can be tuned independently).
@@ -179,27 +150,6 @@ class PoseAnalyzer {
   /// Video-playback guard state: a played demo video repeats reps
   /// near-perfectly. Real humans vary — human jitter clears the suspicion.
   bool _videoSuspected = false;
-
-  /// Batch 5 second opinion (throttled — agreement is a slow signal).
-  final MoveNetVerifier _verifier = MoveNetVerifier();
-  MoveNetResult? _lastMoveNet;
-  int _lastVerifyMs = 0;
-  static const int _verifyIntervalMs = 250;
-
-  /// True while a background MoveNet pass is running (single in-flight —
-  /// the TFLite interpreter is not reentrant).
-  bool _verifying = false;
-
-  /// Bumped on [reset] so a stale in-flight pass can never land its
-  /// result on a fresh exercise.
-  int _verifyGen = 0;
-
-  /// World landmarks of the frame being analyzed (landmarker source only;
-  /// null on the ML Kit path, which has no metric world space).
-  List<List<double>>? _pendingWorld;
-
-  /// Primary-angle history for the temporal trust signal.
-  final List<double> _trustAngleHistory = [];
 
   /// Rep-duration samples (seconds) for regularity analysis.
   final List<double> _repDurations = [];
@@ -222,9 +172,6 @@ class PoseAnalyzer {
         mode: PoseDetectionMode.stream,
       ),
     );
-    // Batch 5 second opinion — best-effort: without it the trust gate runs
-    // single-source (weight redistribution, never inflated agreement).
-    await _verifier.load();
   }
 
   /// Feeds one camera frame through the pipeline. Returns null for dropped
@@ -298,7 +245,6 @@ class PoseAnalyzer {
       int visible = 0,
       FramingCue framing = FramingCue.ok,
       BrainResult? brain,
-      TrustBreakdown? trust,
     }) =>
         PoseFrameResult(
           timestampMs: nowMs,
@@ -310,17 +256,14 @@ class PoseAnalyzer {
           visibleCount: visible,
           requiredCount: _requiredCount,
           brain: brain,
-          trust: trust,
         );
 
     if (poses.isEmpty) {
       _latestPose = null;
       _smoothedPose = null;
-      _lastStructure = null;
       _ovX.clear();
       _ovY.clear();
       _stableFrames = 0;
-      _weakQualityFrames = 0;
       _torsoEma = null;
       _videoSuspected = false;
       _resetRhythm();
@@ -334,10 +277,8 @@ class PoseAnalyzer {
       // Drop the overlay too — the subject changed, don't ghost the old one.
       _latestPose = null;
       _smoothedPose = null;
-      _lastStructure = null;
       _ovX.clear();
       _ovY.clear();
-      _weakQualityFrames = 0;
       return base(
         reason: LockReason.multiPerson,
         locked: false,
@@ -348,19 +289,6 @@ class PoseAnalyzer {
     final pose = poses.first;
     _latestPose = pose; // Store for debug overlay
     _smoothedPose = _smoothOverlay(pose); // Stable coords for the overlay
-    // Complete-body structure (round 3): every major bone + hand part of
-    // THIS frame — raw coordinates, confidence-gated, one canonical model.
-    _lastStructure = BodyStructure.fromFrame(
-      xy: List<pm.LmPoint?>.generate(BodyStructure.jointCount, (i) {
-        final lm = pose.landmarks[PoseLandmarkType.values[i]];
-        if (lm == null || !lm.x.isFinite || !lm.y.isFinite) return null;
-        return (x: lm.x, y: lm.y);
-      }),
-      vis: List<double>.generate(BodyStructure.jointCount, (i) {
-        final lm = pose.landmarks[PoseLandmarkType.values[i]];
-        return lm == null ? 0.0 : lm.likelihood.clamp(0.0, 1.0);
-      }),
-    );
 
     // Subject continuity: torso centroid jump = someone else stepped in.
     final torso = _torsoCentroid(pose, imageWidth, imageHeight);
@@ -392,24 +320,7 @@ class PoseAnalyzer {
         visible[name] = lm;
       }
     }
-    // Count what the exercise actually measures: the primary angle's
-    // vertices. A frame missing any of them cannot produce the counting
-    // angle — everything else may come and go, so partially-visible
-    // bodies keep counting while the measuring joints stay solid.
-    final reqNames = _requiredNames;
-    if (reqNames.isNotEmpty) {
-      var have = 0;
-      for (final n in reqNames) {
-        if (visible.containsKey(n)) have++;
-      }
-      if (have < reqNames.length) {
-        return base(
-          reason: LockReason.occluded,
-          locked: locked,
-          visible: visible.length,
-        );
-      }
-    } else if (visible.length < _requiredCount) {
+    if (visible.length < _requiredCount) {
       return base(
         reason: LockReason.occluded,
         locked: locked,
@@ -417,46 +328,20 @@ class PoseAnalyzer {
       );
     }
 
-    // WS2 6.3 — frame-quality gate (any-angle robustness, conservative):
-    // enough landmarks can still be *present* while their confidence — and
-    // with it the angular fidelity at odd camera angles / in blur — has
-    // collapsed. Two consecutive weak frames are treated as occluded so the
-    // FSM never integrates foreshortened garbage angles; one marginal frame
-    // after a good run still passes (no flicker).
-    double quality = 0;
-    for (final lm in visible.values) {
-      quality += lm.likelihood.clamp(0.0, 1.0);
-    }
-    quality /= visible.length;
-    if (quality < FormRules.minFrameQuality) {
-      _weakQualityFrames++;
-      if (_weakQualityFrames >= 2) {
-        return base(
-          reason: LockReason.occluded,
-          locked: locked,
-          visible: visible.length,
-        );
-      }
-    } else {
-      _weakQualityFrames = 0;
-    }
-
     // Smooth + normalize. Velocity-aware EMA: fast landmark motion raises
     // the effective alpha (up to 0.75) so quick reps keep their full
     // amplitude and still cross the FSM depth thresholds; slow motion keeps
-    // the classic 0.3 smoothing against camera noise. The base alpha honors
-    // the exercise's smoothing window (8.1).
+    // the classic 0.3 smoothing against camera noise.
     final px = <int, pm.LmPoint>{};
     final norm = <String, pm.LmPoint>{};
-    final baseAlpha = smoothingAlphaFor(definition.smoothing);
     for (final entry in visible.entries) {
       final idx = definition.landmarks[entry.key]!;
       final fx = (_smoothX[idx] ??= pm.EmaFilter(
-          baseAlpha,
+          FormRules.emaSmoothingAlpha,
           adaptiveGain: 0.012,
           maxAlpha: 0.75));
       final fy = (_smoothY[idx] ??= pm.EmaFilter(
-          baseAlpha,
+          FormRules.emaSmoothingAlpha,
           adaptiveGain: 0.012,
           maxAlpha: 0.75));
       final sx = fx.push(entry.value.x);
@@ -494,28 +379,10 @@ class PoseAnalyzer {
           framing: framing,
         );
       }
-      // Batch 5 trust gate: a held frame never advances the FSM — the
-      // screen surfaces the hold reason instead of counting on a guess.
-      final trust = _computeTrust(
-        pose: pose,
-        angles: angles,
-        imageWidth: imageWidth,
-        imageHeight: imageHeight,
-      );
-      if (trust.held) {
-        return base(
-          reason: LockReason.ok,
-          locked: true,
-          visible: visible.length,
-          framing: framing,
-          trust: trust,
-        );
-      }
       brain = _brain.processFrame(
         angles: angles,
         landmarkCoords: norm,
         timestamp: nowMs / 1000.0,
-        frameTrust: trust,
       );
     }
 
@@ -528,131 +395,6 @@ class PoseAnalyzer {
     );
   }
 
-  /// Frame trust from the four signals (Batch 5 port of the reference
-  /// blend). Single-source when MoveNet has no opinion (ML Kit path or a
-  /// throttled/missing pass) — weight redistribution, never inflated.
-  TrustBreakdown _computeTrust({
-    required Pose pose,
-    required Map<String, double> angles,
-    required double imageWidth,
-    required double imageHeight,
-  }) {
-    final vis = List<double>.generate(33, (i) {
-      final lm = pose.landmarks[PoseLandmarkType.values[i]];
-      return lm == null ? 0.0 : lm.likelihood.clamp(0.0, 1.0);
-    });
-    final primary = angles[definition.primaryAngle.name];
-    if (primary != null) {
-      _trustAngleHistory.add(primary);
-      if (_trustAngleHistory.length > 13) _trustAngleHistory.removeAt(0);
-    }
-    final mpXY = List<List<double>>.generate(33, (i) {
-      final lm = pose.landmarks[PoseLandmarkType.values[i]];
-      if (lm == null) return [double.nan, double.nan];
-      return [lm.x / imageWidth, lm.y / imageHeight];
-    });
-    final mv = _lastMoveNet;
-    var agreement = 0.0;
-    var available = false;
-    if (mv != null && mv.hasOpinion) {
-      final r = crossModelAgreement(mpXY, vis, mv.imageXY, mv.vis);
-      agreement = r.score;
-      available = r.perJoint.isNotEmpty;
-    }
-    // Visibility is scored on the joints this exercise measures (primary
-    // angle vertices) — an occluded face or cut-off feet must not veto a
-    // squat whose knees are solid. Unknown index space falls back to the
-    // reference core blend.
-    final relevant = <int>[];
-    if (definition.angles.isNotEmpty) {
-      for (final i in definition.primaryAngle.points) {
-        if (i >= 0 && i < vis.length) relevant.add(i);
-      }
-    }
-    return TrustBreakdown(
-      visibility: visibilityScore(vis,
-          relevant: relevant.isEmpty ? null : relevant),
-      agreement: agreement,
-      temporal: temporalScore(_trustAngleHistory),
-      temporalKnown: _trustAngleHistory.length >= 4,
-      // Complete-body geometry (round 3): long-bone consistency over
-      // arms/torso/legs + angle sanity at every major joint — the pose is
-      // judged against the WHOLE skeleton, not just knees and elbows.
-      geometry: geometryScore(
-        mpXY,
-        _pendingWorld,
-        worldBones: BodyStructure.worldBonePairs,
-        jointTriples: BodyStructure.jointTriples,
-      ),
-      agreementAvailable: available,
-    );
-  }
-
-  // -- landmarker source (Batch 5 primary) -------------------------------------
-
-  /// Feeds one PoseLandmarker frame through the shared pipeline. The frame
-  /// is adapted to the analyzer's landmark space (upright pixels), so
-  /// smoothing, angles, trust, rhythm and the brain run unchanged; the ML
-  /// Kit path stays as the fallback. Returns null only for malformed
-  /// frames — the caller just continues.
-  Future<PoseFrameResult?> processLandmarkerFrame(
-    LandmarkerFrame33 frame, {
-    required int inferenceMs,
-    required int nowMs,
-  }) async {
-    framesSeen++;
-    lastInferenceMs = inferenceMs;
-    // Throttled second opinion (agreement is a slow signal). Fire-and-
-    // forget: awaiting TFLite inline hitched the frame pipeline every
-    // 250 ms. The cached result lands when ready; frames never wait.
-    // Guarded to one in-flight pass (the interpreter is not reentrant).
-    if (nowMs - _lastVerifyMs >= _verifyIntervalMs && !_verifying) {
-      _lastVerifyMs = nowMs;
-      _verifying = true;
-      final gen = _verifyGen;
-      unawaited(() async {
-        try {
-          final r = await _verifier.verify(frame.thumb);
-          if (r != null && gen == _verifyGen) _lastMoveNet = r;
-        } finally {
-          if (gen == _verifyGen) _verifying = false;
-        }
-      }());
-    }
-    _pendingWorld = frame.world;
-    try {
-      if (frame.imageXY.length != 33) {
-        lastError = 'landmarker frame has ${frame.imageXY.length} joints';
-        return null;
-      }
-      final pose = Pose(landmarks: {
-        for (var i = 0; i < 33; i++)
-          PoseLandmarkType.values[i]: PoseLandmark(
-            type: PoseLandmarkType.values[i],
-            x: frame.imageXY[i][0] * frame.frameW,
-            y: frame.imageXY[i][1] * frame.frameH,
-            z: frame.z[i],
-            likelihood: frame.vis[i].clamp(0.0, 1.0),
-          ),
-      });
-      lastPosesFound = 1;
-      lastError = null;
-      final result = _handlePoses(
-        [pose],
-        imageWidth: frame.frameW,
-        imageHeight: frame.frameH,
-        inferenceMs: inferenceMs,
-        nowMs: nowMs,
-      );
-      if (!_controller.isClosed) _controller.add(result);
-      return result;
-    } catch (e) {
-      lastError = '$e';
-      return null;
-    } finally {
-      _pendingWorld = null;
-    }
-  }
   /// Rep-rhythm sampling from the primary angle: one movement cycle = one
   /// below→above crossing of the rolling mid-threshold. Feeds the
   /// video-playback hysteresis — suspect at CV < 3% over >=4 cycles
@@ -730,39 +472,13 @@ class PoseAnalyzer {
     return guess;
   }
 
-  /// Landmark names the exercise actually measures: the primary angle's
-  /// vertices that exist in the tracked set. Frames missing any of these
-  /// cannot produce the counting angle — everything else may come and go,
-  /// so partially-visible bodies keep counting while the measuring joints
-  /// stay solid. Empty when the definition carries no usable primary
-  /// (the legacy count path applies instead).
-  Set<String> get _requiredNames {
-    final out = <String>{};
-    if (definition.angles.isEmpty) return out;
-    final byIndex = <int, String>{};
-    for (final entry in definition.landmarks.entries) {
-      byIndex[entry.value] = entry.key;
-    }
-    for (final i in definition.primaryAngle.points) {
-      final name = byIndex[i];
-      if (name != null) out.add(name);
-    }
-    return out;
-  }
-
   int get _requiredCount {
     const keyById = {
       'squat': 'squat',
       'push_up': 'pushup',
       'jumping_jack': 'jumpingJack',
     };
-    final mapped = FormRules.minVisibleLandmarks[keyById[definition.id]];
-    if (mapped != null) return mapped;
-    // Definitions with fewer than 6 tracked landmarks (calf_raise: 3,
-    // tricep_dip: 3, superman: 4, …) can never satisfy the flat fallback
-    // of 6 — every frame gated as occluded and counting stayed dead.
-    // Require all tracked landmarks when fewer than 6 are tracked.
-    return definition.landmarks.length < 6 ? definition.landmarks.length : 6;
+    return FormRules.minVisibleLandmarks[keyById[definition.id]] ?? 6;
   }
 
   pm.LmPoint? _torsoCentroid(
@@ -806,8 +522,7 @@ class PoseAnalyzer {
         x: fx.push(lm.x),
         y: fy.push(lm.y),
         z: lm.z,
-        // Clamped (WS2 6.3): downstream tinting/thresholds assume 0..1.
-        likelihood: lm.likelihood.clamp(0.0, 1.0),
+        likelihood: lm.likelihood,
       );
     }
     return Pose(landmarks: map);
@@ -826,21 +541,13 @@ class PoseAnalyzer {
       if (h > 0.01 && w / h < 1.1) return FramingCue.turnSideways;
       return FramingCue.ok;
     }
-    if (h < 0.5) {
-      // Tiny subject (far from the camera) must be checked first: it also
-      // satisfies h < 0.5, so testing it second made stepCloser unreachable.
-      if (w < 0.2 && h < 0.4) return FramingCue.stepCloser;
-      return FramingCue.stepBack;
-    }
+    if (h < 0.5) return FramingCue.stepBack;
+    if (w < 0.2 && h < 0.4) return FramingCue.stepCloser;
     return FramingCue.ok;
   }
 
   void reset() {
     _brain.reset();
-    _lastMoveNet = null;
-    _lastVerifyMs = 0;
-    _verifying = false;
-    _verifyGen++;
     _smoothX.clear();
     _smoothY.clear();
     _ovX.clear();
@@ -849,13 +556,8 @@ class PoseAnalyzer {
     _smoothedPose = null;
     _torsoEma = null;
     _stableFrames = 0;
-    _weakQualityFrames = 0;
     _busy = false;
     _videoSuspected = false;
-    _pendingWorld = null;
-    _lastMoveNet = null;
-    _lastVerifyMs = 0;
-    _trustAngleHistory.clear();
     _resetRhythm();
   }
 
@@ -870,7 +572,6 @@ class PoseAnalyzer {
   Future<void> dispose() async {
     await _detector?.close();
     _detector = null;
-    _verifier.close();
     if (!_controller.isClosed) await _controller.close();
   }
 
