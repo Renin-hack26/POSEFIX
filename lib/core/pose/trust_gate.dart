@@ -214,7 +214,17 @@ double _angleAt(
 ///
 /// [imageXY]: 33 (x, y) image-normalised pairs. [worldXYZ]: 33 (x, y, z)
 /// world triples, or null when the source has no world space.
-double geometryScore(List<List<double>> imageXY, List<List<double>>? worldXYZ) {
+///
+/// [worldBones]/[jointTriples] override the reference checks with a
+/// complete-body set ([BodyStructure.worldBonePairs] /
+/// [BodyStructure.jointTriples] — long bones + every major joint); the
+/// defaults keep the pinned reference behavior for direct callers.
+double geometryScore(
+  List<List<double>> imageXY,
+  List<List<double>>? worldXYZ, {
+  List<List<int>>? worldBones,
+  List<List<int>>? jointTriples,
+}) {
   if (imageXY.length != 33) return 0.0;
   var performed = 0;
   var penaltySum = 0.0;
@@ -245,18 +255,11 @@ double geometryScore(List<List<double>> imageXY, List<List<double>>? worldXYZ) {
       p.length >= 3 && !p.any((v) => v.isNaN);
 
   if (worldXYZ != null && worldXYZ.length == 33) {
-    bool ok(int i) => finiteTriple(worldXYZ[i]);
-    const pairs = [
-      [23, 25],
-      [25, 27],
-      [24, 26],
-      [26, 28],
-      [11, 13],
-      [12, 14],
-    ];
+    bool ok(int i) => i < worldXYZ.length && finiteTriple(worldXYZ[i]);
+    final pairs = worldBones ?? _referenceWorldPairs;
     final lens = <double>[];
     for (final pr in pairs) {
-      if (!ok(pr[0]) || !ok(pr[1])) continue;
+      if (pr.length < 2 || !ok(pr[0]) || !ok(pr[1])) continue;
       final a = worldXYZ[pr[0]], b = worldXYZ[pr[1]];
       final dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
       final len = math.sqrt(dx * dx + dy * dy + dz * dz);
@@ -283,15 +286,14 @@ double geometryScore(List<List<double>> imageXY, List<List<double>>? worldXYZ) {
         imageXY[i][0],
         imageXY[i][1],
       );
-  for (final t in const [
-    [23, 25, 27],
-    [24, 26, 28],
-    [11, 13, 15],
-    [12, 14, 16],
-  ]) {
+  for (final t in jointTriples ?? _referenceJointTriples) {
     // Unmeasurable triplets are skipped — a missing limb must not read
     // as a degenerate one.
-    if (!finitePair(imageXY[t[0]]) ||
+    if (t.length < 3 ||
+        t[0] >= imageXY.length ||
+        t[1] >= imageXY.length ||
+        t[2] >= imageXY.length ||
+        !finitePair(imageXY[t[0]]) ||
         !finitePair(imageXY[t[1]]) ||
         !finitePair(imageXY[t[2]])) {
       continue;
@@ -310,6 +312,24 @@ double _median(List<double> v) {
       ? s[s.length ~/ 2]
       : (s[s.length ~/ 2 - 1] + s[s.length ~/ 2]) / 2;
 }
+
+/// Reference bone-length pairs — pinned by test/unit/trust_gate_test.dart.
+const List<List<int>> _referenceWorldPairs = [
+  [23, 25],
+  [25, 27],
+  [24, 26],
+  [26, 28],
+  [11, 13],
+  [12, 14],
+];
+
+/// Reference joint-angle triples — pinned by test/unit/trust_gate_test.dart.
+const List<List<int>> _referenceJointTriples = [
+  [23, 25, 27],
+  [24, 26, 28],
+  [11, 13, 15],
+  [12, 14, 16],
+];
 
 /// Fraction of joints above the usable visibility line.
 double frameCompleteness(List<double> vis) {

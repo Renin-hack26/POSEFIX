@@ -60,8 +60,13 @@ class PoseLandmarkerSource {
   bool _ready = false;
   bool _inFlight = false;
   bool _initStarted = false;
+  String? _delegate;
 
   bool get ready => _ready;
+
+  /// Native delegate in use after a successful init (`gpu` / `cpu`);
+  /// null before init or when the bridge didn't report one (host/tests).
+  String? get delegate => _delegate;
 
   /// Idempotent init — false when the bridge/model is unavailable.
   /// Never throws.
@@ -72,10 +77,14 @@ class PoseLandmarkerSource {
     try {
       final res = await _channel.invokeMapMethod<String, dynamic>('init');
       _ready = res?['ok'] == true;
+      final d = res?['delegate'];
+      _delegate = _ready && d is String ? d : null;
     } on MissingPluginException catch (_) {
       _ready = false; // host/tests: no native bridge
+      _delegate = null;
     } catch (_) {
       _ready = false;
+      _delegate = null;
     }
     if (!_ready) _initStarted = false;
     return _ready;
@@ -224,6 +233,7 @@ class PoseLandmarkerSource {
 
   Future<void> close() async {
     _ready = false;
+    _delegate = null;
     try {
       await _channel.invokeMethod<void>('close');
     } catch (_) {}

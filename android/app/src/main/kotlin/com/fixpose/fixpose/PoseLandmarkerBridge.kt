@@ -10,6 +10,7 @@ import android.os.Looper
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import com.google.mediapipe.tasks.core.BaseOptions
+import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
@@ -39,6 +40,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 /// "laggy camera"). The result is posted back to the main thread, which is
 /// where MethodChannel.Result must be invoked.
 ///
+/// **Delegate (round 3):** the landmarker is created with the GPU
+/// delegate (same executor thread as inference, satisfying MediaPipe's
+/// GL same-thread rule) and falls back to CPU — at init or after a
+/// failed first inference — whenever the device can't do GPU. `init`
+/// reports the active delegate (`gpu`/`cpu`) for the on-screen HUD.
+///
 /// **Resolution:** frames are converted at half resolution (`SCALE`). The
 /// model consumes 256×256 internally, so a 360×640 input loses no pose
 /// accuracy while cutting conversion, bitmap churn and resize cost ~4×.
@@ -54,6 +61,13 @@ class PoseLandmarkerBridge(
     private var landmarker: PoseLandmarker? = null
     private val busy = AtomicBoolean(false)
     private var modelPath: String? = null
+
+    // Active delegate for the current landmarker, plus a sticky latch for
+    // the rest of the session: MediaPipe's GPU delegate is created AND
+    // first exercised on [executor], so a driver/GL failure can surface
+    // at init or at the first inference — both paths drop to CPU.
+    private var gpu = false
+    private var gpuDisabled = false
 
     /// Background worker: conversions + inference never touch the UI
     /// thread. Single-threaded, so detections are naturally serialised.
@@ -119,25 +133,50 @@ class PoseLandmarkerBridge(
         return out
     }
 
+    private fun delegateName(): String = if (gpu) "gpu" else "cpu"
+
+    /// Builds a landmarker on the calling thread. GPU first (round 3:
+    /// the heavy model runs several times faster on the GPU delegate);
+    /// MediaPipe's same-thread rule holds because both `init` and every
+    /// `detect` execute on the single [executor] thread.
+    private fun createLandmarker(useGpu: Boolean): PoseLandmarker {
+        val file = modelFile()
+        val options = PoseLandmarker.PoseLandmarkerOptions.builder()
+            .setBaseOptions(
+                BaseOptions.builder()
+                    .setModelAssetPath(file.absolutePath)
+                    .setDelegate(
+                        if (useGpu) Delegate.GPU
+                        else Delegate.CPU,
+                    )
+                    .build(),
+            )
+            .setRunningMode(RunningMode.VIDEO)
+            .setNumPoses(1)
+            .setMinPoseDetectionConfidence(0.5f)
+            .setMinPosePresenceConfidence(0.5f)
+            .setMinTrackingConfidence(0.5f)
+            .build()
+        return PoseLandmarker.createFromOptions(appContext, options)
+    }
+
     private fun init(): Map<String, Any?> {
         synchronized(lock) {
-            if (landmarker != null) return mapOf("ok" to true)
+            if (landmarker != null) return mapOf("ok" to true, "delegate" to delegateName())
             return try {
-                val file = modelFile()
-                val options = PoseLandmarker.PoseLandmarkerOptions.builder()
-                    .setBaseOptions(
-                        BaseOptions.builder().setModelAssetPath(file.absolutePath).build(),
-                    )
-                    .setRunningMode(RunningMode.VIDEO)
-                    .setNumPoses(1)
-                    .setMinPoseDetectionConfidence(0.5f)
-                    .setMinPosePresenceConfidence(0.5f)
-                    .setMinTrackingConfidence(0.5f)
-                    .build()
-                landmarker = PoseLandmarker.createFromOptions(appContext, options)
-                mapOf("ok" to true)
+                landmarker = createLandmarker(!gpuDisabled)
+                gpu = !gpuDisabled
+                mapOf("ok" to true, "delegate" to delegateName())
             } catch (e: Exception) {
-                mapOf("ok" to false, "error" to (e.message ?: "init failed"))
+                // GPU unsupported here (no GL, old driver) — CPU for good.
+                try {
+                    landmarker = createLandmarker(false)
+                    gpu = false
+                    gpuDisabled = true
+                    mapOf("ok" to true, "delegate" to delegateName())
+                } catch (e2: Exception) {
+                    mapOf("ok" to false, "error" to (e2.message ?: "init failed"))
+                }
             }
         }
     }
@@ -159,10 +198,38 @@ class PoseLandmarkerBridge(
             return
         }
         executor.execute {
-            val out = try {
-                runDetect(call)
-            } catch (e: Exception) {
-                mapOf("ok" to false, "error" to (e.message ?: "detect failed"))
+            val out: Map<String, Any?> = try {
+                var r = try {
+                    runDetect(call)
+                } catch (e: Exception) {
+                    mapOf("ok" to false, "error" to (e.message ?: "detect failed"))
+                }
+                // GPU failure at first inference (driver/GL hiccup the
+                // init path can't see): rebuild on CPU and retry this
+                // frame once — the camera degrades instead of dying.
+                if (r["ok"] == false && gpu && !gpuDisabled) {
+                    synchronized(lock) {
+                        try {
+                            landmarker?.close()
+                        } catch (_: Exception) {
+                        }
+                        try {
+                            landmarker = createLandmarker(false)
+                            gpu = false
+                            gpuDisabled = true
+                        } catch (_: Exception) {
+                            landmarker = null
+                        }
+                    }
+                    if (landmarker != null) {
+                        r = try {
+                            runDetect(call)
+                        } catch (e: Exception) {
+                            mapOf("ok" to false, "error" to (e.message ?: "detect failed"))
+                        }
+                    }
+                }
+                r
             } finally {
                 busy.set(false)
             }

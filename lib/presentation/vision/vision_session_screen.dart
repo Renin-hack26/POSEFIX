@@ -13,6 +13,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../core/audio/cue_vocabulary.dart';
 import '../../core/di/app_dependencies.dart';
 import '../../core/pose/angle_readouts.dart';
+import '../../core/pose/body_structure.dart';
 import '../../core/pose/brain_engine.dart';
 import '../../core/pose/exercise_definition.dart';
 import '../../core/pose/pose_analyzer.dart';
@@ -78,7 +79,15 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   /// Pause window start — the elapsed clock shifts forward on resume so
   /// paused time never counts (WS2.12).
   DateTime? _pauseBegan;
+
+  /// True while the frame drain loop is consuming images (one feed in
+  /// flight at a time).
   bool _inFlight = false;
+
+  /// Newest-frame slot (native-camera style): every camera image lands
+  /// here, superseding whatever was waiting — the drain loop always
+  /// processes the freshest frame and stale ones are never touched.
+  CameraImage? _pendingFrame;
   bool _disposed = false;
 
   /// Boot-step label for the loading overlay (WS2.8), null once live.
@@ -205,6 +214,12 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   int _lastPosesFound = 0;
   String? _pipelineError;
 
+  /// Last inference time (ms) + rolling pipeline throughput for the HUD.
+  int _lastInferMs = 0;
+  double _pipelineFps = 0;
+  DateTime? _fpsWindowAt;
+  int _fpsWindowFrames = 0;
+
   // --- frame-rate UI plumbing -------------------------------------------------
   // Per-frame data (HUD readouts + skeleton overlay) is pushed through
   // notifiers instead of setState: the camera preview, controls and the
@@ -224,10 +239,30 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     repaint: _overlayTick,
   );
 
+  /// Active backend tag — the landmarker plus its native delegate
+  /// (`landmarker·gpu` / `landmarker·cpu`), or the ML Kit fallback.
+  String get _backendTag {
+    if (!_useLandmarker) return 'mlkit';
+    final d = _landmarkerSource.delegate;
+    return d == null ? 'landmarker' : 'landmarker·$d';
+  }
+
   /// Publishes current per-frame fields to the HUD listeners.
   void _publishHud() {
     final tracker = _rounds;
     final now = DateTime.now();
+    // Pipeline throughput: frames actually processed over a ≥1 s window.
+    if (_fpsWindowAt == null) {
+      _fpsWindowAt = now;
+      _fpsWindowFrames = _framesSeen;
+    } else {
+      final dtMs = now.difference(_fpsWindowAt!).inMilliseconds;
+      if (dtMs >= 1000) {
+        _pipelineFps = (_framesSeen - _fpsWindowFrames) * 1000.0 / dtMs;
+        _fpsWindowAt = now;
+        _fpsWindowFrames = _framesSeen;
+      }
+    }
     final roundReps = _calibrating
         ? 0
         : (tracker != null
@@ -249,7 +284,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       poses: _lastPosesFound,
       error: _pipelineError,
       lens: _lens,
-      backend: _useLandmarker ? 'landmarker' : 'mlkit',
+      backend: _backendTag,
+      inferMs: _lastInferMs,
+      fps: _pipelineFps,
       reps: _reps,
       roundReps: roundReps,
       roundLabel: roundLabel,
@@ -889,14 +926,35 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
 
   void _onImage(CameraImage image) {
     if (!_ready || _paused || _disposed) return;
-    if (_inFlight) return;
     // Drop frames during an exercise swap — the outgoing analyzer is
     // being disposed and its one stale result must never land.
     if (_switchingBlocks) return;
-    final PoseAnalyzer? analyzer = _analyzer;
-    if (analyzer == null) return;
+    if (_analyzer == null) return;
+    // Newest-frame-wins (native-camera style): the slot always holds the
+    // freshest frame — anything captured while the pipeline is busy is
+    // superseded on arrival, so latency never queues behind old frames.
+    _pendingFrame = image;
+    if (_inFlight) return;
     _inFlight = true;
-    unawaited(_feed(analyzer, image));
+    unawaited(_drainFrames());
+  }
+
+  /// Consumes the slot until it runs dry — one feed in flight at a time,
+  /// each iteration picking up whatever is newest when the previous feed
+  /// finished (stale frames were already overwritten while it ran).
+  Future<void> _drainFrames() async {
+    try {
+      while (!_disposed && !_paused && !_switchingBlocks) {
+        final analyzer = _analyzer;
+        final image = _pendingFrame;
+        if (analyzer == null || image == null) break;
+        _pendingFrame = null;
+        await _feed(analyzer, image);
+      }
+    } finally {
+      _pendingFrame = null;
+      _inFlight = false;
+    }
   }
 
   int get _rotationDegrees => switch (_rotation) {
@@ -963,6 +1021,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       _framesSeen = analyzer.framesSeen;
       _lastPosesFound = analyzer.lastPosesFound;
       _pipelineError = analyzer.lastError;
+      _lastInferMs = analyzer.lastInferenceMs;
       if (result != null) {
         _handleResult(result);
         // Prefer the EMA-smoothed pose for the overlay — stable joints and
@@ -975,8 +1034,6 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       }
     } catch (_) {
       // A bad frame must never break the session.
-    } finally {
-      _inFlight = false;
     }
   }
 
@@ -1327,6 +1384,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   @override
   void dispose() {
     _disposed = true;
+    _pendingFrame = null;
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     _ticker = null;
@@ -1512,6 +1570,8 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
                     error: snap.error,
                     lens: snap.lens,
                     backend: snap.backend,
+                    inferMs: snap.inferMs,
+                    fps: snap.fps,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1645,6 +1705,8 @@ class _PipelineStatus extends StatelessWidget {
     required this.error,
     required this.lens,
     required this.backend,
+    required this.inferMs,
+    required this.fps,
   });
 
   final int frames;
@@ -1654,6 +1716,10 @@ class _PipelineStatus extends StatelessWidget {
 
   /// Active pose backend tag.
   final String backend;
+
+  /// Last inference time (ms) + pipeline throughput for lag diagnosis.
+  final int inferMs;
+  final double fps;
 
   @override
   Widget build(BuildContext context) {
@@ -1665,7 +1731,8 @@ class _PipelineStatus extends StatelessWidget {
     } else if (frames == 0) {
       text = 'camera $lensLabel · starting feed…';
     } else {
-      text = 'camera $lensLabel · frames $frames · poses $poses · $backend';
+      text = 'camera $lensLabel · frames $frames · poses $poses · $backend'
+          ' · $inferMs ms · ${fps.toStringAsFixed(1)} fps';
     }
     return Container(
       width: double.infinity,
@@ -2253,6 +2320,8 @@ class _HudSnapshot {
     required this.error,
     required this.lens,
     required this.backend,
+    required this.inferMs,
+    required this.fps,
     required this.reps,
     required this.roundReps,
     required this.roundLabel,
@@ -2283,6 +2352,8 @@ class _HudSnapshot {
     error: null,
     lens: CameraLensDirection.front,
     backend: 'mlkit',
+    inferMs: 0,
+    fps: 0,
     reps: 0,
     roundReps: 0,
     roundLabel: '—',
@@ -2314,6 +2385,10 @@ class _HudSnapshot {
 
   /// Active pose backend (`landmarker` heavy or `mlkit` fallback).
   final String backend;
+
+  /// Last inference time (ms) and rolling pipeline throughput (fps).
+  final int inferMs;
+  final double fps;
   final int reps;
 
   /// Reps in the current round + `current/total` round + elapsed labels.
@@ -2481,48 +2556,34 @@ class SkeletonOverlayPainter extends CustomPainter {
     textAlign: TextAlign.center,
   );
 
-  /// MediaPipe Pose landmark connections (33-body model, skeleton lines).
-  /// Tiered per the Batch 5 merge (structural = major, hands/feet =
-  /// second, face = detail via [_face]): facial pairs live ONLY in [_face]
-  /// so the jaw is drawn once, thin — never a thick double stroke.
-  /// Hand links follow the reference topology (wrist→pinky→index→thumb
-  /// chain + wrist→thumb); every segment is a real anatomical connection.
-  static const List<(int, int)> _body = [
-    // Torso: shoulders → hips
-    (11, 12),
-    (11, 23), (12, 24), (23, 24),
-    // Left arm: shoulder → elbow → wrist → hand
-    (11, 13), (13, 15), (15, 17), (17, 19), (19, 21), (15, 21),
-    // Right arm
-    (12, 14), (14, 16), (16, 18), (18, 20), (20, 22), (16, 22),
-    // Left leg: hip → knee → ankle → heel/foot
-    (23, 25), (25, 27), (27, 29), (27, 31), (29, 31),
-    // Right leg
-    (24, 26), (26, 28), (28, 30), (28, 32), (30, 32),
+  /// The complete skeleton — every anatomical bone sourced from the
+  /// canonical graph ([BodyStructure.bones], batch/round 3): torso box,
+  /// both arms, wrist+palm hand parts, legs, feet, face detail and neck
+  /// links, in draw order. Tier flags pick the stroke weights below.
+  static final List<(int, int)> _body = [
+    for (final b in BodyStructure.bones)
+      if (b.tier == BoneTier.major || b.tier == BoneTier.appendage)
+        (b.a, b.b),
   ];
 
   /// Appendage bones (hands + feet) — medium tier. Everything else in
   /// [_body] is structural (thick tier).
-  static const Set<(int, int)> _secondBones = {
-    (15, 17), (17, 19), (19, 21), (15, 21),
-    (16, 18), (18, 20), (20, 22), (16, 22),
-    (27, 29), (27, 31), (29, 31),
-    (28, 30), (28, 32), (30, 32),
+  static final Set<(int, int)> _secondBones = {
+    for (final b in BodyStructure.bones)
+      if (b.tier == BoneTier.appendage) (b.a, b.b),
   };
 
   /// Face structure: jaw line (ear → mouth → mouth → ear), eyes, nose.
   /// Nose spokes land on the eye centres (reference topology).
-  static const List<(int, int)> _face = [
-    (7, 9), (9, 10), (10, 8),
-    (0, 9), (0, 10),
-    (1, 2), (2, 3), (4, 5), (5, 6),
-    (0, 2), (0, 5),
-    (3, 7), (6, 8),
+  static final List<(int, int)> _face = [
+    for (final b in BodyStructure.bones)
+      if (b.tier == BoneTier.face) (b.a, b.b),
   ];
 
   /// Shoulder bone structure: neck lines ear → shoulder.
-  static const List<(int, int)> _shoulderBones = [
-    (7, 11), (8, 12),
+  static final List<(int, int)> _shoulderBones = [
+    for (final b in BodyStructure.bones)
+      if (b.tier == BoneTier.neck) (b.a, b.b),
   ];
 
   /// Landmark indices drawn as emphasized bone anchors (shoulders + hips).

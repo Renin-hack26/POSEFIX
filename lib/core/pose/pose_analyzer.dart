@@ -34,6 +34,7 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../audio/cue_vocabulary.dart';
 import '../constants/form_rules.dart';
+import 'body_structure.dart';
 import 'brain_engine.dart';
 import 'exercise_definition.dart';
 import 'movenet_verifier.dart';
@@ -147,6 +148,12 @@ class PoseAnalyzer {
   /// joints and lines stay stable frame-to-frame).
   Pose? _smoothedPose;
   Pose? get smoothedPose => _smoothedPose;
+
+  /// Complete-body structure of the latest frame (all 33 joints, raw
+  /// coordinates + confidence) — the canonical bone model rebuilt every
+  /// analyzed frame. Null while no single pose is tracked.
+  BodyStructure? _lastStructure;
+  BodyStructure? get lastStructure => _lastStructure;
 
   /// Debug telemetry — read by the session screen to show pipeline health.
   /// These never affect counting; they only explain "no person" states.
@@ -309,6 +316,7 @@ class PoseAnalyzer {
     if (poses.isEmpty) {
       _latestPose = null;
       _smoothedPose = null;
+      _lastStructure = null;
       _ovX.clear();
       _ovY.clear();
       _stableFrames = 0;
@@ -326,6 +334,7 @@ class PoseAnalyzer {
       // Drop the overlay too — the subject changed, don't ghost the old one.
       _latestPose = null;
       _smoothedPose = null;
+      _lastStructure = null;
       _ovX.clear();
       _ovY.clear();
       _weakQualityFrames = 0;
@@ -339,6 +348,19 @@ class PoseAnalyzer {
     final pose = poses.first;
     _latestPose = pose; // Store for debug overlay
     _smoothedPose = _smoothOverlay(pose); // Stable coords for the overlay
+    // Complete-body structure (round 3): every major bone + hand part of
+    // THIS frame — raw coordinates, confidence-gated, one canonical model.
+    _lastStructure = BodyStructure.fromFrame(
+      xy: List<pm.LmPoint?>.generate(BodyStructure.jointCount, (i) {
+        final lm = pose.landmarks[PoseLandmarkType.values[i]];
+        if (lm == null || !lm.x.isFinite || !lm.y.isFinite) return null;
+        return (x: lm.x, y: lm.y);
+      }),
+      vis: List<double>.generate(BodyStructure.jointCount, (i) {
+        final lm = pose.landmarks[PoseLandmarkType.values[i]];
+        return lm == null ? 0.0 : lm.likelihood.clamp(0.0, 1.0);
+      }),
+    );
 
     // Subject continuity: torso centroid jump = someone else stepped in.
     final torso = _torsoCentroid(pose, imageWidth, imageHeight);
@@ -553,7 +575,15 @@ class PoseAnalyzer {
       agreement: agreement,
       temporal: temporalScore(_trustAngleHistory),
       temporalKnown: _trustAngleHistory.length >= 4,
-      geometry: geometryScore(mpXY, _pendingWorld),
+      // Complete-body geometry (round 3): long-bone consistency over
+      // arms/torso/legs + angle sanity at every major joint — the pose is
+      // judged against the WHOLE skeleton, not just knees and elbows.
+      geometry: geometryScore(
+        mpXY,
+        _pendingWorld,
+        worldBones: BodyStructure.worldBonePairs,
+        jointTriples: BodyStructure.jointTriples,
+      ),
       agreementAvailable: available,
     );
   }
@@ -571,6 +601,7 @@ class PoseAnalyzer {
     required int nowMs,
   }) async {
     framesSeen++;
+    lastInferenceMs = inferenceMs;
     // Throttled second opinion (agreement is a slow signal). Fire-and-
     // forget: awaiting TFLite inline hitched the frame pipeline every
     // 250 ms. The cached result lands when ready; frames never wait.
