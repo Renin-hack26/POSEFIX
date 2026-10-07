@@ -2,9 +2,9 @@
 /// offline fallback — the model must never silently guess.
 library;
 
-import 'package:fixpose/domain/entities/chat_message.dart';
-import 'package:fixpose/domain/repositories/veda_repository.dart';
-import 'package:fixpose/domain/usecases/estimate_meal_calories.dart';
+import 'package:fixpose/features/chat/domain/entities/chat_message.dart';
+import 'package:fixpose/features/chat/domain/repositories/veda_repository.dart';
+import 'package:fixpose/features/nutrition/domain/usecases/estimate_meal_calories.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeVeda implements VedaRepository {

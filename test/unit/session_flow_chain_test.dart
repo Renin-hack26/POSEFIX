@@ -2,12 +2,12 @@
 /// revived [StartSession] usecase (one record per unique block exercise).
 library;
 
-import 'package:fixpose/domain/entities/exercise.dart';
-import 'package:fixpose/domain/entities/workout.dart';
 import 'package:fixpose/domain/entities/workout_session.dart';
 import 'package:fixpose/domain/repositories/session_repository.dart';
-import 'package:fixpose/domain/repositories/workout_repository.dart';
 import 'package:fixpose/domain/usecases/start_session.dart';
+import 'package:fixpose/features/library/domain/entities/exercise.dart';
+import 'package:fixpose/features/library/domain/entities/workout.dart';
+import 'package:fixpose/features/library/domain/repositories/workout_repository.dart';
 import 'package:fixpose/presentation/vision/session_flow.dart';
 import 'package:flutter_test/flutter_test.dart';
 

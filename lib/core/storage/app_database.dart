@@ -1,11 +1,11 @@
-﻿import 'package:drift/drift.dart';
+import 'package:drift/drift.dart';
 
-import '../../data/datasources/local/chat_dao.dart';
-import '../../data/datasources/local/exercise_dao.dart';
-import '../../data/datasources/local/nutrition_dao.dart';
-import '../../data/datasources/local/plan_dao.dart';
-import '../../data/datasources/local/progress_dao.dart';
 import '../../data/datasources/local/session_dao.dart';
+import '../../features/chat/data/datasources/local/chat_dao.dart';
+import '../../features/library/data/datasources/local/exercise_dao.dart';
+import '../../features/nutrition/data/datasources/local/nutrition_dao.dart';
+import '../../features/plan/data/datasources/local/plan_dao.dart';
+import '../../features/progress/data/datasources/local/progress_dao.dart';
 import 'tables.dart';
 
 export 'tables.dart';

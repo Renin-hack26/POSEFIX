@@ -7,8 +7,8 @@
 library;
 
 import 'package:fixpose/core/utils/extensions.dart';
-import 'package:fixpose/domain/entities/strike_state.dart';
-import 'package:fixpose/engines/strike_engine/strike_engine.dart';
+import 'package:fixpose/features/progress/domain/entities/strike_state.dart';
+import 'package:fixpose/features/progress/domain/strike_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

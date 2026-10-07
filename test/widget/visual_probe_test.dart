@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:fixpose/core/theme/app_theme.dart';
-import 'package:fixpose/data/mappers/content_mappers.dart';
-import 'package:fixpose/domain/entities/exercise.dart';
-import 'package:fixpose/domain/entities/workout.dart';
 import 'package:fixpose/features/home/presentation/widgets/session_slot.dart';
 import 'package:fixpose/features/home/presentation/widgets/suggestions_carousel.dart';
 import 'package:fixpose/features/home/presentation/widgets/tips_carousel.dart';
+import 'package:fixpose/features/library/data/mappers/content_mappers.dart';
+import 'package:fixpose/features/library/domain/entities/exercise.dart';
+import 'package:fixpose/features/library/domain/entities/workout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

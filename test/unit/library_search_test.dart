@@ -16,10 +16,10 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:fixpose/core/search/library_search.dart';
-import 'package:fixpose/data/mappers/content_mappers.dart';
-import 'package:fixpose/domain/entities/exercise.dart';
-import 'package:fixpose/domain/entities/workout.dart';
+import 'package:fixpose/features/library/data/mappers/content_mappers.dart';
+import 'package:fixpose/features/library/domain/entities/exercise.dart';
+import 'package:fixpose/features/library/domain/entities/workout.dart';
+import 'package:fixpose/features/library/domain/library_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Fixture workout — every field optional so each test only states the

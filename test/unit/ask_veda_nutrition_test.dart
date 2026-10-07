@@ -13,21 +13,21 @@
 library;
 
 import 'package:fixpose/core/utils/extensions.dart';
-import 'package:fixpose/domain/entities/body_metric.dart';
-import 'package:fixpose/domain/entities/chat_message.dart';
-import 'package:fixpose/domain/entities/exercise.dart';
-import 'package:fixpose/domain/entities/meal.dart';
-import 'package:fixpose/domain/entities/strike_state.dart';
-import 'package:fixpose/domain/entities/training_plan.dart';
-import 'package:fixpose/domain/entities/workout.dart';
 import 'package:fixpose/domain/entities/workout_session.dart';
-import 'package:fixpose/domain/repositories/nutrition_repository.dart';
-import 'package:fixpose/domain/repositories/plan_repository.dart';
-import 'package:fixpose/domain/repositories/progress_repository.dart';
 import 'package:fixpose/domain/repositories/session_repository.dart';
-import 'package:fixpose/domain/repositories/veda_repository.dart';
-import 'package:fixpose/domain/repositories/workout_repository.dart';
-import 'package:fixpose/domain/usecases/ask_veda.dart';
+import 'package:fixpose/features/chat/domain/entities/chat_message.dart';
+import 'package:fixpose/features/chat/domain/repositories/veda_repository.dart';
+import 'package:fixpose/features/chat/domain/usecases/ask_veda.dart';
+import 'package:fixpose/features/library/domain/entities/exercise.dart';
+import 'package:fixpose/features/library/domain/entities/meal.dart';
+import 'package:fixpose/features/library/domain/entities/workout.dart';
+import 'package:fixpose/features/library/domain/repositories/workout_repository.dart';
+import 'package:fixpose/features/nutrition/domain/repositories/nutrition_repository.dart';
+import 'package:fixpose/features/plan/domain/entities/training_plan.dart';
+import 'package:fixpose/features/plan/domain/repositories/plan_repository.dart';
+import 'package:fixpose/features/progress/domain/entities/body_metric.dart';
+import 'package:fixpose/features/progress/domain/entities/strike_state.dart';
+import 'package:fixpose/features/progress/domain/repositories/progress_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Transport fake: captures the system prompt + turns, returns a canned

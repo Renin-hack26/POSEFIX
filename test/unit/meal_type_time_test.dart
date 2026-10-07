@@ -2,7 +2,7 @@
 /// breakfast/lunch/dinner/snack determined automatically from the time).
 library;
 
-import 'package:fixpose/domain/entities/meal.dart';
+import 'package:fixpose/features/library/domain/entities/meal.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

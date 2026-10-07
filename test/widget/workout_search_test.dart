@@ -13,12 +13,12 @@ library;
 
 import 'package:fixpose/app/app_dependencies.dart';
 import 'package:fixpose/core/theme/app_theme.dart';
-import 'package:fixpose/domain/entities/exercise.dart';
-import 'package:fixpose/domain/entities/training_plan.dart';
-import 'package:fixpose/domain/entities/workout.dart';
-import 'package:fixpose/domain/repositories/exercise_repository.dart';
-import 'package:fixpose/domain/repositories/plan_repository.dart';
-import 'package:fixpose/domain/repositories/workout_repository.dart';
+import 'package:fixpose/features/library/domain/entities/exercise.dart';
+import 'package:fixpose/features/library/domain/entities/workout.dart';
+import 'package:fixpose/features/library/domain/repositories/exercise_repository.dart';
+import 'package:fixpose/features/library/domain/repositories/workout_repository.dart';
+import 'package:fixpose/features/plan/domain/entities/training_plan.dart';
+import 'package:fixpose/features/plan/domain/repositories/plan_repository.dart';
 import 'package:fixpose/presentation/workout/workout_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

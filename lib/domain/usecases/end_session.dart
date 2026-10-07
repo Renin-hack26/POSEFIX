@@ -1,9 +1,9 @@
-import '../../engines/strike_engine/strike_engine.dart';
-import '../entities/report.dart';
-import '../entities/training_plan.dart';
+import '../../features/plan/domain/entities/training_plan.dart';
+import '../../features/plan/domain/repositories/plan_repository.dart';
+import '../../features/progress/domain/entities/report.dart';
+import '../../features/progress/domain/repositories/progress_repository.dart';
+import '../../features/progress/domain/strike_engine.dart';
 import '../entities/workout_session.dart';
-import '../repositories/plan_repository.dart';
-import '../repositories/progress_repository.dart';
 import '../repositories/session_repository.dart';
 
 /// Finalizes the in-flight session (FR-6) and runs the post-workout chain:

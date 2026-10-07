@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 
 import '../../../app/app_dependencies.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../domain/entities/workout.dart';
 import '../../../domain/entities/workout_session.dart';
 import '../../../shared/widgets/app_logo.dart';
 import '../../../shared/widgets/glass_card.dart';
@@ -13,6 +12,7 @@ import '../../../shared/widgets/grid_background.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../auth/domain/entities/user_profile.dart';
+import '../../library/domain/entities/workout.dart';
 import '../domain/entities/home_dashboard.dart';
 import 'widgets/analytics_section.dart';
 import 'widgets/greeting_banner.dart';

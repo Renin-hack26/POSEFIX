@@ -1,14 +1,14 @@
 import 'package:drift/native.dart';
-import 'package:fixpose/core/groq/groq_plan_service.dart';
 import 'package:fixpose/core/storage/app_database.dart';
-import 'package:fixpose/data/datasources/content/content_loader.dart';
-import 'package:fixpose/data/datasources/local/plan_dao.dart';
 import 'package:fixpose/data/datasources/local/session_dao.dart';
-import 'package:fixpose/data/repositories/content_repository_impl.dart';
-import 'package:fixpose/data/repositories/plan_repository_impl.dart';
-import 'package:fixpose/data/repositories/workout_repository_impl.dart';
-import 'package:fixpose/domain/entities/exercise.dart';
-import 'package:fixpose/domain/usecases/generate_weekly_plan.dart';
+import 'package:fixpose/features/library/data/datasources/content/content_loader.dart';
+import 'package:fixpose/features/library/data/repositories/content_repository_impl.dart';
+import 'package:fixpose/features/library/data/repositories/workout_repository_impl.dart';
+import 'package:fixpose/features/library/domain/entities/exercise.dart';
+import 'package:fixpose/features/plan/data/datasources/local/plan_dao.dart';
+import 'package:fixpose/features/plan/data/repositories/plan_repository_impl.dart';
+import 'package:fixpose/features/plan/domain/groq_plan_service.dart';
+import 'package:fixpose/features/plan/domain/usecases/generate_weekly_plan.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Reproduces the onboarding `_generate()` chain exactly as it runs on

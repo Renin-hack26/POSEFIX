@@ -4,15 +4,15 @@
 /// ("showing up" means actual work, PLANNING §4.3).
 library;
 
-import 'package:fixpose/domain/entities/body_metric.dart';
-import 'package:fixpose/domain/entities/strike_state.dart';
-import 'package:fixpose/domain/entities/training_plan.dart';
 import 'package:fixpose/domain/entities/workout_session.dart';
-import 'package:fixpose/domain/repositories/plan_repository.dart';
-import 'package:fixpose/domain/repositories/progress_repository.dart';
 import 'package:fixpose/domain/repositories/session_repository.dart';
 import 'package:fixpose/domain/usecases/end_session.dart';
-import 'package:fixpose/engines/strike_engine/strike_engine.dart';
+import 'package:fixpose/features/plan/domain/entities/training_plan.dart';
+import 'package:fixpose/features/plan/domain/repositories/plan_repository.dart';
+import 'package:fixpose/features/progress/domain/entities/body_metric.dart';
+import 'package:fixpose/features/progress/domain/entities/strike_state.dart';
+import 'package:fixpose/features/progress/domain/repositories/progress_repository.dart';
+import 'package:fixpose/features/progress/domain/strike_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import '../../core/utils/id_gen.dart';
+import '../../features/library/domain/repositories/workout_repository.dart';
 import '../entities/workout_session.dart';
 import '../repositories/session_repository.dart';
-import '../repositories/workout_repository.dart';
 
 /// Starts (or idempotently returns) the in-flight session.
 ///

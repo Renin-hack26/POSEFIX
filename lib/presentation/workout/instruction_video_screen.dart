@@ -6,7 +6,7 @@ import 'package:video_player/video_player.dart';
 import '../../app/app_dependencies.dart';
 import '../../core/pose/exercise_definition.dart';
 import '../../core/theme/app_theme.dart';
-import '../../domain/entities/exercise.dart';
+import '../../features/library/domain/entities/exercise.dart';
 import '../../shared/widgets/glass_card.dart';
 import '../../shared/widgets/grid_background.dart';
 import '../../shared/widgets/primary_button.dart';
