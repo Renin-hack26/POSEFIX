@@ -3,14 +3,14 @@ import 'dart:math';
 import 'package:intl/intl.dart';
 
 import '../../../../core/utils/extensions.dart';
-import '../../../../domain/entities/workout_session.dart';
-import '../../../../domain/repositories/session_repository.dart';
 import '../../../auth/domain/entities/user_profile.dart';
 import '../../../auth/domain/repositories/user_repository.dart';
 import '../../../chat/domain/entities/chat_message.dart';
 import '../../../chat/domain/repositories/veda_repository.dart';
 import '../../../library/domain/repositories/workout_repository.dart';
 import '../../../nutrition/domain/repositories/nutrition_repository.dart';
+import '../../../workout/domain/entities/workout_session.dart';
+import '../../../workout/domain/repositories/session_repository.dart';
 import '../entities/progress_report.dart';
 import '../repositories/progress_repository.dart';
 

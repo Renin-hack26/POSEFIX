@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 
-import '../../app/app_dependencies.dart';
-import '../../core/pose/exercise_definition.dart';
-import '../../core/theme/app_theme.dart';
-import '../../features/library/domain/entities/exercise.dart';
-import '../../shared/widgets/glass_card.dart';
-import '../../shared/widgets/grid_background.dart';
-import '../../shared/widgets/primary_button.dart';
-import '../../shared/widgets/status_pill.dart';
+import '../../../app/app_dependencies.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/glass_card.dart';
+import '../../../shared/widgets/grid_background.dart';
+import '../../../shared/widgets/primary_button.dart';
+import '../../../shared/widgets/status_pill.dart';
+import '../../library/domain/entities/exercise.dart';
+import '../domain/pose/exercise_definition.dart';
 
 /// 09 — Instruction screen: form-demo player (falls back to a static form
 /// guide when no clip is bundled), coaching steps derived from the exercise's

@@ -2,11 +2,11 @@
 /// (PLANNING §5.2). Computed by `GetHomeDashboard`; presentation maps 1:1.
 library;
 
-import '../../../../domain/entities/workout_session.dart';
 import '../../../library/domain/entities/workout.dart';
 import '../../../plan/domain/entities/training_plan.dart';
 import '../../../progress/domain/entities/report.dart';
 import '../../../progress/domain/entities/strike_state.dart';
+import '../../../workout/domain/entities/workout_session.dart';
 
 /// A scheduled session resolved against the workout catalog.
 class TodaySession {

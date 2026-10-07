@@ -5,10 +5,10 @@ library;
 
 import 'dart:math' as math;
 
-import 'package:fixpose/core/pose/body_structure.dart';
-import 'package:fixpose/core/pose/exercise_definition.dart';
-import 'package:fixpose/core/pose/pose_math.dart' as pm;
-import 'package:fixpose/core/pose/trust_gate.dart';
+import 'package:fixpose/features/workout/domain/pose/body_structure.dart';
+import 'package:fixpose/features/workout/domain/pose/exercise_definition.dart';
+import 'package:fixpose/features/workout/domain/pose/pose_math.dart' as pm;
+import 'package:fixpose/features/workout/domain/pose/trust_gate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Standing person in upright normalised coords — mirrors the reference

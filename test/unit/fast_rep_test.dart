@@ -11,9 +11,9 @@
 /// must still never commit; the wobble double-count guard must stay alive.
 library;
 
-import 'package:fixpose/core/pose/brain_engine.dart';
-import 'package:fixpose/core/pose/exercise_catalog.dart';
-import 'package:fixpose/core/pose/pose_math.dart';
+import 'package:fixpose/features/workout/domain/pose/brain_engine.dart';
+import 'package:fixpose/features/workout/domain/pose/exercise_catalog.dart';
+import 'package:fixpose/features/workout/domain/pose/pose_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 BrainResult feed(

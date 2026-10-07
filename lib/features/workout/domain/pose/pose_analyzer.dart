@@ -25,9 +25,9 @@ import 'dart:ui' show Size;
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
-import '../constants/form_rules.dart';
 import 'brain_engine.dart';
 import 'exercise_definition.dart';
+import 'form_rules.dart';
 import 'pose_math.dart' as pm;
 
 /// Why rep counting is currently paused.

@@ -9,8 +9,8 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:fixpose/core/pose/exercise_catalog.dart';
-import 'package:fixpose/core/pose/exercise_definition.dart';
+import 'package:fixpose/features/workout/domain/pose/exercise_catalog.dart';
+import 'package:fixpose/features/workout/domain/pose/exercise_definition.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

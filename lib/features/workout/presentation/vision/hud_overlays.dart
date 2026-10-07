@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../core/audio/cue_vocabulary.dart';
-import '../../core/pose/pose_analyzer.dart';
-import '../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../domain/audio/cue_vocabulary.dart';
+import '../../domain/pose/pose_analyzer.dart';
 
 /// Banner copy per person-lock reason. Empty for [LockReason.ok]
 /// (the banner is hidden while counting is live).

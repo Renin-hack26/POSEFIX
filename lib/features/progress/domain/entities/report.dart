@@ -2,7 +2,7 @@
 /// plus per-exercise breakdown; source for PDF/CSV export and drill-downs.
 library;
 
-import '../../../../domain/entities/workout_session.dart';
+import '../../../workout/domain/entities/workout_session.dart';
 
 /// Per-exercise rollup inside a report.
 class ExerciseBreakdown {

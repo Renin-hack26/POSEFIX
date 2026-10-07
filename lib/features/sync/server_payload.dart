@@ -3,14 +3,14 @@
 /// `syncedAt` on download — non-null `syncedAt` locally = "matches server".
 library;
 
-import '../../data/mappers/session_json.dart';
-import '../../domain/entities/workout_session.dart';
 import '../chat/domain/entities/chat_message.dart';
 import '../library/domain/entities/meal.dart';
 import '../plan/data/mappers/plan_json.dart';
 import '../plan/domain/entities/training_plan.dart';
 import '../progress/domain/entities/body_metric.dart';
 import '../progress/domain/entities/strike_state.dart';
+import '../workout/data/mappers/session_json.dart';
+import '../workout/domain/entities/workout_session.dart';
 
 DateTime? _updated(Map<String, dynamic> r) {
   final v = r['updated_at'];

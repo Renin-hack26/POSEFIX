@@ -13,11 +13,11 @@ import '../../../core/notification/notification_engine.dart';
 import '../../../core/storage/hive_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_mode_provider.dart';
-import '../../../data/mappers/session_json.dart';
-import '../../../domain/entities/workout_session.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/grid_background.dart';
 import '../../auth/domain/entities/user_profile.dart';
+import '../../workout/data/mappers/session_json.dart';
+import '../../workout/domain/entities/workout_session.dart';
 
 /// Theme choices for the Appearance picker (device-follow by default).
 const _themeOptions = [

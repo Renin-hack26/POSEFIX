@@ -19,7 +19,7 @@ import 'package:fixpose/features/library/domain/repositories/exercise_repository
 import 'package:fixpose/features/library/domain/repositories/workout_repository.dart';
 import 'package:fixpose/features/plan/domain/entities/training_plan.dart';
 import 'package:fixpose/features/plan/domain/repositories/plan_repository.dart';
-import 'package:fixpose/presentation/workout/workout_screen.dart';
+import 'package:fixpose/features/workout/presentation/workout_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -6,11 +6,11 @@ import 'package:intl/intl.dart';
 import '../../../app/app_dependencies.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/extensions.dart';
-import '../../../domain/entities/workout_session.dart';
 import '../../../shared/widgets/app_back_button.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/grid_background.dart';
 import '../../library/domain/entities/meal.dart';
+import '../../workout/domain/entities/workout_session.dart';
 
 /// Log page — one chronological feed of everything the user did: workout
 /// sessions and meals, grouped by day (trailing 30 days) with per-day totals.

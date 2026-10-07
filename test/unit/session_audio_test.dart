@@ -2,9 +2,9 @@
 library;
 
 import 'package:fixpose/core/audio/sound_engine.dart';
-import 'package:fixpose/core/pose/brain_engine.dart';
-import 'package:fixpose/core/pose/pose_analyzer.dart';
-import 'package:fixpose/engines/session_audio/session_audio_cues.dart';
+import 'package:fixpose/features/workout/domain/audio/session_audio_cues.dart';
+import 'package:fixpose/features/workout/domain/pose/brain_engine.dart';
+import 'package:fixpose/features/workout/domain/pose/pose_analyzer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Fake engine that records calls without touching platform channels.

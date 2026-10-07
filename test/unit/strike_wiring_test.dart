@@ -14,7 +14,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 const String _screenPath =
-    'lib/presentation/vision/vision_session_screen.dart';
+    'lib/features/workout/presentation/vision/vision_session_screen.dart';
 
 void main() {
   final source = File(_screenPath).readAsStringSync();

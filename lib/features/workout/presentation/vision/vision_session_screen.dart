@@ -10,27 +10,27 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import '../../app/app_dependencies.dart';
-import '../../core/audio/cue_vocabulary.dart';
-import '../../core/pose/angle_readouts.dart';
-import '../../core/pose/body_structure.dart';
-import '../../core/pose/brain_engine.dart';
-import '../../core/pose/exercise_definition.dart';
-import '../../core/pose/pose_analyzer.dart';
-import '../../core/pose/round_tracker.dart';
-import '../../core/pose/trust_gate.dart';
-import '../../core/theme/app_theme.dart';
+import '../../../../app/app_dependencies.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/glass_card.dart';
+import '../../../../shared/widgets/primary_button.dart';
+import '../../../library/domain/entities/workout.dart';
+import '../../domain/audio/cue_vocabulary.dart';
+import '../../domain/audio/session_audio_cues.dart';
 import '../../domain/entities/workout_session.dart';
+import '../../domain/pose/angle_readouts.dart';
+import '../../domain/pose/body_structure.dart';
+import '../../domain/pose/brain_engine.dart';
+import '../../domain/pose/exercise_definition.dart';
+import '../../domain/pose/pose_analyzer.dart';
+import '../../domain/pose/round_tracker.dart';
+import '../../domain/pose/trust_gate.dart';
 import '../../domain/repositories/session_repository.dart';
-import '../../engines/session_audio/session_audio_cues.dart';
-import '../../features/library/domain/entities/workout.dart';
-import '../../shared/widgets/glass_card.dart';
-import '../../shared/widgets/primary_button.dart';
-import '../workout/widgets/framing_guide.dart';
-import '../workout/widgets/posture_avatar.dart';
-import '../workout/widgets/vision_hud.dart';
-import 'session_flow.dart';
-import 'vision_hud.dart';
+import '../../domain/session_flow.dart';
+import '../widgets/framing_guide.dart';
+import '../widgets/posture_avatar.dart';
+import '../widgets/vision_hud.dart';
+import 'hud_overlays.dart';
 
 /// Live workout vision screen: back-camera preview + [PoseAnalyzer] rep
 /// counting with spoken coaching. Live skeleton overlay shows exactly what

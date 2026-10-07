@@ -1,4 +1,4 @@
-import '../../../../data/datasources/local/session_dao.dart';
+import '../../../workout/data/datasources/local/session_dao.dart';
 import '../../domain/entities/exercise.dart';
 import '../../domain/entities/workout.dart';
 import '../../domain/repositories/workout_repository.dart';

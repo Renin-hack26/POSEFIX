@@ -3,7 +3,7 @@
 /// Open Vission `trust.py` contract point for point.
 library;
 
-import 'package:fixpose/core/pose/trust_gate.dart';
+import 'package:fixpose/features/workout/domain/pose/trust_gate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 List<double> _vis(double v) => List<double>.filled(33, v);

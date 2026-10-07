@@ -1,11 +1,11 @@
 import '../../../../core/utils/extensions.dart';
-import '../../../../domain/repositories/session_repository.dart';
 import '../../../library/domain/repositories/content_repository.dart';
 import '../../../library/domain/repositories/workout_repository.dart';
 import '../../../plan/domain/repositories/plan_repository.dart';
 import '../../../progress/domain/entities/report.dart';
 import '../../../progress/domain/strike_engine.dart';
 import '../../../progress/domain/usecases/get_strike_state.dart';
+import '../../../workout/domain/repositories/session_repository.dart';
 import '../entities/home_dashboard.dart';
 
 /// Single-pass HOME aggregation (PLANNING §5.2) — one provider refresh feeds

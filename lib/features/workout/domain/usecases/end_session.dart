@@ -1,8 +1,8 @@
-import '../../features/plan/domain/entities/training_plan.dart';
-import '../../features/plan/domain/repositories/plan_repository.dart';
-import '../../features/progress/domain/entities/report.dart';
-import '../../features/progress/domain/repositories/progress_repository.dart';
-import '../../features/progress/domain/strike_engine.dart';
+import '../../../plan/domain/entities/training_plan.dart';
+import '../../../plan/domain/repositories/plan_repository.dart';
+import '../../../progress/domain/entities/report.dart';
+import '../../../progress/domain/repositories/progress_repository.dart';
+import '../../../progress/domain/strike_engine.dart';
 import '../entities/workout_session.dart';
 import '../repositories/session_repository.dart';
 

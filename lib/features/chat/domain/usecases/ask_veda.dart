@@ -1,10 +1,10 @@
 import '../../../../core/utils/extensions.dart';
 import '../../../../core/utils/id_gen.dart';
-import '../../../../domain/repositories/session_repository.dart';
 import '../../../library/domain/repositories/workout_repository.dart';
 import '../../../nutrition/domain/repositories/nutrition_repository.dart';
 import '../../../plan/domain/repositories/plan_repository.dart';
 import '../../../progress/domain/repositories/progress_repository.dart';
+import '../../../workout/domain/repositories/session_repository.dart';
 import '../entities/chat_message.dart';
 import '../repositories/veda_repository.dart';
 

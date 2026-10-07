@@ -3,7 +3,7 @@
 /// side is verified on-device; here both sides agree on the shapes.
 library;
 
-import 'package:fixpose/core/pose/pose_landmarker_source.dart';
+import 'package:fixpose/features/workout/domain/pose/pose_landmarker_source.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

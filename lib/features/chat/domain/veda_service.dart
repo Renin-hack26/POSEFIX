@@ -2,8 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/app_dependencies.dart';
 import '../../../core/errors/app_exception.dart';
-import '../../../domain/repositories/session_repository.dart';
 import '../../library/domain/repositories/workout_repository.dart';
+import '../../workout/domain/repositories/session_repository.dart';
 import 'entities/chat_message.dart';
 import 'repositories/veda_repository.dart';
 

@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../../core/storage/app_database.dart';
+import '../../../../../core/storage/app_database.dart';
 import '../../../domain/entities/workout_session.dart';
 import '../../mappers/session_json.dart';
 

@@ -1,7 +1,7 @@
 /// Pose math unit tests — angle geometry, EMA smoothing, bbox/centroid.
 library;
 
-import 'package:fixpose/core/pose/pose_math.dart';
+import 'package:fixpose/features/workout/domain/pose/pose_math.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

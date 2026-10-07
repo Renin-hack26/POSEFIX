@@ -9,15 +9,15 @@
 /// (8.2 bilateral one-count-per-cycle is pinned by WS9.2 tests.)
 library;
 
-import 'package:fixpose/core/audio/cue_vocabulary.dart';
 import 'package:fixpose/core/audio/sound_engine.dart';
-import 'package:fixpose/core/pose/angle_readouts.dart';
-import 'package:fixpose/core/pose/brain_engine.dart';
-import 'package:fixpose/core/pose/exercise_catalog.dart';
-import 'package:fixpose/core/pose/exercise_definition.dart';
-import 'package:fixpose/core/pose/pose_analyzer.dart';
-import 'package:fixpose/core/pose/pose_math.dart' show LmPoint;
-import 'package:fixpose/presentation/vision/vision_hud.dart';
+import 'package:fixpose/features/workout/domain/audio/cue_vocabulary.dart';
+import 'package:fixpose/features/workout/domain/pose/angle_readouts.dart';
+import 'package:fixpose/features/workout/domain/pose/brain_engine.dart';
+import 'package:fixpose/features/workout/domain/pose/exercise_catalog.dart';
+import 'package:fixpose/features/workout/domain/pose/exercise_definition.dart';
+import 'package:fixpose/features/workout/domain/pose/pose_analyzer.dart';
+import 'package:fixpose/features/workout/domain/pose/pose_math.dart' show LmPoint;
+import 'package:fixpose/features/workout/presentation/vision/hud_overlays.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 List<ExerciseDefinition> _allDefs() {

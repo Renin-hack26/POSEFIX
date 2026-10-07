@@ -4,14 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/audio/sound_engine.dart';
 import '../core/notification/notification_engine.dart';
-import '../core/pose/exercise_definition.dart';
-import '../core/pose/pose_analyzer.dart';
 import '../core/storage/app_database.dart';
-import '../data/datasources/local/session_dao.dart';
-import '../data/repositories/session_repository_impl.dart';
-import '../domain/repositories/session_repository.dart';
-import '../domain/usecases/end_session.dart';
-import '../domain/usecases/start_session.dart';
 import '../features/auth/data/datasources/remote/auth_remote_data_source.dart';
 import '../features/auth/data/datasources/remote/email_service.dart';
 import '../features/auth/data/repositories/user_repository_impl.dart';
@@ -52,6 +45,13 @@ import '../features/progress/domain/strike_engine.dart';
 import '../features/progress/domain/usecases/generate_progress_report.dart';
 import '../features/progress/domain/usecases/get_strike_state.dart';
 import '../features/sync/sync_engine.dart';
+import '../features/workout/data/datasources/local/session_dao.dart';
+import '../features/workout/data/repositories/session_repository_impl.dart';
+import '../features/workout/domain/pose/exercise_definition.dart';
+import '../features/workout/domain/pose/pose_analyzer.dart';
+import '../features/workout/domain/repositories/session_repository.dart';
+import '../features/workout/domain/usecases/end_session.dart';
+import '../features/workout/domain/usecases/start_session.dart';
 
 /// P1 auth/OTP dependency graph (Riverpod):
 /// data sources → repository → use cases. Screens read only the use-case

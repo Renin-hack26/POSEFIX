@@ -22,7 +22,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'cue_vocabulary.dart';
+import '../../features/workout/domain/audio/cue_vocabulary.dart';
 import 'tone_synth.dart';
 
 /// Sound effect types for distinct workout events.

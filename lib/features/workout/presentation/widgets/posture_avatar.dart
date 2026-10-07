@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_theme.dart';
 
 /// "Follow along" posture card pinned to the top-right of the vision screen
 /// (sample `.avatar-guide`): target-pose silhouette plus caption.

@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import '../../../app/app_dependencies.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/extensions.dart';
-import '../../../domain/entities/workout_session.dart';
 import '../../../shared/widgets/glass_card.dart';
 import '../../../shared/widgets/grid_background.dart';
 import '../../../shared/widgets/primary_button.dart';
@@ -16,6 +15,7 @@ import '../../library/domain/entities/exercise.dart';
 import '../../library/domain/entities/meal.dart';
 import '../../library/domain/entities/workout.dart';
 import '../../library/domain/library_search.dart';
+import '../../workout/domain/entities/workout_session.dart';
 import '../domain/entities/training_plan.dart';
 
 /// 12 · Plan tab (sample/index.html): week header + navigation, quick chips,

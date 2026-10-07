@@ -17,11 +17,11 @@ import '../features/onboarding/presentation/splash_screen.dart';
 import '../features/plan/presentation/plan_screen.dart';
 import '../features/progress/presentation/report_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
-import '../presentation/vision/vision_session_screen.dart';
-import '../presentation/workout/instruction_video_screen.dart';
-import '../presentation/workout/session_summary_screen.dart';
-import '../presentation/workout/workout_details_screen.dart';
-import '../presentation/workout/workout_screen.dart';
+import '../features/workout/presentation/instruction_video_screen.dart';
+import '../features/workout/presentation/session_summary_screen.dart';
+import '../features/workout/presentation/vision/vision_session_screen.dart';
+import '../features/workout/presentation/workout_details_screen.dart';
+import '../features/workout/presentation/workout_screen.dart';
 import 'app_shell.dart';
 
 /// Root navigator key (for full-screen routes: vision, OTP, etc.).

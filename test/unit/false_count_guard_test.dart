@@ -15,8 +15,8 @@
 /// exactly 3 frames).
 library;
 
-import 'package:fixpose/core/pose/brain_engine.dart';
-import 'package:fixpose/core/pose/exercise_catalog.dart';
+import 'package:fixpose/features/workout/domain/pose/brain_engine.dart';
+import 'package:fixpose/features/workout/domain/pose/exercise_catalog.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 BrainResult feed(BrainEngine engine, double angle, double t) =>

@@ -13,8 +13,6 @@
 library;
 
 import 'package:fixpose/core/utils/extensions.dart';
-import 'package:fixpose/domain/entities/workout_session.dart';
-import 'package:fixpose/domain/repositories/session_repository.dart';
 import 'package:fixpose/features/chat/domain/entities/chat_message.dart';
 import 'package:fixpose/features/chat/domain/repositories/veda_repository.dart';
 import 'package:fixpose/features/chat/domain/usecases/ask_veda.dart';
@@ -28,6 +26,8 @@ import 'package:fixpose/features/plan/domain/repositories/plan_repository.dart';
 import 'package:fixpose/features/progress/domain/entities/body_metric.dart';
 import 'package:fixpose/features/progress/domain/entities/strike_state.dart';
 import 'package:fixpose/features/progress/domain/repositories/progress_repository.dart';
+import 'package:fixpose/features/workout/domain/entities/workout_session.dart';
+import 'package:fixpose/features/workout/domain/repositories/session_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Transport fake: captures the system prompt + turns, returns a canned

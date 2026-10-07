@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_theme.dart';
 
 /// "Stand inside the frame" positioning guide (sample `.frame-guide`): dims
 /// everything outside the dashed frame, adds an inner chartreuse glow and the

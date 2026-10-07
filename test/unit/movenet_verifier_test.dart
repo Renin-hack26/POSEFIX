@@ -4,8 +4,8 @@ library;
 
 import 'dart:typed_data';
 
-import 'package:fixpose/core/pose/movenet_verifier.dart';
-import 'package:fixpose/core/pose/trust_gate.dart';
+import 'package:fixpose/features/workout/domain/pose/movenet_verifier.dart';
+import 'package:fixpose/features/workout/domain/pose/trust_gate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Fake interpreter replaying one canned 17-keypoint output.

@@ -1,5 +1,5 @@
-import 'package:fixpose/core/pose/brain_engine.dart';
-import 'package:fixpose/core/pose/exercise_catalog.dart';
+import 'package:fixpose/features/workout/domain/pose/brain_engine.dart';
+import 'package:fixpose/features/workout/domain/pose/exercise_catalog.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Rep rejection & count integrity (WS2 §2.10 + WS9.4): a rep that fires

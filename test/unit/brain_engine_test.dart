@@ -2,8 +2,8 @@
 /// and the condition language, all driven by synthetic angles (no camera).
 library;
 
-import 'package:fixpose/core/pose/brain_engine.dart';
-import 'package:fixpose/core/pose/exercise_catalog.dart';
+import 'package:fixpose/features/workout/domain/pose/brain_engine.dart';
+import 'package:fixpose/features/workout/domain/pose/exercise_catalog.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Feeds one frame into [engine] and returns the result.

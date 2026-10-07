@@ -3,9 +3,9 @@
 /// trust-blind mode (legacy/tests) behaves exactly as before.
 library;
 
-import 'package:fixpose/core/pose/brain_engine.dart';
-import 'package:fixpose/core/pose/exercise_catalog.dart';
-import 'package:fixpose/core/pose/trust_gate.dart';
+import 'package:fixpose/features/workout/domain/pose/brain_engine.dart';
+import 'package:fixpose/features/workout/domain/pose/exercise_catalog.dart';
+import 'package:fixpose/features/workout/domain/pose/trust_gate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 TrustBreakdown _good() => TrustBreakdown(

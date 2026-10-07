@@ -3,15 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../app/app_dependencies.dart';
-import '../../core/theme/app_theme.dart';
-import '../../domain/entities/workout_session.dart';
-import '../../domain/usecases/end_session.dart';
-import '../../shared/widgets/glass_card.dart';
-import '../../shared/widgets/grid_background.dart';
-import '../../shared/widgets/primary_button.dart';
-import '../../shared/widgets/section_header.dart';
-import '../../shared/widgets/status_pill.dart';
+import '../../../app/app_dependencies.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/glass_card.dart';
+import '../../../shared/widgets/grid_background.dart';
+import '../../../shared/widgets/primary_button.dart';
+import '../../../shared/widgets/section_header.dart';
+import '../../../shared/widgets/status_pill.dart';
+import '../domain/entities/workout_session.dart';
+import '../domain/usecases/end_session.dart';
 
 /// 11 — Session summary: completion headline, result stats, per-exercise
 /// breakdown, streak banner and the exit actions.

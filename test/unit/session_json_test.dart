@@ -3,7 +3,7 @@
 /// on those and wedged the sync pass on a single row.
 library;
 
-import 'package:fixpose/data/mappers/session_json.dart';
+import 'package:fixpose/features/workout/data/mappers/session_json.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

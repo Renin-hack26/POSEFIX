@@ -17,8 +17,6 @@ import 'dart:io';
 
 import 'package:fixpose/app/app_dependencies.dart';
 import 'package:fixpose/core/theme/app_theme.dart';
-import 'package:fixpose/domain/entities/workout_session.dart';
-import 'package:fixpose/domain/repositories/session_repository.dart';
 import 'package:fixpose/features/library/data/mappers/content_mappers.dart';
 import 'package:fixpose/features/library/domain/entities/exercise.dart';
 import 'package:fixpose/features/library/domain/entities/meal.dart';
@@ -29,6 +27,8 @@ import 'package:fixpose/features/nutrition/domain/repositories/nutrition_reposit
 import 'package:fixpose/features/plan/domain/entities/training_plan.dart';
 import 'package:fixpose/features/plan/domain/repositories/plan_repository.dart';
 import 'package:fixpose/features/plan/presentation/plan_screen.dart';
+import 'package:fixpose/features/workout/domain/entities/workout_session.dart';
+import 'package:fixpose/features/workout/domain/repositories/session_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

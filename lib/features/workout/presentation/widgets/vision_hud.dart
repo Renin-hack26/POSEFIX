@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_theme.dart';
 
 /// Rep-count HUD (sample `.hud`) overlaid on the top-left of the live preview:
 /// big rep total plus round and time chips.

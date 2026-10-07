@@ -6,8 +6,8 @@
 library;
 
 import 'package:fixpose/core/audio/sound_engine.dart';
-import 'package:fixpose/core/pose/brain_engine.dart';
-import 'package:fixpose/core/pose/pose_analyzer.dart';
+import 'package:fixpose/features/workout/domain/pose/brain_engine.dart';
+import 'package:fixpose/features/workout/domain/pose/pose_analyzer.dart';
 
 /// Maps end-of-session stats onto a completion mood.
 ///

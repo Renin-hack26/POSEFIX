@@ -3,8 +3,8 @@
 /// camera/session UI itself is not harness-testable.
 library;
 
-import 'package:fixpose/core/audio/cue_vocabulary.dart';
-import 'package:fixpose/core/pose/round_tracker.dart';
+import 'package:fixpose/features/workout/domain/audio/cue_vocabulary.dart';
+import 'package:fixpose/features/workout/domain/pose/round_tracker.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
