@@ -7,7 +7,7 @@
 /// registered accounts. Faked client; no network.
 library;
 
-import 'package:fixpose/data/datasources/remote/auth_remote_data_source.dart';
+import 'package:fixpose/features/auth/data/datasources/remote/auth_remote_data_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

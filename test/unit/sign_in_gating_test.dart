@@ -5,9 +5,9 @@
 library;
 
 import 'package:fixpose/core/errors/app_exception.dart';
-import 'package:fixpose/data/datasources/remote/auth_remote_data_source.dart';
-import 'package:fixpose/data/datasources/remote/email_service.dart';
-import 'package:fixpose/data/repositories/user_repository_impl.dart';
+import 'package:fixpose/features/auth/data/datasources/remote/auth_remote_data_source.dart';
+import 'package:fixpose/features/auth/data/datasources/remote/email_service.dart';
+import 'package:fixpose/features/auth/data/repositories/user_repository_impl.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 

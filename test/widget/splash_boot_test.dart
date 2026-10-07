@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:fixpose/core/storage/hive_service.dart';
+import 'package:fixpose/features/auth/presentation/sign_in_screen.dart';
+import 'package:fixpose/features/onboarding/presentation/permission_screen.dart';
+import 'package:fixpose/features/onboarding/presentation/splash_screen.dart';
 import 'package:fixpose/main.dart';
-import 'package:fixpose/presentation/auth/sign_in_screen.dart';
-import 'package:fixpose/presentation/permissions/permission_screen.dart';
-import 'package:fixpose/presentation/splash/splash_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
