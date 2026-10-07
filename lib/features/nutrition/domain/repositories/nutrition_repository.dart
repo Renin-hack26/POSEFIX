@@ -1,4 +1,4 @@
-import '../../../../core/utils/extensions.dart';
+﻿import '../../../../core/utils/extensions.dart';
 import '../../../library/domain/entities/meal.dart';
 
 /// Nutrition — bundled food catalog (search), manual entries and the daily

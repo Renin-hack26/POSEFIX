@@ -1,4 +1,4 @@
-import '../../../core/utils/extensions.dart';
+﻿import '../../../core/utils/extensions.dart';
 import 'entities/strike_state.dart';
 
 /// STRIKE_ENGINE — continuous-day strike + badge tiers (PLANNING §4.3).

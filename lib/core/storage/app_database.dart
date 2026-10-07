@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart';
+﻿import 'package:drift/drift.dart';
 
 import '../../features/chat/data/datasources/local/chat_dao.dart';
 import '../../features/library/data/datasources/local/exercise_dao.dart';

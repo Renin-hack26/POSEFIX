@@ -1,4 +1,4 @@
-/// Post-workout report (FR-6) — snapshot of a session's headline metrics
+﻿/// Post-workout report (FR-6) — snapshot of a session's headline metrics
 /// plus per-exercise breakdown; source for PDF/CSV export and drill-downs.
 library;
 

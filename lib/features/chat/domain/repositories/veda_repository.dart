@@ -1,4 +1,4 @@
-import '../entities/chat_message.dart';
+﻿import '../entities/chat_message.dart';
 
 /// VEDA chat — local history (synced to the account) + GROQ transport.
 ///

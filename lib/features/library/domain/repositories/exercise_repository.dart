@@ -1,4 +1,4 @@
-import '../entities/exercise.dart';
+﻿import '../entities/exercise.dart';
 
 /// Exercise catalog access — bundled seed content + per-user progress flags.
 ///
