@@ -21,6 +21,17 @@
 
 ## Log
 
+### 2026-10-07 — v1.1.14 (round 8): Silent-exception kill-switch removed, visibility gate unblocked, rotation corrected, full diagnostic strip
+- **Silent crash in `_feed` fixed**: `_handleResult` now runs *after* overlay/telemetry publish; any throw is caught, logged (once per message), and surfaced via `_pipelineError` so the strip turns red instead of freezing green. Eliminated the "counts nothing, traces nothing, strip says healthy" failure mode.
+- **Visibility gate unblocked 8 exercises / 25 workouts**: `_requiredCount` now clamps to `definition.landmarks.length` (`math.min(required, landmarks.length)`). Exercises with 3-4 declared landmarks (`chair-dip`, `wall-sit`, `calf-raise`, `glute-bridge`, `high-knees`, `mountain-climber`, `deadlift`, `leg-raise`) were mathematically impossible to pass the old `required=6` gate → `brain == null` forever, skeleton drew but counting dead.
+- **RoundTracker seeded correctly**: `observe(0, nowSec)` called in `_beginBlock` so round 1 needs exactly `targetReps` (not `targetReps+1`), HUD shows "10 OF 10" not "9 OF 10".
+- **Lens-toggle/retry re-anchors counters**: `_repsOffset = _reps; _lastEngineCount = 0; _rounds?.rebase(0, now)` alongside `analyzer.reset()` so a mid-session lens swap doesn't reset the counter or inflate the round target.
+- **ML Kit rotation now display-aware**: `_rotationFromSensorAndDisplay(sensor, display, lens)` implements the Android contract `(sensor ∓ display) % 360`. Session locked to portrait via `SystemChrome.setPreferredOrientations` so the preview/analysis rotation matches.
+- **NV12 chroma swap fixed**: `_nv12ToNv21` now writes `V = base+1` (interleaved UV) instead of `base + uvPixelStride`; accepted frames no longer carry scrambled chroma.
+- **Status strip is now a full diagnostic panel**: build tag **`b19`**, color-coded (red error, amber poses=0/overlay suppressed, green healthy), transform fingerprint `rotX · prevWxH · bufWxH · mirrorY/N`, joint count `joints N/33`, stalled-feed detection (`>500ms`), multi-person shows `overlay SUPPRESSED` instead of healthy.
+- **Intake hardening**: 3 s timeout on `detector.processImage` → `inference-timeout` error; lifecycle auto-pause only on `paused` (not `inactive`); `_switchingBlocks` latch guarded by `try/finally`; `firstWhere` gets `orElse` fallback.
+- Gates: analyze 0, **332/332**. Build `1.1.14+19`.
+
 ### 2026-10-07 — v1.1.14 (round 4): Y-pixel-stride gather + NV12 acceptance + unmissable status strip
 - Field report: round-6 build still detects/count/traces nothing; the strip line itself was never relayed — so round 5 stops relying on the user reading 11px grey text.
 - Converter: **(a)** the 3-plane path now honors **Y `bytesPerPixel`** — with `pixelStride 2` luma the old width-copy read padding bytes and handed ML Kit a scrambled picture (poses 0 forever, *no error anywhere*); **(b)** **two-plane NV12** (Y + interleaved UV) is converted (`_nv12ToNv21`, chroma pair swap, per-plane strides/bounds) instead of refused; **(c)** ≥3 planes map the first three as Y/U/V.

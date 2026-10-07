@@ -19,6 +19,7 @@
 library;
 
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' show Size;
 
@@ -479,7 +480,13 @@ class PoseAnalyzer {
       'push_up': 'pushup',
       'jumping_jack': 'jumpingJack',
     };
-    return FormRules.minVisibleLandmarks[keyById[definition.id]] ?? 6;
+    final required = FormRules.minVisibleLandmarks[keyById[definition.id]] ?? 6;
+    // Clamp to the number of landmarks the definition actually declares.
+    // Some exercises (chair-dip, wall-sit, calf-raise, glute-bridge, high-knees,
+    // mountain-climber, deadlift, leg-raise) declare only 3-4 landmarks but
+    // the default required=6 would make the visibility gate mathematically
+    // impossible to pass, permanently occluding the brain engine.
+    return math.min(required, definition.landmarks.length);
   }
 
   pm.LmPoint? _torsoCentroid(
@@ -773,10 +780,13 @@ class PoseAnalyzer {
     }
     for (var row = 0; row < height ~/ 2; row++) {
       for (var col = 0; col < width ~/ 2; col++) {
+        // NV12 stores U,V interleaved per pixel: [U0,V0, U1,V1, ...].
+        // uvPixelStride is typically 2 (distance between U0 and V0) or 1 (packed UV).
+        // Each chroma pair spans 2 * uvPixelStride bytes.
         final base = row * uvRowStride + col * 2 * uvPixelStride;
         final u = base < uv.length ? uv[base] : 0x80;
-        final v =
-            base + uvPixelStride < uv.length ? uv[base + uvPixelStride] : 0x80;
+        // V is the byte immediately after U in the interleaved stream.
+        final v = base + 1 < uv.length ? uv[base + 1] : 0x80;
         out[o++] = v;
         out[o++] = u;
       }

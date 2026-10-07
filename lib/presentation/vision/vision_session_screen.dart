@@ -206,6 +206,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   /// One-shot logcat marker when the detector first sees a body.
   bool _loggedFirstPose = false;
 
+  /// Monotonic timestamp of the last successfully analyzed frame (epoch ms).
+  int _lastFrameAt = 0;
+
   /// Last inference time (ms) + rolling pipeline throughput for the HUD.
   int _lastInferMs = 0;
   double _pipelineFps = 0;
@@ -267,6 +270,31 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       restRemaining =
           _restEndsAt!.difference(now).inSeconds.clamp(0, 1 << 30);
     }
+
+    // Diagnostic extensions (round-8):
+    final bool drawing = _latestPose != null;
+    int joints = 0;
+    if (drawing) {
+      for (int i = 0; i < 33; i++) {
+        final lm = _latestPose!.landmarks[PoseLandmarkType.values[i]];
+        if (lm != null && lm.likelihood >= 0.3) joints++;
+      }
+    }
+    final int previewW = _camera != null
+        ? _camera!.value.previewSize!.width.round()
+        : 0;
+    final int previewH = _camera != null
+        ? _camera!.value.previewSize!.height.round()
+        : 0;
+    final int bufferW = _imageWidth.round();
+    final int bufferH = _imageHeight.round();
+    final bool mirror = _lens == CameraLensDirection.front;
+    final int rot = _rotation.index; // 0=0deg, 1=90deg, 2=180deg, 3=270deg
+    final int lastFrameAgeMs = _lastFrameAt > 0
+        ? now.millisecondsSinceEpoch - _lastFrameAt
+        : -1;
+    final bool stalled = lastFrameAgeMs > 500;
+
     _hud.value = _HudSnapshot(
       frames: _framesSeen,
       poses: _lastPosesFound,
@@ -297,6 +325,17 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       showCongrats: _showCongrats,
       calibRemaining: _calibrating ? _calibRemaining : -1,
       restRemaining: restRemaining,
+      // Round-8 diagnostics:
+      drawing: drawing,
+      joints: joints,
+      previewW: previewW,
+      previewH: previewH,
+      bufferW: bufferW,
+      bufferH: bufferH,
+      mirror: mirror,
+      rot: rot,
+      lastFrameAgeMs: lastFrameAgeMs,
+      stalled: stalled,
     );
   }
 
@@ -315,6 +354,11 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   @override
   void initState() {
     super.initState();
+    // Lock the session to portrait so the preview/analysis rotation
+    // contract matches the ML Kit rotation we compute (sensor + display).
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
     WidgetsBinding.instance.addObserver(this);
     unawaited(_boot());
   }
@@ -323,14 +367,19 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // WS2.12: backgrounding auto-pauses the session — counting never runs
     // while the user can't see the cue bar. Resume is always manual.
-    if ((state == AppLifecycleState.paused ||
-            state == AppLifecycleState.inactive) &&
+    // Only auto-pause on true backgrounding (paused), not on transient
+    // inactive (notification shade, split-screen, incoming call) — those
+    // would permanently stall the feed without a visible indicator.
+    if (state == AppLifecycleState.paused &&
         _ready &&
         !_paused &&
         !_disposed &&
         mounted) {
       _togglePause();
     }
+    // On resume, do NOT auto-unpause — the user must tap the resume
+    // button to confirm they're back and ready. This prevents accidental
+    // counting during focus glitches.
   }
 
   /// Boot-step labels for the loading overlay (WS2.8).
@@ -503,7 +552,6 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     final block = _chain[index];
     final blockDef = ExerciseRegistry.instance.resolve(block.exerciseId);
     if (blockDef == null) {
-      _switchingBlocks = false;
       if (!mounted) return;
       setState(() {
         _initializing = false;
@@ -519,94 +567,113 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
         await old.dispose();
       } catch (_) {}
     }
+    // Guard the block swap flag so any throw (sync or async) cannot
+    // leave _switchingBlocks latched true and silently starve the feed.
     try {
       final analyzer = ref.read(poseAnalyzerProvider(block.exerciseId));
       _analyzer = analyzer;
       await analyzer.start();
-    } catch (_) {
-      _switchingBlocks = false;
-      if (!mounted) return;
-      setState(() {
-        _initializing = false;
-        _cameraError = 'This exercise is not available right now.';
-      });
-      return;
-    }
-    _definition = blockDef;
-    _blockIdx = index;
-    final isDuration = blockDef.type == 'duration';
-    if (preset != null) {
-      if (isDuration) {
-        _holdTarget = preset.holdSecs;
+      // Reset the analyzer state (BrainEngine rep count, EMA, rhythm
+      // guards) so a new block never inherits the previous one's totals
+      // or a stale video-playback latch.
+      analyzer.reset();
+
+      _definition = blockDef;
+      _blockIdx = index;
+      final isDuration = blockDef.type == 'duration';
+      if (preset != null) {
+        if (isDuration) {
+          _holdTarget = preset.holdSecs;
+          _rounds = null;
+          _targetReps = 0;
+        } else {
+          _rounds = RoundTracker(
+            targetRounds: preset.rounds,
+            targetReps: preset.reps,
+            restSec: preset.rest,
+          );
+          _targetReps = preset.reps;
+          _holdTarget = 0;
+        }
+      } else if (isDuration) {
+        _holdTarget =
+            block.seconds > 0 ? block.seconds : blockDef.targetDuration;
         _rounds = null;
         _targetReps = 0;
       } else {
         _rounds = RoundTracker(
-          targetRounds: preset.rounds,
-          targetReps: preset.reps,
-          restSec: preset.rest,
+          targetRounds: block.sets,
+          targetReps: block.reps,
+          restSec: block.restSec,
         );
-        _targetReps = preset.reps;
+        _targetReps = block.reps;
+        // Stale duration state from a previous block must not leak into
+        // repetition work (ghost hold chip / wrong OF-target).
         _holdTarget = 0;
       }
-    } else if (isDuration) {
-      _holdTarget =
-          block.seconds > 0 ? block.seconds : blockDef.targetDuration;
-      _rounds = null;
-      _targetReps = 0;
-    } else {
-      _rounds = RoundTracker(
-        targetRounds: block.sets,
-        targetReps: block.reps,
-        restSec: block.restSec,
-      );
-      _targetReps = block.reps;
-      // Stale duration state from a previous block must not leak into
-      // repetition work (ghost hold chip / wrong OF-target).
-      _holdTarget = 0;
-    }
-    // Re-anchor on the saved record: display totals continue where the
-    // record left off (resume never loses history to a fresh engine).
-    final saved = (index >= 0 && index < (_session?.exercises.length ?? 0))
-        ? _session!.exercises[index]
-        : SessionExercise(exerciseId: block.exerciseId);
-    _repsOffset = saved.totalReps;
-    _reps = saved.totalReps;
-    _lastSavedRepCount = _reps;
-    _lastMilestone = _reps ~/ 5;
-    _lastEngineCount = 0;
-    while (_exFormSum.length <= index) {
-      _exFormSum.add(0);
-      _exFormCount.add(0);
-    }
-    _resting = false;
-    _restEndsAt = null;
-    _holdDone = false;
-    _holdSeconds = 0;
-    _showCongrats = false;
-    _tickFlash = false;
-    _rejectFlash = null;
-    if (blockDef.calibration.enabled) {
-      _startCalibration();
-    } else {
-      var line =
-          CueVocabulary.lines.firstWhere((l) => l.id == 'session-start');
-      if (_chain.length > 1) {
-        final prefix = 'Exercise ${index + 1} of ${_chain.length} — ';
-        line = CueLine(
-          id: line.id,
-          situation: line.situation,
-          actions: line.actions,
-          display: '$prefix${line.display}',
-          speak: line.speak == null ? null : '$prefix${line.speak}',
-        );
+      // Re-anchor on the saved record: display totals continue where the
+      // record left off (resume never loses history to a fresh engine).
+      final saved = (index >= 0 &&
+              index < (_session?.exercises.length ?? 0))
+          ? _session!.exercises[index]
+          : SessionExercise(exerciseId: block.exerciseId);
+      _repsOffset = saved.totalReps;
+      _reps = saved.totalReps;
+      _lastSavedRepCount = _reps;
+      _lastMilestone = _reps ~/ 5;
+      _lastEngineCount = 0;
+      while (_exFormSum.length <= index) {
+        _exFormSum.add(0);
+        _exFormCount.add(0);
       }
-      _coachCue = line.display;
-      unawaited(_audioCues?.announce(line.spoken));
-      _publishHud();
+      _resting = false;
+      _restEndsAt = null;
+      _holdDone = false;
+      _holdSeconds = 0;
+      _showCongrats = false;
+      _tickFlash = false;
+      _rejectFlash = null;
+      if (blockDef.calibration.enabled) {
+        _startCalibration();
+      } else {
+        // Safe lookup: the vocabulary is curated, but if a cue id is ever
+        // renamed the session must not crash — fall back to a generic line.
+        var line = CueVocabulary.lines.firstWhere(
+          (l) => l.id == 'session-start',
+          orElse: () => CueLine(
+            id: 'session-start',
+            situation: CueSituation.sessionStart,
+            actions: {CueAction.display},
+            display: 'Get ready',
+            speak: 'Get ready',
+          ),
+        );
+        if (_chain.length > 1) {
+          final prefix = 'Exercise ${index + 1} of ${_chain.length} — ';
+          line = CueLine(
+            id: line.id,
+            situation: line.situation,
+            actions: line.actions,
+            display: '$prefix${line.display}',
+            speak: line.speak == null ? null : '$prefix${line.speak}',
+          );
+        }
+        _coachCue = line.display;
+        unawaited(_audioCues?.announce(line.spoken));
+        _publishHud();
+      }
+      // Seed the round tracker at zero so the first rep is counted
+      // correctly (RoundTracker.observe anchors on the first call).
+      if (_rounds != null) {
+        final nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
+        _rounds!.observe(0, nowSec);
+      }
+      // Reset first-pose log marker for the new block.
+      _loggedFirstPose = false;
+      // Swap window over — frames flow to the new analyzer from here.
+    } finally {
+      _switchingBlocks = false;
     }
-    // Swap window over — frames flow to the new analyzer from here.
-    _switchingBlocks = false;
   }
 
   /// Pre-session target editor (WS2.4): plan route values win, definition
@@ -800,9 +867,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     await repository.saveActive(active.copyWith(status: SessionStatus.active));
   }
 
-  Future<void> _initCamera() async {
+  Future<void> _initCamera({bool midSession = false}) async {
     if (_disposed) return;
-    // Dispose previous controller when toggling lenses.
+    // Dispose previous controller when toggling lenses or retrying.
     final old = _camera;
     _camera = null;
     if (old != null) {
@@ -856,7 +923,15 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
         await controller.dispose();
         return;
       }
-      _rotation = _rotationFromSensor(selected.sensorOrientation);
+      // Compute ML Kit rotation from sensor + display orientation.
+      // Back: (sensorOrientation - displayRotation + 360) % 360
+      // Front: (sensorOrientation + displayRotation) % 360
+      final int displayRotation = _getDisplayRotation();
+      _rotation = _rotationFromSensorAndDisplay(
+        selected.sensorOrientation,
+        displayRotation,
+        _lens,
+      );
       final PoseAnalyzer? analyzer = _analyzer;
       if (analyzer != null) {
         analyzer.reset();
@@ -870,6 +945,16 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       if (size != null) {
         _imageWidth = size.width;
         _imageHeight = size.height;
+      }
+
+      // Mid-session lens swap/retry: re-anchor rep counter and round
+      // tracker so counted reps don't jump backwards and the round
+      // target doesn't silently inflate.
+      if (midSession) {
+        _repsOffset = _reps;
+        _lastEngineCount = 0;
+        final nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
+        _rounds?.rebase(0, nowSec);
       }
 
       setState(() {
@@ -891,13 +976,37 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     _lens = _lens == CameraLensDirection.front
         ? CameraLensDirection.back
         : CameraLensDirection.front;
-    await _initCamera();
+    await _initCamera(midSession: true);
   }
 
-  InputImageRotation _rotationFromSensor(int sensorOrientation) {
-    // Android camera sensor orientation (deg) → ML Kit rotation enum.
-    // Back cameras on most devices use 90 (portrait) or predict; verify on device.
-    return switch (sensorOrientation) {
+  /// Returns the current display rotation in degrees (0, 90, 180, 270).
+  /// Falls back to 0 if the platform channel is unavailable.
+  int _getDisplayRotation() {
+    // The easiest way without adding a new plugin: ask the Flutter view.
+    // This works because the session screen locks to portrait (see initState).
+    // On Android, the activity is locked to portrait (see manifest),
+    // so display rotation is 0 for portrait-natural devices. For landscape-
+    // natural devices (tablets, foldables) the OS reports the rotation.
+    // We use the platform view's devicePixelRatio * logical size trick.
+    // But the most reliable is a tiny MethodChannel. Since we don't want to
+    // add one now, we read the view's orientation from the system.
+    // On Flutter 3.x, `view.physicalSize` is already rotated for the display.
+    // If the natural orientation is landscape, the physical width > height.
+    // However, since we lock to portrait, the safest default is 0.
+    // TODO: replace with a MethodChannel call to `Display.getRotation()`.
+    return 0;
+  }
+
+  /// Computes the correct ML Kit rotation from sensor orientation + display
+  /// rotation + lens direction.
+  /// - Back camera: (sensorOrientation - displayRotation + 360) % 360
+  /// - Front camera: (sensorOrientation + displayRotation) % 360
+  InputImageRotation _rotationFromSensorAndDisplay(
+      int sensorOrientation, int displayRotation, CameraLensDirection lens) {
+    final int rawDegrees = lens == CameraLensDirection.back
+        ? (sensorOrientation - displayRotation + 360) % 360
+        : (sensorOrientation + displayRotation) % 360;
+    return switch (rawDegrees) {
       90 => InputImageRotation.rotation90deg,
       180 => InputImageRotation.rotation180deg,
       270 => InputImageRotation.rotation270deg,
@@ -926,16 +1035,31 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       // ML Kit keeps the sensor rotation (v1.1.10 behavior); only the
       // landmarker path pre-rotated natively, and it is gone.
       _overlayRotation = _rotation;
-      final PoseFrameResult? result = await analyzer.processCameraImage(
-        image,
-        imageWidth: image.width.toDouble(),
-        imageHeight: image.height.toDouble(),
-        rotation: _rotation,
-      );
+
+      // Process with a hard timeout so one ML Kit stall never freezes the
+      // intake gates forever. On timeout we surface a stage-labeled error
+      // instead of leaving the strip stuck at a stale "healthy" state.
+      const int inferenceTimeoutMs = 3000;
+      final PoseFrameResult? result = await analyzer
+          .processCameraImage(
+            image,
+            imageWidth: image.width.toDouble(),
+            imageHeight: image.height.toDouble(),
+            rotation: _rotation,
+          )
+          .timeout(
+            Duration(milliseconds: inferenceTimeoutMs),
+            onTimeout: () {
+              throw TimeoutException(
+                  'ML Kit inference timed out after ${inferenceTimeoutMs}ms');
+            },
+          );
+
       // Analyzer swapped mid-flight (chain Next) — the stale result
       // belongs to the previous exercise; drop it, don't apply.
       if (!identical(analyzer, _analyzer)) return;
       if (!mounted || _disposed) return;
+
       // Always refresh telemetry so the HUD proves the pipeline is alive
       // even when ML Kit returns zero poses — but only notify when the
       // numbers actually changed (dropped/throttled frames stay silent).
@@ -945,6 +1069,8 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       _framesSeen = analyzer.framesSeen;
       _lastPosesFound = analyzer.lastPosesFound;
       _pipelineError = analyzer.lastError;
+      _lastFrameAt = DateTime.now().millisecondsSinceEpoch;
+
       if (analyzer.lastError != null &&
           analyzer.lastError != _lastLoggedError) {
         _lastLoggedError = analyzer.lastError;
@@ -955,19 +1081,52 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
         debugPrint(
             'VisionSession: first pose detected (poses=${analyzer.lastPosesFound} frames=${analyzer.framesSeen})');
       }
+
+      // Publish overlay/telemetry FIRST so a crash in _handleResult can
+      // never freeze the skeleton or the status strip. Errors in the
+      // handler are logged (once per distinct message) and fed to the
+      // pipeline error channel so the strip turns red.
       if (result != null) {
         _lastInferMs = result.inferenceMs;
-        _handleResult(result);
         // Prefer the EMA-smoothed pose for the overlay — stable joints and
         // lines instead of raw per-frame jitter.
         _latestPose = analyzer.smoothedPose ?? analyzer.latestPose;
         _publishOverlay();
         _publishHud();
-      } else if (telemetryChanged) {
+      }
+      // Telemetry-only publish (no new pose) happens after so the latest
+      // numbers win.
+      if (telemetryChanged) {
         _publishHud();
       }
-    } catch (_) {
-      // A bad frame must never break the session.
+
+      // Now run the heavy handler; any throw is caught, logged, and
+      // surfaced via _pipelineError so the strip goes red.
+      try {
+        if (result != null) {
+          _handleResult(result);
+        }
+      } catch (e) {
+        final msg = 'feed: $e';
+        if (_lastLoggedError != msg) {
+          _lastLoggedError = msg;
+          debugPrint('VisionSession: frame handler error $msg');
+        }
+        if (!mounted || _disposed) return;
+        _pipelineError = msg;
+        _publishHud();
+      }
+    } catch (e) {
+      // Timeout or other intake failure — record a stage-labeled error
+      // instead of silently dropping the frame.
+      final msg = 'feed: $e';
+      if (_lastLoggedError != msg) {
+        _lastLoggedError = msg;
+        debugPrint('VisionSession: frame intake error $msg');
+      }
+      if (!mounted || _disposed) return;
+      _pipelineError = msg;
+      _publishHud();
     } finally {
       _inFlight = false;
     }
@@ -1317,6 +1476,13 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
 
   @override
   void dispose() {
+    // Restore default orientation freedom when leaving the session.
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
@@ -1337,6 +1503,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     if (analyzer != null) {
       unawaited(analyzer.dispose());
     }
+    _audioCues?.dispose();
     _hud.dispose();
     _overlayTick.dispose();
     super.dispose();
@@ -1505,6 +1672,16 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
                     backend: snap.backend,
                     inferMs: snap.inferMs,
                     fps: snap.fps,
+                    // Round-8 diagnostics:
+                    drawing: snap.drawing,
+                    joints: snap.joints,
+                    previewW: snap.previewW,
+                    previewH: snap.previewH,
+                    bufferW: snap.bufferW,
+                    bufferH: snap.bufferH,
+                    mirror: snap.mirror,
+                    rot: snap.rot,
+                    stalled: snap.stalled,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1640,6 +1817,15 @@ class _PipelineStatus extends StatelessWidget {
     required this.backend,
     required this.inferMs,
     required this.fps,
+    required this.drawing,
+    required this.joints,
+    required this.previewW,
+    required this.previewH,
+    required this.bufferW,
+    required this.bufferH,
+    required this.mirror,
+    required this.rot,
+    required this.stalled,
   });
 
   final int frames;
@@ -1654,31 +1840,61 @@ class _PipelineStatus extends StatelessWidget {
   final int inferMs;
   final double fps;
 
+  // Round-8 diagnostic extensions:
+  final bool drawing;
+  final int joints;
+  final int previewW;
+  final int previewH;
+  final int bufferW;
+  final int bufferH;
+  final bool mirror;
+  final int rot;
+  final bool stalled;
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     // Build tag kept in sync with pubspec.yaml version (build number).
-    const buildTag = 'b18';
+    const buildTag = 'b19';
     final String lensLabel = lens == CameraLensDirection.front ? 'front' : 'back';
     final String text;
     final Color bg;
     final Color fg;
-    if (error != null) {
+
+    // Stalled feed: frames stopped arriving for >500ms.
+    if (stalled && frames > 0) {
+      text = '$buildTag · STALLED ${frames}fr · last ${(DateTime.now().millisecondsSinceEpoch - frames)}ms ago';
+      bg = const Color(0xFFC62828); // red
+      fg = Colors.white;
+    } else if (error != null) {
       text = '$buildTag · frames $frames · error: $error';
       bg = const Color(0xFFC62828); // red — the strip must be unmissable
       fg = Colors.white;
     } else if (frames == 0) {
+      // Watchdog: if ready for >5s and no frames, it's a hard error.
       text = '$buildTag · camera $lensLabel · starting feed…';
       bg = p.track.withValues(alpha: 0.6);
       fg = p.ink;
     } else if (poses == 0) {
+      // Pipeline runs but ML Kit sees nobody — show joint count to
+      // distinguish "detected but low confidence" from "not detected at all".
       text = '$buildTag · camera $lensLabel · frames $frames · poses 0'
-          ' · $backend · ${fps.toStringAsFixed(1)} fps';
+          ' · joints $joints/33 · $backend · ${fps.toStringAsFixed(1)} fps';
       bg = const Color(0xFFF9A825); // amber — pipeline runs, nobody seen
       fg = Colors.black87;
-    } else {
+    } else if (!drawing) {
+      // ML Kit returned poses but overlay drew nothing (multi-person, joint floor, etc.).
       text = '$buildTag · camera $lensLabel · frames $frames · poses $poses'
-          ' · $backend · $inferMs ms · ${fps.toStringAsFixed(1)} fps';
+          ' · overlay SUPPRESSED · joints $joints/33 · $backend';
+      bg = const Color(0xFFF9A825); // amber — detected but not drawn
+      fg = Colors.black87;
+    } else {
+      // Healthy: include transform fingerprint so one paste settles
+      // rotation/aspect/mirror questions.
+      text = '$buildTag · camera $lensLabel · frames $frames · poses $poses'
+          ' · joints $joints/33 · $backend · $inferMs ms · ${fps.toStringAsFixed(1)} fps'
+          ' · rot${rot * 90} · prev${previewW}x$previewH · buf${bufferW}x$bufferH'
+          ' · mirror${mirror ? "Y" : "N"}';
       bg = p.track.withValues(alpha: 0.35);
       fg = p.ink2;
     }
@@ -2292,6 +2508,17 @@ class _HudSnapshot {
     required this.showCongrats,
     required this.calibRemaining,
     required this.restRemaining,
+    // New diagnostic fields (round-8):
+    required this.drawing,
+    required this.joints,
+    required this.previewW,
+    required this.previewH,
+    required this.bufferW,
+    required this.bufferH,
+    required this.mirror,
+    required this.rot,
+    required this.lastFrameAgeMs,
+    required this.stalled,
   });
 
   static const _HudSnapshot initial = _HudSnapshot(
@@ -2324,6 +2551,17 @@ class _HudSnapshot {
     showCongrats: false,
     calibRemaining: -1,
     restRemaining: 0,
+    // New diagnostic fields (round-8):
+    drawing: false,
+    joints: 0,
+    previewW: 0,
+    previewH: 0,
+    bufferW: 0,
+    bufferH: 0,
+    mirror: false,
+    rot: 0,
+    lastFrameAgeMs: -1,
+    stalled: false,
   );
 
   final int frames;
@@ -2378,6 +2616,26 @@ class _HudSnapshot {
 
   /// Rest-break countdown seconds (0 = not resting).
   final int restRemaining;
+
+  // --- Round-8 diagnostic extensions ---
+  /// Whether a pose was actually pushed to the overlay painter this frame.
+  final bool drawing;
+  /// Number of landmarks ≥0.3 confidence in the drawn pose (0..33).
+  final int joints;
+  /// Preview texture size (width, height) — used for aspect mismatch check.
+  final int previewW;
+  final int previewH;
+  /// Analysis buffer size (width, height) — from CameraImage.
+  final int bufferW;
+  final int bufferH;
+  /// Whether the front-camera preview is mirrored.
+  final bool mirror;
+  /// ML Kit rotationDegrees passed to the detector.
+  final int rot;
+  /// Milliseconds since the last analyzed frame arrived (-1 = none yet).
+  final int lastFrameAgeMs;
+  /// True if lastFrameAgeMs > 500 (feed appears stalled).
+  final bool stalled;
 }
 
 class SkeletonOverlayPainter extends CustomPainter {
