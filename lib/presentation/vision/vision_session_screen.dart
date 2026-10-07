@@ -203,6 +203,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   /// printed once (logcat backup for the on-screen strip).
   String? _lastLoggedError;
 
+  /// One-shot logcat marker when the detector first sees a body.
+  bool _loggedFirstPose = false;
+
   /// Last inference time (ms) + rolling pipeline throughput for the HUD.
   int _lastInferMs = 0;
   double _pipelineFps = 0;
@@ -947,6 +950,11 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
         _lastLoggedError = analyzer.lastError;
         debugPrint('VisionSession: pipeline ${analyzer.lastError}');
       }
+      if (analyzer.lastPosesFound > 0 && !_loggedFirstPose) {
+        _loggedFirstPose = true;
+        debugPrint(
+            'VisionSession: first pose detected (poses=${analyzer.lastPosesFound} frames=${analyzer.framesSeen})');
+      }
       if (result != null) {
         _lastInferMs = result.inferenceMs;
         _handleResult(result);
@@ -1649,24 +1657,39 @@ class _PipelineStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    // Build tag kept in sync with pubspec.yaml version (build number).
+    const buildTag = 'b18';
     final String lensLabel = lens == CameraLensDirection.front ? 'front' : 'back';
     final String text;
+    final Color bg;
+    final Color fg;
     if (error != null) {
-      text = 'camera $lensLabel · frames $frames · error: $error';
+      text = '$buildTag · frames $frames · error: $error';
+      bg = const Color(0xFFC62828); // red — the strip must be unmissable
+      fg = Colors.white;
     } else if (frames == 0) {
-      text = 'camera $lensLabel · starting feed…';
+      text = '$buildTag · camera $lensLabel · starting feed…';
+      bg = p.track.withValues(alpha: 0.6);
+      fg = p.ink;
+    } else if (poses == 0) {
+      text = '$buildTag · camera $lensLabel · frames $frames · poses 0'
+          ' · $backend · ${fps.toStringAsFixed(1)} fps';
+      bg = const Color(0xFFF9A825); // amber — pipeline runs, nobody seen
+      fg = Colors.black87;
     } else {
-      text = 'camera $lensLabel · frames $frames · poses $poses · $backend'
-          ' · $inferMs ms · ${fps.toStringAsFixed(1)} fps';
+      text = '$buildTag · camera $lensLabel · frames $frames · poses $poses'
+          ' · $backend · $inferMs ms · ${fps.toStringAsFixed(1)} fps';
+      bg = p.track.withValues(alpha: 0.35);
+      fg = p.ink2;
     }
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      color: p.track.withValues(alpha: 0.35),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      color: bg,
       child: Text(
         text,
-        style: TextStyle(fontSize: 11, color: p.ink2),
-        maxLines: 2,
+        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg),
+        maxLines: 3,
         overflow: TextOverflow.ellipsis,
       ),
     );

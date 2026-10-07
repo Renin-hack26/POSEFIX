@@ -231,15 +231,10 @@ void main() {
     test('a wrong plane count for the declared group degrades to an error',
         () async {
       final analyzer = await _started();
-      // NV21 is single-plane by contract — two planes must be refused.
-      final nv21 = _image(
-        ImageFormatGroup.nv21,
-        planes: [
-          _plane(Uint8List(_w * _h), _w, 1),
-          _plane(Uint8List(_w * _h ~/ 2), _w, 1),
-        ],
-      );
-      var r = await _frame(analyzer, image: nv21);
+      // NV21 is single-plane by contract — an empty plane list is malformed
+      // and must be refused with a labeled error, not crash.
+      final empty = _image(ImageFormatGroup.nv21, planes: []);
+      var r = await _frame(analyzer, image: empty);
       expect(r, isNull);
       expect(analyzer.lastError, contains('input-convert failed: group=nv21'));
 
@@ -325,6 +320,42 @@ void main() {
         image: _image(ImageFormatGroup.yuv420, planes: [y, u, vShort]),
       );
       expect(r, isNotNull, reason: 'frame must still flow to the detector');
+      expect(r!.posesFound, 1);
+      expect(analyzer.lastError, isNull);
+    });
+
+    test('a two-plane NV12 frame is converted and reaches the detector',
+        () async {
+      final analyzer = await _started();
+      _detected = [_standing()];
+      // Y + interleaved UV (pixelStride 2): the standard semi-planar
+      // layout some HALs expose as two planes.
+      final y = _plane(Uint8List(_w * _h), _w, 1);
+      final uv = _plane(Uint8List(_w * _h ~/ 2), _w, 2);
+      final r = await _frame(
+        analyzer,
+        image: _image(ImageFormatGroup.yuv420, planes: [y, uv]),
+      );
+      expect(r, isNotNull, reason: 'NV12 must be converted to NV21');
+      expect(r!.posesFound, 1);
+      expect(analyzer.lastError, isNull);
+    });
+
+    test('strided Y (pixelStride 2) is gathered, not scrambled', () async {
+      final analyzer = await _started();
+      _detected = [_standing()];
+      // Luma delivered with pixelStride 2: a naive width-copy reads padding
+      // bytes and hands ML Kit a scrambled picture — poses 0 forever with
+      // NO error anywhere. The gather path must be used instead.
+      final yStride = _w * 2;
+      final y = _plane(Uint8List(yStride * _h), yStride, 2);
+      final u = _plane(Uint8List((_w ~/ 2) * (_h ~/ 2)), _w ~/ 2, 1);
+      final v = _plane(Uint8List((_w ~/ 2) * (_h ~/ 2)), _w ~/ 2, 1);
+      final r = await _frame(
+        analyzer,
+        image: _image(ImageFormatGroup.yuv420, planes: [y, u, v]),
+      );
+      expect(r, isNotNull, reason: 'strided luma must still be mapped');
       expect(r!.posesFound, 1);
       expect(analyzer.lastError, isNull);
     });

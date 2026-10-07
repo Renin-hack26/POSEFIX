@@ -617,8 +617,20 @@ class PoseAnalyzer {
     }
 
     Uint8List? nv21;
-    if (planes.length == 3) {
-      nv21 = _yuv420ToNv21(image);
+    if (planes.length >= 3) {
+      nv21 = _yuv420ToNv21(image); // first three planes are Y, U, V
+    } else if (planes.length == 2) {
+      // NV12: Y + interleaved UV — swap each chroma pair to VU.
+      nv21 = _nv12ToNv21(
+        planes[0].bytes,
+        planes[0].bytesPerRow,
+        planes[0].bytesPerPixel ?? 1,
+        planes[1].bytes,
+        planes[1].bytesPerRow,
+        planes[1].bytesPerPixel ?? 1,
+        w,
+        h,
+      );
     } else if (planes.length == 1) {
       final plane = planes.first;
       if (group == ImageFormatGroup.bgra8888) {
@@ -726,6 +738,52 @@ class PoseAnalyzer {
     return out;
   }
 
+  /// NV12 (Y + interleaved UV, two planes) → NV21 (Y + interleaved VU):
+  /// strips row padding, honors both planes' pixel strides, swaps each
+  /// chroma pair. Undersized buffers degrade per-pixel instead of throwing.
+  static Uint8List? _nv12ToNv21(
+    Uint8List y,
+    int yRowStride,
+    int yPixelStride,
+    Uint8List uv,
+    int uvRowStride,
+    int uvPixelStride,
+    int width,
+    int height,
+  ) {
+    if (width <= 0 || height <= 0) return null;
+    if (yRowStride < 1 || uvRowStride < 1) return null;
+    final out = Uint8List(width * height * 3 ~/ 2);
+    var o = 0;
+    if (yPixelStride == 1) {
+      for (var row = 0; row < height; row++) {
+        final p = row * yRowStride;
+        if (p + width > y.length) return null; // malformed luma — refuse
+        out.setRange(o, o + width, y, p);
+        o += width;
+      }
+    } else {
+      for (var row = 0; row < height; row++) {
+        final rowStart = row * yRowStride;
+        for (var col = 0; col < width; col++) {
+          final p = rowStart + col * yPixelStride;
+          out[o++] = p < y.length ? y[p] : 0;
+        }
+      }
+    }
+    for (var row = 0; row < height ~/ 2; row++) {
+      for (var col = 0; col < width ~/ 2; col++) {
+        final base = row * uvRowStride + col * 2 * uvPixelStride;
+        final u = base < uv.length ? uv[base] : 0x80;
+        final v =
+            base + uvPixelStride < uv.length ? uv[base + uvPixelStride] : 0x80;
+        out[o++] = v;
+        out[o++] = u;
+      }
+    }
+    return out;
+  }
+
   /// YUV420_888 (Y + U + V, arbitrary row/pixel strides) → NV21 (Y + VU).
   /// The old code simply concatenated the three planes, which garbles the
   /// chroma whenever pixelStride != 1 and ML Kit then sees noise and
@@ -741,6 +799,7 @@ class PoseAnalyzer {
       final width = image.width;
       final height = image.height;
       final yRowStride = yPlane.bytesPerRow;
+      final yPixelStride = yPlane.bytesPerPixel ?? 1;
       // Chroma planes can differ (strides, buffer sizes, pixel stride) —
       // index each with ITS OWN layout; out-of-range reads degrade to
       // neutral chroma instead of rejecting the whole frame.
@@ -750,12 +809,26 @@ class PoseAnalyzer {
       final uvPixelStrideV = vPlane.bytesPerPixel ?? 1;
 
       final out = Uint8List(width * height * 3 ~/ 2);
-      // Y: copy row by row (handles rowStride padding).
+      // Y: row by row — handles rowStride padding AND pixelStride > 1
+      // (some HALs deliver strided luma; a naive width-copy then reads
+      // padding bytes and hands ML Kit a scrambled picture while every
+      // size check still passes).
       var outPos = 0;
-      for (var row = 0; row < height; row++) {
-        final srcPos = row * yRowStride;
-        out.setRange(outPos, outPos + width, yBytes.sublist(srcPos, srcPos + width));
-        outPos += width;
+      if (yPixelStride == 1) {
+        for (var row = 0; row < height; row++) {
+          final srcPos = row * yRowStride;
+          out.setRange(
+              outPos, outPos + width, yBytes.sublist(srcPos, srcPos + width));
+          outPos += width;
+        }
+      } else {
+        for (var row = 0; row < height; row++) {
+          final rowStart = row * yRowStride;
+          for (var col = 0; col < width; col++) {
+            final srcPos = rowStart + col * yPixelStride;
+            out[outPos++] = srcPos < yBytes.length ? yBytes[srcPos] : 0;
+          }
+        }
       }
       // VU interleaved, subsampled 2x2.
       for (var row = 0; row < height ~/ 2; row++) {

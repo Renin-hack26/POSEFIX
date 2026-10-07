@@ -21,6 +21,13 @@
 
 ## Log
 
+### 2026-10-07 — v1.1.14 (round 4): Y-pixel-stride gather + NV12 acceptance + unmissable status strip
+- Field report: round-6 build still detects/count/traces nothing; the strip line itself was never relayed — so round 5 stops relying on the user reading 11px grey text.
+- Converter: **(a)** the 3-plane path now honors **Y `bytesPerPixel`** — with `pixelStride 2` luma the old width-copy read padding bytes and handed ML Kit a scrambled picture (poses 0 forever, *no error anywhere*); **(b)** **two-plane NV12** (Y + interleaved UV) is converted (`_nv12ToNv21`, chroma pair swap, per-plane strides/bounds) instead of refused; **(c)** ≥3 planes map the first three as Y/U/V.
+- Diagnostics: the status strip is now 14px bold, color-coded (red = error with full text, amber = frames flowing but `poses 0`, neutral = healthy) and prefixed with build tag **`b18`** (synced with pubspec `1.1.14+18`) so any paste proves which build was tested; logcat gains a one-shot `first pose detected` marker.
+- Tests: empty-plane-list replaces the old "2 planes = invalid" case (NV12 is now legal), +2 pinning tests (NV12 conversion, strided-Y gather).
+- Gates: analyze 0, **332/332**. Build `1.1.14+18`.
+
 ### 2026-10-07 — v1.1.14 (round 3): `input-convert failed` root-caused from the device HUD — three converter holes closed
 - On-device diagnosis via the stage-labeled status strip: `error: input-convert failed: group=? planes=? WxH` + no-person banner → frames reach the analyzer but `_toInputImage` refuses every frame, so ML Kit is never invoked (round-5 fixed the native exception; this fixes the local refusals).
 - Fixes: **(a)** NV21 with stride-padded Y rows + width-packed chroma (buffer ends at `stride*h + w*h/2` — the case wrongly skipped as "rare") now repacks instead of being refused; **(b)** the 3-plane converter indexes U and V with *each plane's own* strides plus bounds (a short/mismatched V no longer RangeErrors the whole frame — luma flows, chroma degrades to neutral 0x80); **(c)** a single plane with exactly NV21-shaped bytes is accepted even when the group label is `unknown`/`jpeg` — byte-count evidence beats the label.
