@@ -1,6 +1,6 @@
-import '../../../domain/entities/body_metric.dart';
-import '../../../domain/entities/strike_state.dart';
-import '../../../domain/repositories/progress_repository.dart';
+import '../../domain/entities/body_metric.dart';
+import '../../domain/entities/strike_state.dart';
+import '../../domain/repositories/progress_repository.dart';
 import '../datasources/local/progress_dao.dart';
 
 /// Body metrics + strike state over Drift (synced to the account).

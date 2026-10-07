@@ -1,19 +1,19 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/di/app_dependencies.dart';
+import '../../app/app_dependencies.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/home_dashboard.dart';
 import '../../domain/entities/user_profile.dart';
 import '../../domain/entities/workout.dart';
 import '../../domain/entities/workout_session.dart';
-import '../shared/app_logo.dart';
-import '../shared/glass_card.dart';
-import '../shared/grid_background.dart';
-import '../shared/primary_button.dart';
-import '../shared/section_header.dart';
+import '../../shared/widgets/app_logo.dart';
+import '../../shared/widgets/glass_card.dart';
+import '../../shared/widgets/grid_background.dart';
+import '../../shared/widgets/primary_button.dart';
+import '../../shared/widgets/section_header.dart';
 import 'widgets/analytics_section.dart';
 import 'widgets/greeting_banner.dart';
 import 'widgets/progress_graph.dart';

@@ -1,7 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../shared/glass_card.dart';
+import '../../../shared/widgets/glass_card.dart';
 
 /// Payload of one rotating tip: heading plus advice copy.
 typedef TipItem = ({String title, String body});

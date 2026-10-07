@@ -1,4 +1,4 @@
-import '../../domain/entities/plan_template.dart';
+import '../entities/plan_template.dart';
 
 /// Bundled coaching content that doesn't belong to a single domain repo —
 /// rotating tips (Home) and plan templates (plan generation).

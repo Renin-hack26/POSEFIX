@@ -1,5 +1,5 @@
-import '../../../domain/entities/plan_template.dart';
-import '../../../domain/repositories/content_repository.dart';
+import '../../domain/entities/plan_template.dart';
+import '../../domain/repositories/content_repository.dart';
 import '../datasources/content/content_loader.dart';
 
 class ContentRepositoryImpl implements ContentRepository {

@@ -3,15 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../core/di/app_dependencies.dart';
+import '../../app/app_dependencies.dart';
 import '../../core/pdf/progress_report_pdf.dart';
 import '../../core/report/report_sections.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/progress_report.dart';
-import '../shared/app_back_button.dart';
-import '../shared/glass_card.dart';
-import '../shared/grid_background.dart';
-import '../shared/primary_button.dart';
+import '../../shared/widgets/app_back_button.dart';
+import '../../shared/widgets/glass_card.dart';
+import '../../shared/widgets/grid_background.dart';
+import '../../shared/widgets/primary_button.dart';
 
 /// Home → Progress report — AI-generated documented report: personal
 /// details, training history, body metrics and AI suggestions, with PDF

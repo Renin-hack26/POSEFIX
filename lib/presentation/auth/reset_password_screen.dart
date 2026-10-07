@@ -1,18 +1,18 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/di/app_dependencies.dart';
+import '../../app/app_dependencies.dart';
 import '../../core/errors/app_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/validators.dart';
-import '../shared/app_back_button.dart';
-import '../shared/app_text_field.dart';
-import '../shared/glass_card.dart';
-import '../shared/grid_background.dart';
-import '../shared/password_field.dart';
-import '../shared/primary_button.dart';
+import '../../shared/widgets/app_back_button.dart';
+import '../../shared/widgets/app_text_field.dart';
+import '../../shared/widgets/glass_card.dart';
+import '../../shared/widgets/grid_background.dart';
+import '../../shared/widgets/password_field.dart';
+import '../../shared/widgets/primary_button.dart';
 import 'otp_screen.dart';
 
 /// 05 — Reset password (sample/index.html).

@@ -3,16 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/di/app_dependencies.dart';
+import '../../app/app_dependencies.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/extensions.dart';
 import '../../core/utils/id_gen.dart';
 import '../../domain/entities/meal.dart';
 import '../../domain/usecases/estimate_meal_calories.dart';
-import '../shared/app_back_button.dart';
-import '../shared/glass_card.dart';
-import '../shared/grid_background.dart';
-import '../shared/primary_button.dart';
+import '../../shared/widgets/app_back_button.dart';
+import '../../shared/widgets/glass_card.dart';
+import '../../shared/widgets/grid_background.dart';
+import '../../shared/widgets/primary_button.dart';
 
 /// Meal page — free-text AI calorie logging: describe the meal, the model
 /// estimates calories (manual entry fallback), pick date/time (default now),

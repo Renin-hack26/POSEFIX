@@ -2,7 +2,7 @@
 /// entry, clock-derived meal tag, save → entry with time + tag.
 library;
 
-import 'package:fixpose/core/di/app_dependencies.dart';
+import 'package:fixpose/app/app_dependencies.dart';
 import 'package:fixpose/core/theme/app_theme.dart';
 import 'package:fixpose/core/utils/extensions.dart';
 import 'package:fixpose/domain/entities/chat_message.dart';
@@ -11,7 +11,7 @@ import 'package:fixpose/domain/repositories/nutrition_repository.dart';
 import 'package:fixpose/domain/repositories/veda_repository.dart';
 import 'package:fixpose/domain/usecases/estimate_meal_calories.dart';
 import 'package:fixpose/presentation/nutrition/meal_screen.dart';
-import 'package:fixpose/presentation/shared/primary_button.dart';
+import 'package:fixpose/shared/widgets/primary_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

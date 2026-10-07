@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/app_dependencies.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/repositories/session_repository.dart';
 import '../../domain/repositories/veda_repository.dart';
 import '../../domain/repositories/workout_repository.dart';
-import '../di/app_dependencies.dart';
 import '../errors/app_exception.dart';
 
 /// VEDA service — the chat screen's single entry point to the assistant.

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/di/app_dependencies.dart';
+import '../../app/app_dependencies.dart';
 import '../../core/search/library_search.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/extensions.dart';
@@ -12,11 +12,11 @@ import '../../domain/entities/meal.dart';
 import '../../domain/entities/training_plan.dart';
 import '../../domain/entities/workout.dart';
 import '../../domain/entities/workout_session.dart';
-import '../shared/glass_card.dart';
-import '../shared/grid_background.dart';
-import '../shared/primary_button.dart';
-import '../shared/section_header.dart';
-import '../shared/status_pill.dart';
+import '../../shared/widgets/glass_card.dart';
+import '../../shared/widgets/grid_background.dart';
+import '../../shared/widgets/primary_button.dart';
+import '../../shared/widgets/section_header.dart';
+import '../../shared/widgets/status_pill.dart';
 
 /// 12 · Plan tab (sample/index.html): week header + navigation, quick chips,
 /// day strip, next session with Start, exercise library, meals and history.

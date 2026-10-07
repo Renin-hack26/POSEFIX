@@ -1,15 +1,15 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/di/app_dependencies.dart';
+import '../../app/app_dependencies.dart';
 import '../../core/errors/app_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/validators.dart';
-import '../shared/app_logo.dart';
-import '../shared/app_text_field.dart';
-import '../shared/grid_background.dart';
-import '../shared/primary_button.dart';
+import '../../shared/widgets/app_logo.dart';
+import '../../shared/widgets/app_text_field.dart';
+import '../../shared/widgets/grid_background.dart';
+import '../../shared/widgets/primary_button.dart';
 
 /// 02 — Sign In (sample/index.html).
 ///

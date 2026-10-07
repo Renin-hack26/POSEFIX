@@ -1,5 +1,5 @@
-import '../../../domain/entities/workout_session.dart';
-import '../../../domain/repositories/session_repository.dart';
+import '../../domain/entities/workout_session.dart';
+import '../../domain/repositories/session_repository.dart';
 import '../datasources/local/session_dao.dart';
 
 /// Session persistence over Drift (offline-first, append-only history).

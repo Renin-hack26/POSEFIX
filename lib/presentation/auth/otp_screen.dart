@@ -1,18 +1,18 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/app_dependencies.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/di/app_dependencies.dart';
 import '../../core/errors/app_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
-import '../shared/app_back_button.dart';
-import '../shared/grid_background.dart';
-import '../shared/primary_button.dart';
+import '../../shared/widgets/app_back_button.dart';
+import '../../shared/widgets/grid_background.dart';
+import '../../shared/widgets/primary_button.dart';
 
 /// Where the verified code should land.
 enum OtpPurpose { signup, reset }

@@ -1,7 +1,7 @@
-import '../../../core/search/library_search.dart';
-import '../../../core/utils/extensions.dart';
-import '../../../domain/entities/meal.dart';
-import '../../../domain/repositories/nutrition_repository.dart';
+import '../../core/search/library_search.dart';
+import '../../core/utils/extensions.dart';
+import '../../domain/entities/meal.dart';
+import '../../domain/repositories/nutrition_repository.dart';
 import '../datasources/content/content_loader.dart';
 import '../datasources/local/nutrition_dao.dart';
 

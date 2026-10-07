@@ -1,4 +1,4 @@
-﻿import '../../domain/entities/workout_session.dart';
+import '../entities/workout_session.dart';
 
 /// Workout session persistence — offline-first.
 ///

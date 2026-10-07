@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/di/app_dependencies.dart';
+import '../../app/app_dependencies.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/extensions.dart';
 import '../../domain/entities/meal.dart';
 import '../../domain/entities/workout_session.dart';
-import '../shared/app_back_button.dart';
-import '../shared/glass_card.dart';
-import '../shared/grid_background.dart';
+import '../../shared/widgets/app_back_button.dart';
+import '../../shared/widgets/glass_card.dart';
+import '../../shared/widgets/grid_background.dart';
 
 /// Log page — one chronological feed of everything the user did: workout
 /// sessions and meals, grouped by day (trailing 30 days) with per-day totals.

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../core/di/app_dependencies.dart';
+import '../../app/app_dependencies.dart';
 import '../../core/notification/notification_engine.dart';
 import '../../core/storage/hive_service.dart';
 import '../../core/theme/app_theme.dart';
@@ -16,8 +16,8 @@ import '../../core/theme/theme_mode_provider.dart';
 import '../../data/mappers/session_json.dart';
 import '../../domain/entities/user_profile.dart';
 import '../../domain/entities/workout_session.dart';
-import '../shared/glass_card.dart';
-import '../shared/grid_background.dart';
+import '../../shared/widgets/glass_card.dart';
+import '../../shared/widgets/grid_background.dart';
 
 /// Theme choices for the Appearance picker (device-follow by default).
 const _themeOptions = [

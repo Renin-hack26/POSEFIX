@@ -1,6 +1,6 @@
-import '../../../domain/entities/exercise.dart';
-import '../../../domain/entities/workout.dart';
-import '../../../domain/repositories/workout_repository.dart';
+import '../../domain/entities/exercise.dart';
+import '../../domain/entities/workout.dart';
+import '../../domain/repositories/workout_repository.dart';
 import '../datasources/content/content_loader.dart';
 import '../datasources/local/session_dao.dart';
 

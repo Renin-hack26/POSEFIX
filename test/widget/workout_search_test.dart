@@ -11,7 +11,7 @@
 ///  * a query with no hits shows the search-aware empty state.
 library;
 
-import 'package:fixpose/core/di/app_dependencies.dart';
+import 'package:fixpose/app/app_dependencies.dart';
 import 'package:fixpose/core/theme/app_theme.dart';
 import 'package:fixpose/domain/entities/exercise.dart';
 import 'package:fixpose/domain/entities/training_plan.dart';

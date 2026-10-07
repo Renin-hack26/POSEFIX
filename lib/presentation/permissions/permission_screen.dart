@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/di/app_dependencies.dart';
+import '../../app/app_dependencies.dart';
 import '../../core/permissions/permission_flow.dart';
 import '../../core/theme/app_theme.dart';
-import '../shared/app_back_button.dart';
-import '../shared/app_logo.dart';
-import '../shared/glass_card.dart';
-import '../shared/grid_background.dart';
-import '../shared/primary_button.dart';
+import '../../shared/widgets/app_back_button.dart';
+import '../../shared/widgets/app_logo.dart';
+import '../../shared/widgets/glass_card.dart';
+import '../../shared/widgets/grid_background.dart';
+import '../../shared/widgets/primary_button.dart';
 
 /// First-install permission rationale (PLANNING §6): shown once after splash,
 /// before the auth stack. Denials are fine — the camera is re-requested when

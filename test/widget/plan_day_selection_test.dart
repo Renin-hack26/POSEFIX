@@ -15,7 +15,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:fixpose/core/di/app_dependencies.dart';
+import 'package:fixpose/app/app_dependencies.dart';
 import 'package:fixpose/core/theme/app_theme.dart';
 import 'package:fixpose/data/mappers/content_mappers.dart';
 import 'package:fixpose/domain/entities/exercise.dart';

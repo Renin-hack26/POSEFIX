@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/di/app_dependencies.dart';
+import '../../app/app_dependencies.dart';
 import '../../core/search/library_search.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise.dart';
 import '../../domain/entities/training_plan.dart';
 import '../../domain/entities/workout.dart';
-import '../shared/glass_card.dart';
-import '../shared/grid_background.dart';
-import '../shared/primary_button.dart';
-import '../shared/section_header.dart';
-import '../shared/status_pill.dart';
+import '../../shared/widgets/glass_card.dart';
+import '../../shared/widgets/grid_background.dart';
+import '../../shared/widgets/primary_button.dart';
+import '../../shared/widgets/section_header.dart';
+import '../../shared/widgets/status_pill.dart';
 
 /// 07 — Workout tab: header, today's session resume card, category chips,
 /// search, and the workout library. Every card opens its details page.

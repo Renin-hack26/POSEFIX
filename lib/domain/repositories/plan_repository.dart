@@ -1,4 +1,4 @@
-﻿import '../../domain/entities/training_plan.dart';
+import '../entities/training_plan.dart';
 
 /// Current weekly plan — local-first (Drift primary), uploaded to the account
 /// by the sync engine (conflict policy: last-writer-wins via `lastUpdated`).

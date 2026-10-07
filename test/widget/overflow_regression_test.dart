@@ -9,7 +9,7 @@
 library;
 
 import 'package:fixpose/core/theme/app_theme.dart';
-import 'package:fixpose/presentation/shared/glass_card.dart';
+import 'package:fixpose/shared/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

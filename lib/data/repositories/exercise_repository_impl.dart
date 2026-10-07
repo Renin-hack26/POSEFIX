@@ -1,5 +1,5 @@
-import '../../../domain/entities/exercise.dart';
-import '../../../domain/repositories/exercise_repository.dart';
+import '../../domain/entities/exercise.dart';
+import '../../domain/repositories/exercise_repository.dart';
 import '../datasources/content/content_loader.dart';
 import '../datasources/local/exercise_dao.dart';
 

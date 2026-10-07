@@ -1,4 +1,4 @@
-import '../../domain/entities/workout.dart';
+import '../entities/workout.dart';
 
 /// Workout library access — 50+ bundled unique workouts, each with its own
 /// demo clip. Content is account-independent (never synced); suggestions are

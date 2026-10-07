@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,8 +8,8 @@ import '../../core/errors/app_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/veda/veda_service.dart';
 import '../../domain/entities/chat_message.dart';
-import '../shared/app_back_button.dart';
-import '../shared/grid_background.dart';
+import '../../shared/widgets/app_back_button.dart';
+import '../../shared/widgets/grid_background.dart';
 
 /// VEDA chat screen — real GROQ-backed conversation.
 ///

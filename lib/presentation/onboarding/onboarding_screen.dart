@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/di/app_dependencies.dart';
+import '../../app/app_dependencies.dart';
 import '../../core/storage/hive_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise.dart';
-import '../shared/app_logo.dart';
-import '../shared/glass_card.dart';
-import '../shared/grid_background.dart';
-import '../shared/primary_button.dart';
-import '../shared/section_header.dart';
+import '../../shared/widgets/app_logo.dart';
+import '../../shared/widgets/glass_card.dart';
+import '../../shared/widgets/grid_background.dart';
+import '../../shared/widgets/primary_button.dart';
+import '../../shared/widgets/section_header.dart';
 
 /// Onboarding (PLANNING §5.4): pick level + goal once → the weekly plan is
 /// generated locally and the app enters HOME.

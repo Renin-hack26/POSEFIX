@@ -7,7 +7,7 @@ library;
 
 import 'dart:async';
 
-import 'package:fixpose/core/di/app_dependencies.dart';
+import 'package:fixpose/app/app_dependencies.dart';
 import 'package:fixpose/core/theme/app_theme.dart';
 import 'package:fixpose/core/utils/extensions.dart';
 import 'package:fixpose/domain/entities/body_metric.dart';

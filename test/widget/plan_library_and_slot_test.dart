@@ -12,7 +12,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:fixpose/core/di/app_dependencies.dart';
+import 'package:fixpose/app/app_dependencies.dart';
 import 'package:fixpose/core/theme/app_theme.dart';
 import 'package:fixpose/data/mappers/content_mappers.dart';
 import 'package:fixpose/domain/entities/exercise.dart';
@@ -26,7 +26,7 @@ import 'package:fixpose/domain/repositories/plan_repository.dart';
 import 'package:fixpose/domain/repositories/session_repository.dart';
 import 'package:fixpose/domain/repositories/workout_repository.dart';
 import 'package:fixpose/presentation/plan/plan_screen.dart';
-import 'package:fixpose/presentation/shared/section_header.dart';
+import 'package:fixpose/shared/widgets/section_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

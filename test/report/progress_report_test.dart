@@ -6,7 +6,7 @@ library;
 
 import 'dart:convert';
 
-import 'package:fixpose/core/di/app_dependencies.dart';
+import 'package:fixpose/app/app_dependencies.dart';
 import 'package:fixpose/core/pdf/progress_report_pdf.dart';
 import 'package:fixpose/core/report/report_sections.dart';
 import 'package:fixpose/core/theme/app_theme.dart';

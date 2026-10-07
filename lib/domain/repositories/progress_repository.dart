@@ -1,5 +1,5 @@
-import '../../domain/entities/body_metric.dart';
-import '../../domain/entities/strike_state.dart';
+import '../entities/body_metric.dart';
+import '../entities/strike_state.dart';
 
 /// Progress data — consistency strike state + body metrics (weight/height).
 /// Local-first; both sync to the account (LWW per record).

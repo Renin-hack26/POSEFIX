@@ -1,4 +1,4 @@
-import 'package:fixpose/presentation/shared/primary_button.dart';
+import 'package:fixpose/shared/widgets/primary_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

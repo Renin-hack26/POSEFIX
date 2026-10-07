@@ -1,7 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../shared/glass_card.dart';
+import '../../../shared/widgets/glass_card.dart';
 
 /// Payload of one stat tile: big value plus caption.
 typedef StatItem = ({String value, String label});

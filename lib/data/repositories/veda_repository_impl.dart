@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 
-import '../../../core/errors/app_exception.dart';
-import '../../../domain/entities/chat_message.dart';
-import '../../../domain/repositories/veda_repository.dart';
+import '../../core/errors/app_exception.dart';
+import '../../domain/entities/chat_message.dart';
+import '../../domain/repositories/veda_repository.dart';
 import '../datasources/local/chat_dao.dart';
 
 /// VEDA chat — local history (account-synced via the sweep) + GROQ transport.

@@ -1,8 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../shared/glass_card.dart';
-import '../../shared/status_pill.dart';
+import '../../../shared/widgets/glass_card.dart';
+import '../../../shared/widgets/status_pill.dart';
 
 /// One weekday bar: label letter, 0..1 fill height and the dimmed
 /// (below-target) styling.

@@ -1,5 +1,5 @@
-﻿import '../../core/utils/extensions.dart';
-import '../../domain/entities/meal.dart';
+import '../../core/utils/extensions.dart';
+import '../entities/meal.dart';
 
 /// Nutrition — bundled food catalog (search), manual entries and the daily
 /// calorie target. Entries/target sync to the account (LWW per record).
