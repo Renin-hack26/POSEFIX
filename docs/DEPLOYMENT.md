@@ -48,7 +48,7 @@ First launch checks for an offline-capable system voice; prompts one-time (free)
 powershell -File tools/build_release.ps1
 
 # Manual equivalent:
-flutter build apk --release --dart-define-from-file=secrets/dart_defines.json
+flutter build apk --release --target-platform android-arm,android-arm64 --dart-define-from-file=secrets/dart_defines.json
 ```
 Artifact: `build/app/outputs/flutter-apk/app-release.apk`
 Deliverable: copy → `releases/v<version>/FixPose-v<version>-<buildtype>.apk` (naming + size budget in `releases/README.md`)

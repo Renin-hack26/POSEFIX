@@ -24,7 +24,9 @@ if (-not $json.GROQ_API_KEY -or $json.GROQ_API_KEY -notlike "gsk_*") {
 }
 
 Write-Host "Building release APK with --dart-define-from-file=$defines ..."
-flutter build apk --release "--dart-define-from-file=$defines"
+# --target-platform: fat APK limited to phone ABIs (drops x86/x86_64 emulator
+# natives — a gradle ndk.abiFilters alone is overridden by the Flutter plugin).
+flutter build apk --release --target-platform android-arm,android-arm64 "--dart-define-from-file=$defines"
 if ($LASTEXITCODE -ne 0) { throw "flutter build failed ($LASTEXITCODE)" }
 
 $apk = "build/app/outputs/flutter-apk/app-release.apk"
