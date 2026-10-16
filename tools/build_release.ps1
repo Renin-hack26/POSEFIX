@@ -60,3 +60,4 @@ Write-Host "GROQ key baked in: $baked"
 if (-not $baked) {
     throw "GROQ_API_KEY was NOT found in libapp.so - do not ship this APK."
 }
+exit 0
