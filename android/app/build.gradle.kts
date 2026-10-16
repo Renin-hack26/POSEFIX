@@ -30,6 +30,11 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Round-9: ship only the two ABIs the camera + ML Kit stack targets.
+        // Drops x86/x86_64 emulator natives (~40% APK size reduction).
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {

@@ -118,7 +118,10 @@ class PoseAnalyzer {
   bool _busy = false;
   int _lastStartMs = 0;
 
-  final _controller = StreamController<PoseFrameResult>.broadcast();
+  // Non-final: start() revives the stream after dispose() closes it (the
+  // provider family caches this analyzer across blocks in one session).
+  StreamController<PoseFrameResult> _controller =
+      StreamController<PoseFrameResult>.broadcast();
   Stream<PoseFrameResult> get results => _controller.stream;
 
   /// Latest raw pose from ML Kit (for debug visualization overlay).
@@ -152,6 +155,10 @@ class PoseAnalyzer {
   /// near-perfectly. Real humans vary — human jitter clears the suspicion.
   bool _videoSuspected = false;
 
+  /// Wall-clock ms when the suspicion last latched — watchdog input so a
+  /// stale latch can never hold counting hostage (auto-clears after 15 s).
+  int _videoSuspectedAtMs = 0;
+
   /// Rep-duration samples (seconds) for regularity analysis.
   final List<double> _repDurations = [];
 
@@ -167,6 +174,11 @@ class PoseAnalyzer {
   final List<(double, double)> _rhythmSamples = [];
 
   Future<void> start() async {
+    // Revive a closed results stream: the provider family caches this
+    // instance across blocks, and dispose() closes the controller.
+    if (_controller.isClosed) {
+      _controller = StreamController<PoseFrameResult>.broadcast();
+    }
     _detector ??= PoseDetector(
       options: PoseDetectorOptions(
         model: PoseDetectionModel.base, // latency-optimized; accurate is ~3x slower
@@ -204,7 +216,11 @@ class PoseAnalyzer {
         return null;
       }
       final sw = Stopwatch()..start();
-      final poses = await detector.processImage(input);
+      // Hard timeout: a wedged native detector must never leave _busy
+      // latched true (which would silently starve every later frame).
+      final poses = await detector
+          .processImage(input)
+          .timeout(const Duration(seconds: 3));
       sw.stop();
       lastInferenceMs = sw.elapsedMilliseconds;
       lastPosesFound = poses.length;
@@ -225,6 +241,9 @@ class PoseAnalyzer {
       );
       if (!_controller.isClosed) _controller.add(result);
       return result;
+    } on TimeoutException {
+      lastError = 'inference-timeout: ML Kit gave no reply in 3s';
+      return null;
     } catch (e) {
       lastError = 'pose-process: $e';
       return null;
@@ -276,11 +295,21 @@ class PoseAnalyzer {
       _stableFrames = 0;
       _videoSuspected = false;
       _resetRhythm();
-      // Drop the overlay too — the subject changed, don't ghost the old one.
-      _latestPose = null;
-      _smoothedPose = null;
-      _ovX.clear();
-      _ovY.clear();
+      // The subject may have changed (bystander stepped in/out) — drop the
+      // torso anchor so the return to one person is not read as a jump.
+      _torsoEma = null;
+      // Still draw the largest person so the user sees who the tracker
+      // follows; the lock banner/strip explain why counting is paused.
+      final largest = _largestPose(poses);
+      if (largest != null) {
+        _latestPose = largest;
+        _smoothedPose = _smoothOverlay(largest);
+      } else {
+        _latestPose = null;
+        _smoothedPose = null;
+        _ovX.clear();
+        _ovY.clear();
+      }
       return base(
         reason: LockReason.multiPerson,
         locked: false,
@@ -361,6 +390,19 @@ class PoseAnalyzer {
     }
 
     final framing = _decideFraming([for (final v in norm.values) v]);
+
+    // A missing/NaN primary angle would silently poison every FSM
+    // comparison (NaN < x is always false) — treat the frame as occluded
+    // so the user gets the "adjust" cue instead of dead counting.
+    final primary = angles[definition.primaryAngle.name];
+    if (primary == null || primary.isNaN) {
+      return base(
+        reason: LockReason.occluded,
+        locked: locked,
+        visible: visible.length,
+        framing: framing,
+      );
+    }
 
     // Video-playback guard: rep rhythm analysis. A played exercise video
     // repeats reps near-perfectly (coefficient of variation ≈ 0); a real
@@ -453,6 +495,16 @@ class PoseAnalyzer {
     final cv = stdDev / mean;
 
     if (_videoSuspected) {
+      // Watchdog: a stale (or false) latch must never pause counting
+      // forever — resume after 15 s and re-learn from fresh cycles.
+      final heldMs =
+          DateTime.now().millisecondsSinceEpoch - _videoSuspectedAtMs;
+      if (heldMs > 15000) {
+        _videoSuspected = false;
+        _repDurations.clear();
+        _lastCycleAtMs = null;
+        return;
+      }
       if (cv > 0.08) {
         // Human jitter returned — resume counting automatically.
         _videoSuspected = false;
@@ -461,6 +513,7 @@ class PoseAnalyzer {
       }
     } else if (cv < 0.03) {
       _videoSuspected = true;
+      _videoSuspectedAtMs = DateTime.now().millisecondsSinceEpoch;
     }
   }
 
@@ -516,6 +569,34 @@ class PoseAnalyzer {
   /// directly onto the preview. Alpha 0.5 keeps the skeleton responsive
   /// while removing per-frame jitter from lines and joints; fast motion
   /// adapts up to 0.85 so the overlay doesn't visibly trail the body.
+  /// Picks the largest person (confident-landmark bounding box) for the
+  /// overlay when several people are in frame. Null when no pose has at
+  /// least two confident joints.
+  Pose? _largestPose(List<Pose> poses) {
+    Pose? best;
+    var bestArea = -1.0;
+    for (final pose in poses) {
+      var minX = double.infinity, minY = double.infinity;
+      var maxX = -double.infinity, maxY = -double.infinity;
+      var n = 0;
+      for (final lm in pose.landmarks.values) {
+        if (lm.likelihood < FormRules.minLandmarkConfidence) continue;
+        n++;
+        if (lm.x < minX) minX = lm.x;
+        if (lm.x > maxX) maxX = lm.x;
+        if (lm.y < minY) minY = lm.y;
+        if (lm.y > maxY) maxY = lm.y;
+      }
+      if (n < 2) continue;
+      final area = (maxX - minX) * (maxY - minY);
+      if (area > bestArea) {
+        bestArea = area;
+        best = pose;
+      }
+    }
+    return best;
+  }
+
   Pose _smoothOverlay(Pose pose) {
     final map = <PoseLandmarkType, PoseLandmark>{};
     for (final entry in pose.landmarks.entries) {
@@ -566,6 +647,7 @@ class PoseAnalyzer {
     _stableFrames = 0;
     _busy = false;
     _videoSuspected = false;
+    _videoSuspectedAtMs = 0;
     _resetRhythm();
   }
 
@@ -578,8 +660,12 @@ class PoseAnalyzer {
   }
 
   Future<void> dispose() async {
-    await _detector?.close();
+    // Null the field BEFORE the await: a start() arriving during close()
+    // must create a fresh detector, not keep the dying one (which dispose
+    // would then null out, leaving a silently dead pipeline).
+    final detector = _detector;
     _detector = null;
+    await detector?.close();
     if (!_controller.isClosed) await _controller.close();
   }
 
@@ -780,10 +866,14 @@ class PoseAnalyzer {
     }
     for (var row = 0; row < height ~/ 2; row++) {
       for (var col = 0; col < width ~/ 2; col++) {
-        // NV12 stores U,V interleaved per pixel: [U0,V0, U1,V1, ...].
-        // uvPixelStride is typically 2 (distance between U0 and V0) or 1 (packed UV).
-        // Each chroma pair spans 2 * uvPixelStride bytes.
-        final base = row * uvRowStride + col * 2 * uvPixelStride;
+        // NV12's UV plane interleaves U,V per chroma sample:
+        // [U0,V0, U1,V1, ...]. The distance between consecutive U samples
+        // is uvPixelStride (2 for the standard interleaved layout).
+        // The old `col * 2 * uvPixelStride` skipped every second chroma
+        // pair — latent on camerax (which delivers single-plane NV21
+        // today) but wrong for any two-plane YUV_420_888 producer.
+        final pairStride = uvPixelStride >= 2 ? uvPixelStride : 2;
+        final base = row * uvRowStride + col * pairStride;
         final u = base < uv.length ? uv[base] : 0x80;
         // V is the byte immediately after U in the interleaved stream.
         final v = base + 1 < uv.length ? uv[base + 1] : 0x80;

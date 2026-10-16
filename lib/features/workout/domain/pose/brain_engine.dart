@@ -716,9 +716,12 @@ class BrainEngine {
     TrustBreakdown? frameTrust,
   }) {
     // Wall-clock gap since the previous analyzed frame — drives the
-    // stabilizer's time-aware confirmation window.
+    // stabilizer's time-aware confirmation window and the hold clock.
+    // Clamped to [0, 0.25]s: a stalled stream or resumed session must not
+    // inject a huge dt (instant commits / inflated hold seconds).
     final double? lastT = _lastT;
-    _frameDt = lastT == null ? 0.0 : timestamp - lastT;
+    final double rawDt = lastT == null ? 0.0 : timestamp - lastT;
+    _frameDt = rawDt.isFinite ? rawDt.clamp(0.0, 0.25).toDouble() : 0.0;
     if (frameTrust != null) {
       _lastTrust = frameTrust;
       _trustAccum.push(frameTrust);

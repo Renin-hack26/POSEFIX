@@ -42,7 +42,13 @@ First launch checks for an offline-capable system voice; prompts one-time (free)
 
 ## Build APK
 ```
-flutter build apk --release
+# Canonical release build — bakes GROQ_API_KEY from secrets/dart_defines.json
+# and verifies it landed in libapp.so. NEVER ship a build without the flag:
+# v1.1.0 and b19 (round-8) both shipped with a dead AI stack exactly that way.
+powershell -File tools/build_release.ps1
+
+# Manual equivalent:
+flutter build apk --release --dart-define-from-file=secrets/dart_defines.json
 ```
 Artifact: `build/app/outputs/flutter-apk/app-release.apk`
 Deliverable: copy → `releases/v<version>/FixPose-v<version>-<buildtype>.apk` (naming + size budget in `releases/README.md`)

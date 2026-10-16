@@ -21,6 +21,23 @@
 
 ## Log
 
+### 2026-10-16 — v1.1.14 (round 9): GROQ key baked again (AI chat/reports fix), lag fixes, gate observability, perf charts
+- **Root cause of "AI chatting etc not working" (user field report)**: the round-8 APK was built **without `--dart-define-from-file`** (same incident as v1.1.0) → `GROQ_API_KEY=""` on device → Veda chat, plan generation and progress reports all failed with "API key not configured for this build". Round 9 is built through the new **`tools/build_release.ps1`** (validates `secrets/dart_defines.json`, passes the flag, then verifies the `gsk_` key string is present inside `lib/arm64-v8a/libapp.so` — prints a boolean only). `docs/DEPLOYMENT.md` documents the canonical build.
+- **Lag: analysis rate cap** (~20 fps, 50 ms min interval, `_framesThrottled` counter) + **UI-frame timing telemetry** (`SchedulerBinding.addTimingsCallback` → rolling build/raster ms) + **perf screen** (long-press the status strip): Apache ECharts via `graphify` — UI build / raster / ML Kit ms on the left axis, pipeline FPS on the right, 1 Hz samples in a 240-slot ring buffer (`perf_telemetry.dart`).
+- **Gate observability**: `minLandmarkConfidence` 0.5→**0.35** (at 480p analysis, distal joints routinely score 0.35-0.6 — the 0.5 cut-off made the visibility gate unpassable on-device: poses found, counting dead) + `vis N/R` readout on the strip; new lock-specific strip states `OCCLUDED`, `MULTI-PERSON LOCK`, `NO FRAMES delivered — stream stalled` (camera ready >5 s, zero frames) and the stalled-age bug (`now - frames`) fixed to real `last frame Xms ago`.
+- **Pipeline hardening (regression sweep)**: 3 s inference timeout moved into the analyzer (busy latch always cleared), `_frameDt` clamped to ≤0.25 s, NaN/missing primary angle → occluded (no silent dead counting), video-guard latch auto-clears after 15 s, multi-person draws the **largest pose** (overlay no longer vanishes; `_torsoEma` reset), dispose/start race fixed (`_detector` nulled before close, results stream revived, `_controller` non-final), NV12 2-plane chroma stride fixed (`col * uvPixelStride`), `_beginBlock` early exits clear the swap latch + per-block lock/error/overlay resets, boot failure surfaces as an error card, real `targetCompletion` ratio for the summary mood.
+- APK built with `--dart-define-from-file=secrets/dart_defines.json`; **arm64-v8a + armeabi-v7a only** (`abiFilters`) — x86/x86_64 natives dropped.
+- Gates: analyze 0, **320/320** (2 pipeline tests updated to the new multi-person/0.35 contracts). Build `1.1.14+20` (strip tag `b20`).
+
+### 2026-10-16 — Cleanup: dead MediaPipe/MoveNet stack, test benches and stale artifacts retired
+- Deleted the unused landmarker chain (`movenet_worker.dart`, `movenet_verifier.dart`, `pose_landmarker_source.dart` + their tests, `PoseLandmarkerBridge.kt`, both model assets 41 MB, `tflite_flutter` + `tasks-vision` deps, MainActivity poseBridge wiring); ML Kit `keep` rules added to proguard. Dead PC pose bench removed (`tools/pose_test`, `.venv-pose`).
+- Disk trash purged (~2.1 GB): desktop pose scripts, the stale v1.1.13 APK copy under `website/downloads/`, six superseded release APKs.
+- Gates at the time: analyze 0, **320/320** (12 tests went with the deleted chain).
+
+### 2026-10-16 — Restructure: feature-first layout (merge `agent/reorg`)
+- `lib/` is now feature-first (`features/<domain>/{domain,data,presentation}` + `core`/`shared`); the only conflict (pipeline test location) resolved as `test/features/workout/pose_analyzer_pipeline_test.dart` with imports rewritten to `features/workout/domain/pose/…`.
+- Gates: analyze 0, **332/332**.
+
 ### 2026-10-07 — v1.1.14 (round 8): Silent-exception kill-switch removed, visibility gate unblocked, rotation corrected, full diagnostic strip
 - **Silent crash in `_feed` fixed**: `_handleResult` now runs *after* overlay/telemetry publish; any throw is caught, logged (once per message), and surfaced via `_pipelineError` so the strip turns red instead of freezing green. Eliminated the "counts nothing, traces nothing, strip says healthy" failure mode.
 - **Visibility gate unblocked 8 exercises / 25 workouts**: `_requiredCount` now clamps to `definition.landmarks.length` (`math.min(required, landmarks.length)`). Exercises with 3-4 declared landmarks (`chair-dip`, `wall-sit`, `calf-raise`, `glute-bridge`, `high-knees`, `mountain-climber`, `deadlift`, `leg-raise`) were mathematically impossible to pass the old `required=6` gate → `brain == null` forever, skeleton drew but counting dead.

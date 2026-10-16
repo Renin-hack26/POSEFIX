@@ -39,8 +39,15 @@ class FormRules {
   // ---------------------------------------------------------------------------
   // Shared detection / counting gates
   // ---------------------------------------------------------------------------
-  /// Minimum landmark confidence (0..1) before any state transition is accepted.
-  static const double minLandmarkConfidence = 0.5;
+  /// Minimum landmark confidence (0..1) before a landmark is "visible".
+  ///
+  /// 0.35, not 0.5: at the stream's 480p analysis size ML Kit routinely
+  /// scores distal joints (ankles, wrists, feet) 0.35-0.6 even when they
+  /// are perfectly visible — a 0.5 cut-off made the visibility gate
+  /// mathematically unpassable on-device (poses found, brain never ran,
+  /// zero reps counted). The FSM's own noise guards (EMA smoothing,
+  /// 2-3 frame stabilizer, ROM-visit credits) absorb the extra jitter.
+  static const double minLandmarkConfidence = 0.35;
 
   /// Minimum MEAN confidence over an exercise's required landmarks before a
   /// frame's angles are trusted (WS2 6.3 — any-angle robustness).

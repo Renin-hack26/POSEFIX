@@ -461,8 +461,9 @@ void main() {
       expect(two.posesFound, 2);
       expect(two.personLocked, isFalse);
       expect(two.brain, isNull);
-      expect(analyzer.smoothedPose, isNull,
-          reason: 'the overlay never ghosts the wrong subject');
+      expect(analyzer.smoothedPose, isNotNull,
+          reason: 'round-9: the overlay draws the largest person in frame '
+              'while counting is paused, so the user sees who is tracked');
 
       expect((await _feed(analyzer, _standing()))!.personLocked, isFalse,
           reason: 'lock re-arms from scratch after a subject change');
@@ -491,7 +492,7 @@ void main() {
           reason: 'two stable frames at the new position re-lock');
     });
 
-    test('visibility gate: squat needs all 8 landmarks at ≥ 0.5 confidence',
+    test('visibility gate: squat needs all 8 landmarks at ≥ 0.35 confidence',
         () async {
       final analyzer = await _started();
       final pose = _standing();
@@ -506,17 +507,17 @@ void main() {
       expect(analyzer.smoothedPose, isNotNull,
           reason: 'the overlay still tracks what it can see');
 
-      // 8th landmark just below the confidence bar → still occluded.
+      // 8th landmark just below the 0.35 confidence floor → still occluded.
       final low = [...pose];
-      low[7] = _lm(PoseLandmarkType.rightAnkle, 264, 512, likelihood: 0.49);
+      low[7] = _lm(PoseLandmarkType.rightAnkle, 264, 512, likelihood: 0.34);
       _detected = [low];
       r = await _frame(analyzer);
       expect(r!.lockReason, LockReason.occluded);
       expect(r.visibleCount, 7);
 
-      // Exactly at the bar → clears (the gate is inclusive).
+      // Exactly at the floor → clears (the gate is inclusive).
       final edge = [...pose];
-      edge[7] = _lm(PoseLandmarkType.rightAnkle, 264, 512, likelihood: 0.5);
+      edge[7] = _lm(PoseLandmarkType.rightAnkle, 264, 512, likelihood: 0.35);
       _detected = [edge];
       r = await _frame(analyzer);
       expect(r!.lockReason, LockReason.ok);

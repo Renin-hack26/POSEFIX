@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show FrameTiming;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -22,6 +23,7 @@ import '../../domain/pose/angle_readouts.dart';
 import '../../domain/pose/body_structure.dart';
 import '../../domain/pose/brain_engine.dart';
 import '../../domain/pose/exercise_definition.dart';
+import '../../domain/pose/form_rules.dart';
 import '../../domain/pose/pose_analyzer.dart';
 import '../../domain/pose/round_tracker.dart';
 import '../../domain/pose/trust_gate.dart';
@@ -31,6 +33,8 @@ import '../widgets/framing_guide.dart';
 import '../widgets/posture_avatar.dart';
 import '../widgets/vision_hud.dart';
 import 'hud_overlays.dart';
+import 'perf_screen.dart';
+import 'perf_telemetry.dart';
 
 /// Live workout vision screen: back-camera preview + [PoseAnalyzer] rep
 /// counting with spoken coaching. Live skeleton overlay shows exactly what
@@ -209,6 +213,27 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   /// Monotonic timestamp of the last successfully analyzed frame (epoch ms).
   int _lastFrameAt = 0;
 
+  /// Epoch ms when the camera became ready this block (0 = not ready) —
+  /// drives the "no frames delivered" watchdog.
+  int _readyAtMs = 0;
+
+  /// Minimum gap between analysis starts (~20 fps cap).
+  static const int _minAnalysisIntervalMs = 50;
+
+  /// Analysis rate cap state: start time of the last accepted frame +
+  /// count of frames skipped by the cap (perf telemetry).
+  int _lastFeedStartedAtMs = 0;
+  int _framesThrottled = 0;
+
+  /// Round-9 pipeline-visibility readouts (strip + perf charts).
+  int _visNow = 0;
+  int _visRequired = 0;
+
+  /// Rolling UI-frame durations (ms) from the engine's FrameTiming stream —
+  /// build + raster, last ~90 frames each (strip + perf screen).
+  final List<double> _uiBuildMs = [];
+  final List<double> _uiRasterMs = [];
+
   /// Last inference time (ms) + rolling pipeline throughput for the HUD.
   int _lastInferMs = 0;
   double _pipelineFps = 0;
@@ -290,10 +315,12 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     final int bufferH = _imageHeight.round();
     final bool mirror = _lens == CameraLensDirection.front;
     final int rot = _rotation.index; // 0=0deg, 1=90deg, 2=180deg, 3=270deg
-    final int lastFrameAgeMs = _lastFrameAt > 0
-        ? now.millisecondsSinceEpoch - _lastFrameAt
-        : -1;
-    final bool stalled = lastFrameAgeMs > 500;
+    final int nowMs = now.millisecondsSinceEpoch;
+    final int lastFrameAgeMs = _lastFrameAt > 0 ? nowMs - _lastFrameAt : -1;
+    // Watchdog: >500ms without a frame is a stall; a feed that never
+    // delivers its first frame within 5s of camera-ready is a hard stall too.
+    final bool stalled = lastFrameAgeMs > 500 ||
+        (_readyAtMs > 0 && _framesSeen == 0 && nowMs - _readyAtMs > 5000);
 
     _hud.value = _HudSnapshot(
       frames: _framesSeen,
@@ -336,6 +363,8 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       rot: rot,
       lastFrameAgeMs: lastFrameAgeMs,
       stalled: stalled,
+      vis: _visNow,
+      visRequired: _visRequired,
     );
   }
 
@@ -360,7 +389,19 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       DeviceOrientation.portraitUp,
     ]);
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_boot());
+    WidgetsBinding.instance.addTimingsCallback(_onTimings);
+    unawaited(_boot().catchError((Object e, StackTrace st) {
+      // Last-resort guard: _boot handles audio/camera internally, but any
+      // unforeseen throw must surface as an error card — never as an
+      // unhandled async error with a loading overlay stuck forever.
+      debugPrint('VisionSession: boot failed: $e');
+      if (mounted && !_disposed) {
+        setState(() {
+          _initializing = false;
+          _cameraError = 'Startup failed: $e';
+        });
+      }
+    }));
   }
 
   @override
@@ -547,11 +588,20 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
   /// targets, re-anchors counters on the saved record (resume-safe), then
   /// runs calibration where enabled or announces the start.
   Future<void> _beginBlock(int index, {_Targets? preset}) async {
-    if (!mounted || _disposed) return;
-    if (index < 0 || index >= _chain.length) return;
+    if (!mounted || _disposed) {
+      _switchingBlocks = false;
+      return;
+    }
+    if (index < 0 || index >= _chain.length) {
+      // Clear the swap latch on every early exit — the caller set it while
+      // routing the chain; leaving it set starves the feed forever.
+      _switchingBlocks = false;
+      return;
+    }
     final block = _chain[index];
     final blockDef = ExerciseRegistry.instance.resolve(block.exerciseId);
     if (blockDef == null) {
+      _switchingBlocks = false;
       if (!mounted) return;
       setState(() {
         _initializing = false;
@@ -668,8 +718,16 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
         final nowSec = DateTime.now().millisecondsSinceEpoch / 1000.0;
         _rounds!.observe(0, nowSec);
       }
-      // Reset first-pose log marker for the new block.
+      // Reset per-block state so the new exercise never inherits the old
+      // block's lock/framing snapshot, error strip or overlay skeleton.
       _loggedFirstPose = false;
+      _lastLockReason = LockReason.ok;
+      _lastSpokenFraming = FramingCue.ok;
+      _pipelineError = null;
+      _lastLoggedError = null;
+      _visNow = 0;
+      _latestPose = null;
+      _publishOverlay();
       // Swap window over — frames flow to the new analyzer from here.
     } finally {
       _switchingBlocks = false;
@@ -715,8 +773,60 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
           return;
         }
       }
+      _publishPerfSample();
       _publishHud();
     });
+  }
+
+  /// Aggregates ~1 Hz pipeline + UI health into [PerfTelemetry] for the
+  /// performance charts screen (graphify).
+  void _publishPerfSample() {
+    final samples = PerfTelemetry.instance.samples;
+    final t = samples.isEmpty ? 0.0 : samples.last.tSec + 1.0;
+    PerfTelemetry.instance.add(PerfSample(
+      tSec: t,
+      fps: _pipelineFps,
+      inferMs: _lastInferMs.toDouble(),
+      uiBuildMs: _avgMs(_uiBuildMs),
+      uiRasterMs: _avgMs(_uiRasterMs),
+      joints: _jointsNow,
+      poses: _lastPosesFound,
+      throttled: _framesThrottled,
+    ));
+  }
+
+  /// UI-frame timings from the engine — build + raster, rolling ~90 frames.
+  void _onTimings(List<FrameTiming> timings) {
+    for (final t in timings) {
+      _uiBuildMs.add(t.buildDuration.inMicroseconds / 1000.0);
+      _uiRasterMs.add(t.rasterDuration.inMicroseconds / 1000.0);
+    }
+    if (_uiBuildMs.length > 90) {
+      _uiBuildMs.removeRange(0, _uiBuildMs.length - 90);
+    }
+    if (_uiRasterMs.length > 90) {
+      _uiRasterMs.removeRange(0, _uiRasterMs.length - 90);
+    }
+  }
+
+  static double _avgMs(List<double> xs) {
+    if (xs.isEmpty) return 0;
+    var sum = 0.0;
+    for (final x in xs) {
+      sum += x;
+    }
+    return sum / xs.length;
+  }
+
+  /// Confident joints on the current overlay pose (0-33).
+  int get _jointsNow {
+    final pose = _latestPose;
+    if (pose == null) return 0;
+    var n = 0;
+    for (final lm in pose.landmarks.values) {
+      if (lm.likelihood >= FormRules.minLandmarkConfidence) n++;
+    }
+    return n;
   }
 
   // --- calibration phase (WS2.10) --------------------------------------------
@@ -885,6 +995,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       _permissionDenied = false;
       _cameraError = null;
       _ready = false;
+      _readyAtMs = 0;
     });
     final PermissionStatus status = await Permission.camera.request();
     if (_disposed || !mounted) return;
@@ -957,6 +1068,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
         _rounds?.rebase(0, nowSec);
       }
 
+      _readyAtMs = DateTime.now().millisecondsSinceEpoch;
       setState(() {
         _camera = controller;
         _initializing = false;
@@ -1022,6 +1134,14 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     // v1.1.10 intake: one frame in flight; new frames arriving mid-feed
     // are dropped (the pipeline never queues stale work).
     if (_inFlight) return;
+    // Round-9 analysis rate cap (~20 fps): frees CPU for preview + UI and
+    // keeps thermals flat; overlay/counters only need ~20 Hz updates.
+    final int nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - _lastFeedStartedAtMs < _minAnalysisIntervalMs) {
+      _framesThrottled++;
+      return;
+    }
+    _lastFeedStartedAtMs = nowMs;
     final PoseAnalyzer? analyzer = _analyzer;
     if (analyzer == null) return;
     _inFlight = true;
@@ -1036,24 +1156,14 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       // landmarker path pre-rotated natively, and it is gone.
       _overlayRotation = _rotation;
 
-      // Process with a hard timeout so one ML Kit stall never freezes the
-      // intake gates forever. On timeout we surface a stage-labeled error
-      // instead of leaving the strip stuck at a stale "healthy" state.
-      const int inferenceTimeoutMs = 3000;
-      final PoseFrameResult? result = await analyzer
-          .processCameraImage(
-            image,
-            imageWidth: image.width.toDouble(),
-            imageHeight: image.height.toDouble(),
-            rotation: _rotation,
-          )
-          .timeout(
-            Duration(milliseconds: inferenceTimeoutMs),
-            onTimeout: () {
-              throw TimeoutException(
-                  'ML Kit inference timed out after ${inferenceTimeoutMs}ms');
-            },
-          );
+      // The analyzer owns the inference timeout (and clears its busy latch
+      // on expiry) — no extra Timer allocation per frame on this hot path.
+      final PoseFrameResult? result = await analyzer.processCameraImage(
+        image,
+        imageWidth: image.width.toDouble(),
+        imageHeight: image.height.toDouble(),
+        rotation: _rotation,
+      );
 
       // Analyzer swapped mid-flight (chain Next) — the stale result
       // belongs to the previous exercise; drop it, don't apply.
@@ -1088,6 +1198,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
       // pipeline error channel so the strip turns red.
       if (result != null) {
         _lastInferMs = result.inferenceMs;
+        // Round-9: gate evidence — visible required landmarks vs requirement.
+        _visNow = result.visibleCount;
+        _visRequired = result.requiredCount;
         // Prefer the EMA-smoothed pose for the overlay — stable joints and
         // lines instead of raw per-frame jitter.
         _latestPose = analyzer.smoothedPose ?? analyzer.latestPose;
@@ -1360,6 +1473,9 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     });
     if (_paused) {
       _pauseBegan = now;
+      // Don't ghost the frozen skeleton under the paused banner.
+      _latestPose = null;
+      _publishOverlay();
     } else if (_pauseBegan != null && _sessionStartTime != null) {
       // Freeze the elapsed clock across the pause.
       _sessionStartTime = _sessionStartTime!.add(now.difference(_pauseBegan!));
@@ -1460,8 +1576,22 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
               : 0,
         ),
       );
+      // Real completion ratio (0..1) — duration blocks use the hold clock;
+      // rep blocks use reps counted this block vs the block's full target.
+      final int targetRounds = _rounds?.targetRounds ?? 1;
+      final double targetCompletion;
+      if (_holdTarget > 0) {
+        targetCompletion =
+            (_holdSeconds / _holdTarget).clamp(0.0, 1.0).toDouble();
+      } else if (_targetReps > 0 && targetRounds > 0) {
+        targetCompletion = ((_reps - _repsOffset) / (_targetReps * targetRounds))
+            .clamp(0.0, 1.0)
+            .toDouble();
+      } else {
+        targetCompletion = 1.0;
+      }
       final mood = computeMood(
-        targetCompletion: 1.0,
+        targetCompletion: targetCompletion,
         avgForm: avgForm,
         exitedEarly: _exitedEarly,
       );
@@ -1485,6 +1615,7 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
     ]);
     _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
+    WidgetsBinding.instance.removeTimingsCallback(_onTimings);
     _ticker?.cancel();
     _ticker = null;
     _flashTimer?.cancel();
@@ -1664,24 +1795,36 @@ class _VisionSessionScreenState extends ConsumerState<VisionSessionScreen>
                 // Rebuilds alone when the snapshot ticks.
                 ValueListenableBuilder<_HudSnapshot>(
                   valueListenable: _hud,
-                  builder: (context, snap, _) => _PipelineStatus(
-                    frames: snap.frames,
-                    poses: snap.poses,
-                    error: snap.error,
-                    lens: snap.lens,
-                    backend: snap.backend,
-                    inferMs: snap.inferMs,
-                    fps: snap.fps,
-                    // Round-8 diagnostics:
-                    drawing: snap.drawing,
-                    joints: snap.joints,
-                    previewW: snap.previewW,
-                    previewH: snap.previewH,
-                    bufferW: snap.bufferW,
-                    bufferH: snap.bufferH,
-                    mirror: snap.mirror,
-                    rot: snap.rot,
-                    stalled: snap.stalled,
+                  builder: (context, snap, _) => GestureDetector(
+                    // Long-press: performance charts (graphify/ECharts).
+                    onLongPress: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const PerfScreen(),
+                      ),
+                    ),
+                    child: _PipelineStatus(
+                      frames: snap.frames,
+                      poses: snap.poses,
+                      error: snap.error,
+                      lens: snap.lens,
+                      backend: snap.backend,
+                      inferMs: snap.inferMs,
+                      fps: snap.fps,
+                      // Round-8 diagnostics + round-9 gate evidence:
+                      drawing: snap.drawing,
+                      joints: snap.joints,
+                      previewW: snap.previewW,
+                      previewH: snap.previewH,
+                      bufferW: snap.bufferW,
+                      bufferH: snap.bufferH,
+                      mirror: snap.mirror,
+                      rot: snap.rot,
+                      stalled: snap.stalled,
+                      stalledForMs: snap.lastFrameAgeMs,
+                      lock: snap.lockReason,
+                      vis: snap.vis,
+                      visRequired: snap.visRequired,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1826,6 +1969,12 @@ class _PipelineStatus extends StatelessWidget {
     required this.mirror,
     required this.rot,
     required this.stalled,
+    // Round-9: gate evidence + lock diagnostics (defaults keep old call
+    // sites compiling).
+    this.vis = 0,
+    this.visRequired = 0,
+    this.stalledForMs = -1,
+    this.lock = LockReason.ok,
   });
 
   final int frames;
@@ -1851,19 +2000,35 @@ class _PipelineStatus extends StatelessWidget {
   final int rot;
   final bool stalled;
 
+  /// Round-9: visible required landmarks / requirement (gate margin).
+  final int vis;
+  final int visRequired;
+
+  /// ms since the last delivered frame (meaningful while stalled).
+  final int stalledForMs;
+
+  /// Person-lock reason of the latest frame (occluded / multi-person).
+  final LockReason lock;
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     // Build tag kept in sync with pubspec.yaml version (build number).
-    const buildTag = 'b19';
+    const buildTag = 'b20';
     final String lensLabel = lens == CameraLensDirection.front ? 'front' : 'back';
     final String text;
     final Color bg;
     final Color fg;
 
-    // Stalled feed: frames stopped arriving for >500ms.
+    // Stalled feed: frames stopped arriving >500ms ago — or never started
+    // within 5s of camera-ready (hard stall, distinct red message).
     if (stalled && frames > 0) {
-      text = '$buildTag · STALLED ${frames}fr · last ${(DateTime.now().millisecondsSinceEpoch - frames)}ms ago';
+      text = '$buildTag · STALLED $frames fr · last frame ${stalledForMs}ms ago'
+          ' · $backend';
+      bg = const Color(0xFFC62828); // red
+      fg = Colors.white;
+    } else if (stalled && frames == 0) {
+      text = '$buildTag · NO FRAMES delivered — camera on, stream stalled';
       bg = const Color(0xFFC62828); // red
       fg = Colors.white;
     } else if (error != null) {
@@ -1871,7 +2036,7 @@ class _PipelineStatus extends StatelessWidget {
       bg = const Color(0xFFC62828); // red — the strip must be unmissable
       fg = Colors.white;
     } else if (frames == 0) {
-      // Watchdog: if ready for >5s and no frames, it's a hard error.
+      // Camera warming up (the watchdog above catches never-frames).
       text = '$buildTag · camera $lensLabel · starting feed…';
       bg = p.track.withValues(alpha: 0.6);
       fg = p.ink;
@@ -1882,17 +2047,30 @@ class _PipelineStatus extends StatelessWidget {
           ' · joints $joints/33 · $backend · ${fps.toStringAsFixed(1)} fps';
       bg = const Color(0xFFF9A825); // amber — pipeline runs, nobody seen
       fg = Colors.black87;
+    } else if (lock == LockReason.occluded) {
+      // Poses found but too few required landmarks cleared the confidence
+      // floor — counting cannot run; this is the gate evidence readout.
+      text = '$buildTag · frames $frames · poses $poses · OCCLUDED'
+          ' · vis $vis/$visRequired · joints $joints/33 · $backend';
+      bg = const Color(0xFFF9A825); // amber — adjust distance/framing
+      fg = Colors.black87;
+    } else if (lock == LockReason.multiPerson) {
+      text = '$buildTag · frames $frames · poses $poses · MULTI-PERSON LOCK'
+          ' · joints $joints/33 · $backend';
+      bg = const Color(0xFFF9A825); // amber — stand alone in frame
+      fg = Colors.black87;
     } else if (!drawing) {
-      // ML Kit returned poses but overlay drew nothing (multi-person, joint floor, etc.).
+      // ML Kit returned poses but overlay drew nothing (joint floor, etc.).
       text = '$buildTag · camera $lensLabel · frames $frames · poses $poses'
           ' · overlay SUPPRESSED · joints $joints/33 · $backend';
       bg = const Color(0xFFF9A825); // amber — detected but not drawn
       fg = Colors.black87;
     } else {
       // Healthy: include transform fingerprint so one paste settles
-      // rotation/aspect/mirror questions.
+      // rotation/aspect/mirror questions; vis is the gate margin.
       text = '$buildTag · camera $lensLabel · frames $frames · poses $poses'
-          ' · joints $joints/33 · $backend · $inferMs ms · ${fps.toStringAsFixed(1)} fps'
+          ' · vis $vis/$visRequired · joints $joints/33 · $backend · $inferMs ms'
+          ' · ${fps.toStringAsFixed(1)} fps'
           ' · rot${rot * 90} · prev${previewW}x$previewH · buf${bufferW}x$bufferH'
           ' · mirror${mirror ? "Y" : "N"}';
       bg = p.track.withValues(alpha: 0.35);
@@ -2519,6 +2697,9 @@ class _HudSnapshot {
     required this.rot,
     required this.lastFrameAgeMs,
     required this.stalled,
+    // Round-9 diagnostics (defaults keep the const initial instance valid):
+    this.vis = 0,
+    this.visRequired = 0,
   });
 
   static const _HudSnapshot initial = _HudSnapshot(
@@ -2634,6 +2815,11 @@ class _HudSnapshot {
   final int rot;
   /// Milliseconds since the last analyzed frame arrived (-1 = none yet).
   final int lastFrameAgeMs;
+
+  /// Round-9: visible required landmarks vs the exercise's requirement.
+  final int vis;
+  final int visRequired;
+
   /// True if lastFrameAgeMs > 500 (feed appears stalled).
   final bool stalled;
 }
