@@ -5,15 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:workmanager/workmanager.dart';
 
+import 'app/app_router.dart';
 import 'core/audio/sound_engine.dart';
 import 'core/config/supabase_config.dart';
 import 'core/notification/notification_engine.dart';
 import 'core/notification/reminder_worker.dart';
-import 'core/pose/exercise_catalog.dart';
 import 'core/storage/hive_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
-import 'presentation/navigation/app_router.dart';
+import 'features/workout/domain/pose/exercise_catalog.dart';
 
 /// FixPose app entry point.
 ///
