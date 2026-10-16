@@ -38,9 +38,9 @@ android {
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
             // Batch 8: R8 shrink + minify for the release APK (smaller
-            // download, faster install). AAR consumer rules (ML Kit,
-            // tasks-vision, TFLite) keep their natives; drift/json use
-            // codegen, not reflection. Verified by release smoke builds.
+            // download, faster install). ML Kit AAR consumer rules keep
+            // its natives; drift/json use codegen, not reflection. Verified
+            // by release smoke builds.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -53,8 +53,6 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    // Batch 5 pose stack: MediaPipe Tasks Vision (PoseLandmarker heavy).
-    implementation("com.google.mediapipe:tasks-vision:0.10.14")
 }
 
 kotlin {
